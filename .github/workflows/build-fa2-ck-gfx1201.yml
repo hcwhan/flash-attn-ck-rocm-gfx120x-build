@@ -91,8 +91,9 @@ jobs:
         working-directory: C:\fa\flash-attention
         run: |
           New-Item -ItemType Directory -Force -Path $env:GITHUB_WORKSPACE\dist | Out-Null
+          python -m pip install numpy
           . $env:GITHUB_WORKSPACE\build\setup-rocm-env.ps1 -PythonExe python
-          python -m pip wheel . --no-build-isolation -w $env:GITHUB_WORKSPACE\dist -v
+          python -m pip wheel . --no-build-isolation --no-deps -w $env:GITHUB_WORKSPACE\dist -v
           Get-ChildItem $env:GITHUB_WORKSPACE\dist
 
       - name: CPU smoke test

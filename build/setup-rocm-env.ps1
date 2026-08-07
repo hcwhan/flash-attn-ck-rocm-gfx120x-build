@@ -21,10 +21,13 @@ if ($LASTEXITCODE -ne 0) {
 
 $llvmBin = Join-Path $rocmRoot "lib\llvm\bin"
 $rocmBin = Join-Path $rocmRoot "bin"
+$deviceLibPath = Join-Path $rocmRoot "lib\llvm\amdgcn\bitcode"
 
 $env:ROCM_HOME = $rocmRoot
 $env:ROCM_PATH = $rocmRoot
 $env:HIP_PATH = $rocmRoot
+$env:HIP_DEVICE_LIB_PATH = $deviceLibPath
+$env:DEVICE_LIB_PATH = $deviceLibPath
 $env:PATH = "$llvmBin;$rocmBin;$env:PATH"
 $env:CC = "clang-cl"
 $env:CXX = "clang-cl"
@@ -37,6 +40,7 @@ $env:FLASH_ATTENTION_FORCE_BUILD = "TRUE"
 $env:BUILD_TARGET = "rocm"
 
 Write-Host "ROCM_HOME=$env:ROCM_HOME"
+Write-Host "HIP_DEVICE_LIB_PATH=$env:HIP_DEVICE_LIB_PATH"
 Write-Host "hipcc=$(Get-Command hipcc -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
 Write-Host "clang-cl=$(Get-Command clang-cl -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
 
