@@ -1,5 +1,7 @@
 # flash-attn-rocm-gfx1201-build
 
+[中文文档](README.zh-CN.md)
+
 GitHub Actions workflow to build **FlashAttention 2 CK backend** for **Windows / gfx1201 / PyTorch 2.12.0+rocm7.14.0**.
 
 ## Target
@@ -15,9 +17,10 @@ GitHub Actions workflow to build **FlashAttention 2 CK backend** for **Windows /
 
 ## Trigger
 
-- Push to `main`
 - Manual: Actions -> **Build FlashAttention CK (Windows gfx1201)** -> Run workflow
-- Tag: `fa-ck-v*`
+- Tag push: `fa-ck-v*`
+
+> Push to `main` does **not** auto-trigger builds (avoids duplicate runs when pushing workflow fixes).
 
 ## Output
 
@@ -31,9 +34,15 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 ## Install on ComfyUI portable Python
 
+Replace `<ComfyUI>` with your ComfyUI root directory:
+
 ```powershell
-$PY = "E:\LLM\ComfyUI\python_embeded\python.exe"
+$PY = "<ComfyUI>\python_embeded\python.exe"
 & $PY -m pip install .\downloaded.whl
 ```
 
 Then switch ComfyUI launch arg from `--use-pytorch-cross-attention` to `--use-flash-attention`.
+
+## Repository
+
+https://github.com/hcwhan/flash-attn-rocm-gfx1201-build

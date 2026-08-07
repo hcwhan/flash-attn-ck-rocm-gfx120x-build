@@ -12,14 +12,12 @@ on:
         required: false
         default: "4"
   push:
-    branches:
-      - main
     tags:
       - "fa-ck-v*"
 
 concurrency:
   group: build-fa2-ck-gfx1201
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   PYTHON_VERSION: "3.12"
@@ -75,20 +73,27 @@ jobs:
 
       - name: Checkout flash-attention
         shell: pwsh
+        env:
+          FA_SRC: C:\fa\flash-attention
         run: |
+          git config --global core.longpaths true
+          if (Test-Path $env:FA_SRC) { Remove-Item -Recurse -Force $env:FA_SRC }
+          New-Item -ItemType Directory -Force -Path C:\fa | Out-Null
           git clone --depth 1 --branch $env:FLASH_ATTN_REF `
             https://github.com/Dao-AILab/flash-attention.git `
-            third_party/flash-attention
-          git -C third_party/flash-attention submodule update --init csrc/composable_kernel
+            $env:FA_SRC
+          git -C $env:FA_SRC submodule update --init csrc/composable_kernel
 
       - name: Build wheel
         shell: pwsh
-        working-directory: third_party/flash-attention
+        env:
+          FA_SRC: C:\fa\flash-attention
+        working-directory: C:\fa\flash-attention
         run: |
-          New-Item -ItemType Directory -Force -Path ../../dist | Out-Null
-          . ../../build/setup-rocm-env.ps1 -PythonExe python
-          python -m pip wheel . --no-build-isolation -w ../../dist -v
-          Get-ChildItem ../../dist
+          New-Item -ItemType Directory -Force -Path $env:GITHUB_WORKSPACE\dist | Out-Null
+          . $env:GITHUB_WORKSPACE\build\setup-rocm-env.ps1 -PythonExe python
+          python -m pip wheel . --no-build-isolation -w $env:GITHUB_WORKSPACE\dist -v
+          Get-ChildItem $env:GITHUB_WORKSPACE\dist
 
       - name: CPU smoke test
         shell: pwsh
@@ -111,7 +116,7 @@ jobs:
         with:
           name: build-logs
           path: |
-            third_party/flash-attention/build
             dist
+            C:\fa\flash-attention\build
           retention-days: 7
           if-no-files-found: ignore
