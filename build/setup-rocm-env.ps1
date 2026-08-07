@@ -33,6 +33,8 @@ $env:CC = "clang-cl"
 $env:CXX = "clang-cl"
 $env:DISTUTILS_USE_SDK = "1"
 $env:GPU_ARCHS = "gfx1201"
+$env:OPT_DIM = "64,128,256"
+$env:FLASHATTENTION_DISABLE_BACKWARD = "TRUE"
 if (-not $env:MAX_JOBS) {
     $env:MAX_JOBS = "4"
 }

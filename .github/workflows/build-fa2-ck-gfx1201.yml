@@ -84,6 +84,13 @@ jobs:
             $env:FA_SRC
           git -C $env:FA_SRC submodule update --init --depth 1 csrc/composable_kernel csrc/cutlass
 
+      - name: Patch flash-attention for inference-only build
+        shell: pwsh
+        env:
+          FA_SRC: C:\fa\flash-attention
+        run: |
+          . $env:GITHUB_WORKSPACE\build\patch-fa-inference.ps1 -FlashAttentionRoot $env:FA_SRC
+
       - name: Build wheel
         shell: pwsh
         env:

@@ -5,6 +5,8 @@
   "hip": "7.14.0",
   "rocm_index": "https://repo.amd.com/rocm/whl-multi-arch/",
   "gpu_archs": "gfx1201",
+  "opt_dim": "64,128,256",
+  "inference_only": true,
   "flash_attention_ref": "main",
   "flash_attention_min_commit": "5301a359f59ef8fa10f211618d9f7a69716a8898",
   "flash_attention_note": "v2.8.3.post1 lacks gfx1201 in allowed_archs; need main after PR #2400",

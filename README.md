@@ -22,6 +22,14 @@ GitHub Actions workflow to build **FlashAttention 2 CK backend** for **Windows /
 
 > Push to `main` does **not** auto-trigger builds (avoids duplicate runs when pushing workflow fixes).
 
+## Build profile
+
+This workflow builds an **inference-only** wheel for ComfyUI:
+
+- CK kernels: **fwd only** (no bwd / kv-cache variants)
+- `OPT_DIM=64,128,256` (covers common diffusion head dims)
+- Fits GitHub hosted runner **6h** timeout; full upstream build needs ~20h+
+
 ## Output
 
 Artifact: `flash-attn-ck-gfx1201-cp312-rocm714`
