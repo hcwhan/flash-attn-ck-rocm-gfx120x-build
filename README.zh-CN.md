@@ -12,7 +12,7 @@
 | 系统 | Windows |
 | Python | 3.12 |
 | PyTorch | `2.12.0+rocm7.14.0` |
-| flash-attention | 最新 tag（`v2.8.3.post1`） |
+| flash-attention | `main`（含 PR [#2400](https://github.com/Dao-AILab/flash-attention/pull/2400) RDNA4 支持；tag `v2.8.3.post1` 不含 `gfx1201`） |
 | Runner | `windows-2022`（仅 GitHub 托管） |
 
 ## 触发方式

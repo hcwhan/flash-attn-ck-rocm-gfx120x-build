@@ -12,7 +12,7 @@ GitHub Actions workflow to build **FlashAttention 2 CK backend** for **Windows /
 | OS | Windows |
 | Python | 3.12 |
 | PyTorch | `2.12.0+rocm7.14.0` |
-| flash-attention | latest tag (`v2.8.3.post1`) |
+| flash-attention | `main` (includes RDNA4 via PR [#2400](https://github.com/Dao-AILab/flash-attention/pull/2400); tag `v2.8.3.post1` lacks `gfx1201`) |
 | Runner | `windows-2022` (hosted only) |
 
 ## Trigger
