@@ -1,0 +1,117 @@
+name: Build FlashAttention CK (Windows gfx1201)
+
+on:
+  workflow_dispatch:
+    inputs:
+      flash_attn_ref:
+        description: "flash-attention git ref (tag/branch/commit)"
+        required: false
+        default: "v2.8.3.post1"
+      max_jobs:
+        description: "Parallel compile jobs (use 2 if OOM on hosted runner)"
+        required: false
+        default: "4"
+  push:
+    branches:
+      - main
+    tags:
+      - "fa-ck-v*"
+
+concurrency:
+  group: build-fa2-ck-gfx1201
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.12"
+  PYTORCH_VERSION: "2.12.0+rocm7.14.0"
+  TORCH_DEVICE: "gfx1201"
+  ROCM_INDEX: "https://repo.amd.com/rocm/whl-multi-arch/"
+  GPU_ARCHS: "gfx1201"
+  FLASH_ATTN_REF: ${{ github.event.inputs.flash_attn_ref || 'v2.8.3.post1' }}
+  MAX_JOBS: ${{ github.event.inputs.max_jobs || '4' }}
+
+jobs:
+  build:
+    name: build-win-gfx1201
+    runs-on: windows-2022
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Upgrade pip tooling
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip wheel setuptools psutil packaging ninja
+
+      - name: Install pinned PyTorch ROCm
+        shell: pwsh
+        run: |
+          python -m pip install --no-cache-dir `
+            --index-url $env:ROCM_INDEX `
+            "torch[device-${{ env.TORCH_DEVICE }}]==${{ env.PYTORCH_VERSION }}"
+
+      - name: Install ROCm devel headers
+        shell: pwsh
+        run: |
+          python -m pip install --no-cache-dir `
+            --index-url $env:ROCM_INDEX `
+            "rocm[devel]==7.14.0"
+
+      - name: Verify torch and rocm toolchain
+        shell: pwsh
+        run: |
+          python -c "import torch; print('torch', torch.__version__); print('hip', torch.version.hip); print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)"
+          python -c "import importlib.util, os; s=importlib.util.find_spec('_rocm_sdk_core'); print('rocm_sdk_core', os.path.dirname(s.origin))"
+
+      - name: Checkout flash-attention
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch $env:FLASH_ATTN_REF `
+            https://github.com/Dao-AILab/flash-attention.git `
+            third_party/flash-attention
+          git -C third_party/flash-attention submodule update --init csrc/composable_kernel
+
+      - name: Build wheel
+        shell: pwsh
+        working-directory: third_party/flash-attention
+        run: |
+          New-Item -ItemType Directory -Force -Path ../../dist | Out-Null
+          . ../../build/setup-rocm-env.ps1 -PythonExe python
+          python -m pip wheel . --no-build-isolation -w ../../dist -v
+          Get-ChildItem ../../dist
+
+      - name: CPU smoke test
+        shell: pwsh
+        run: |
+          $whl = Get-ChildItem dist/*.whl | Select-Object -First 1
+          if (-not $whl) { throw 'No wheel produced' }
+          python -m pip install $whl.FullName
+          python -c "from flash_attn import flash_attn_func; import flash_attn_2_cuda; print('OK', flash_attn_2_cuda.__file__); print([x for x in dir(flash_attn_2_cuda) if not x.startswith('_')])"
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flash-attn-ck-gfx1201-cp312-rocm714
+          path: dist/*.whl
+          retention-days: 30
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            third_party/flash-attention/build
+            dist
+          retention-days: 7
+          if-no-files-found: ignore
