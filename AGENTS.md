@@ -9,7 +9,7 @@
 | **serial** | prep → 全量 `bdist_wheel` → smoke test |
 | **parallel** | prep → compile-d32\|d64\|d128\|d256 → link-wheel → smoke test |
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/compile/link_parallel_wheel.py`。Cache 前缀：`serial-v3` / `parallel-v3-d{dim}`（精确 key，无 `restore-keys`；指纹含 MSVC 工具集 + ROCm clang）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/compile/link_parallel_wheel.py`。Cache 前缀：`serial-v4` / `parallel-v4-d{dim}`（精确 key，无 `restore-keys`；key 含仓库 commit-id + 工具链指纹（MSVC+clang）+ pip 工具链指纹）。
 
 ## 复用入口
 
@@ -41,7 +41,7 @@
 | `fa-prep-artifact` / `fa-plan-opt-dim-matrix` | prep / parallel matrix |
 | `fa-read-version-lock` 等 | 被 bootstrap 调用 |
 
-`hashFiles` 内联于 `fa-build-with-cache` 的 `cache-key`（workflow/job `env` 均不支持；parallel/serial 共用同一文件列表）。Workflow `env`：`MAX_JOBS`/`FA_SRC`/`FA_ARTIFACT`/`FA_STAGING`/`SKIP_CACHE_RESTORE`。
+缓存 key 含仓库 commit-id（覆盖 build 脚本/lock/action 全部仓内输入）+ 工具链指纹（MSVC+clang，镜像更新）+ pip 工具链指纹（pip/setuptools/wheel/ninja/packaging/psutil，运行时 `pip freeze` 观测）。Workflow `env`：`MAX_JOBS`/`FA_SRC`/`FA_ARTIFACT`/`FA_STAGING`/`SKIP_CACHE_RESTORE`。
 
 **有意不合并：** compile 阶段 `get-fa-release-dir.ps1` dim 校验 vs link 阶段 `validate_staging`；四 shard 重复编 shared obj（link 只用 d32）；parallel link-wheel 无 ninja cache；obj artifact 名 `d{dim}` 即 staging 子目录名（勿 normalize）。
 
@@ -51,7 +51,7 @@
 |----------|------------|
 | `flash_attention_build_commit`、`flash_attention_repo`、`opt_dim`、`expected_wheel_pattern`、`wheel_artifact_name`、`python`、`pytorch`、`hip`、`gpu_archs`… | `flash_attention_min_commit`、`flash_attention_build_commit_date` |
 
-prep clone `flash_attention_build_commit` 并输出 `fa-commit-sha`（lock 值，供 cache key）；不参与逻辑的字段不得进脚本分支。
+prep clone `flash_attention_build_commit`；不参与逻辑的字段不得进脚本分支。
 
 ## 设计决策
 
@@ -75,7 +75,7 @@ prep clone `flash_attention_build_commit` 并输出 `fa-commit-sha`（lock 值�
 
 **不要添加：** 双源校验、manifest 读回自证、`FA_SKIP_*`、多候选目录排序、git 考古、薄 one-liner 包装、排障用 build-log artifact、lock 只读字段进逻辑。
 
-**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；patch before-state（含 mha_bwd guard 前置校验）；smoke 产物校验（.pyd 体积 / CXX11_ABI / dim 符号 / METADATA）；cache 精确 key 含 FA commit。
+**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；patch before-state（含 mha_bwd guard 前置校验）；smoke 产物校验（.pyd 体积 / CXX11_ABI / dim 符号 / METADATA）；cache 精确 key 含仓库 commit-id。
 
 **改代码前：** 连续 CI 是否必发生？信息是否已在 lock/env/上游 output？能否复用上表入口？能删则删。
 

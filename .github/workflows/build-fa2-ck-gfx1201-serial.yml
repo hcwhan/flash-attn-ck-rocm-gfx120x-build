@@ -34,8 +34,6 @@ jobs:
     name: prep-fa-src
     runs-on: windows-2022
     timeout-minutes: 45
-    outputs:
-      fa-commit-sha: ${{ steps.fa-prep.outputs.fa-commit-sha }}
 
     steps:
       - name: Checkout build repo
@@ -64,15 +62,19 @@ jobs:
           fa-src: ${{ env.FA_SRC }}
           artifact-name: ${{ env.FA_ARTIFACT }}
 
-      - name: Fingerprint MSVC toolset for cache key
+      - name: Fingerprint toolchain for cache key
         id: msvc-fp
-        uses: ./.github/actions/fa-msvc-fingerprint
+        uses: ./.github/actions/fa-toolchain-fingerprint
 
       - name: Build wheel with ninja cache
         uses: ./.github/actions/fa-build-with-cache
         with:
           fa-src: ${{ env.FA_SRC }}
-          cache-key: fa2-ck-gfx1201-serial-v3-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/compile/compile-opt-dim.ps1', 'build/compile/link_parallel_wheel.py', 'build/wheel/build-bdist-wheel.ps1', 'build/common/paths.ps1', 'build/common/get-fa-release-dir.ps1', 'build/common/get-rocm-sdk-paths.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}-msvc${{ steps.msvc-fp.outputs.msvc-hash }}
+          # Repository commit covers all build inputs that live in this repo
+          # (scripts, VERSION.lock.json incl. the pinned FA commit); the runtime
+          # fingerprints cover external inputs: MSVC/clang toolchain (image
+          # updates) and the unpinned pip toolchain installs.
+          cache-key: fa2-ck-gfx1201-serial-v4-${{ github.sha }}-msvc${{ steps.msvc-fp.outputs.msvc-hash }}-pip${{ steps.msvc-fp.outputs.pip-hash }}
           skip-restore: ${{ env.SKIP_CACHE_RESTORE }}
           run: |
             . $env:GITHUB_WORKSPACE\build\wheel\build-bdist-wheel.ps1 `

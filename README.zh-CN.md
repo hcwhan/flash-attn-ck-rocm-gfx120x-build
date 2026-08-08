@@ -58,8 +58,8 @@ ComfyUI **推理专用** wheel：
 
 | Workflow | 用途 | 触发 |
 |----------|------|------|
-| **Build FlashAttention CK serial (Windows gfx1201)** | 单 job 全量编译 + cache（`serial-v3`） | **仅手动** |
-| **Build FlashAttention CK parallel (Windows gfx1201)** | OPT_DIM 分片 compile + link（`parallel-v3-d{dim}`） | **仅手动** |
+| **Build FlashAttention CK serial (Windows gfx1201)** | 单 job 全量编译 + cache（`serial-v4`） | **仅手动** |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | OPT_DIM 分片 compile + link（`parallel-v4-d{dim}`） | **仅手动** |
 
 > 推送到 `main` **不会**自动触发编译。
 
@@ -85,7 +85,7 @@ ComfyUI **推理专用** wheel：
 | `compile-d32` … `d256` | 各编一个 OPT_DIM shard，上传 `.obj` | 各 6 h |
 | `link-wheel` | 合并 obj + link + 打 wheel + CPU smoke test | 6 h |
 
-- Cache key 含 FA commit SHA 与工具链指纹（MSVC 工具集 + ROCm clang）；**仅精确匹配**（无 `restore-keys`）。串行 `serial-v3`，并行 `parallel-v3-d{dim}`，互不共用。
+- Cache key 含仓库 commit-id 与工具链指纹（MSVC 工具集 + ROCm clang + pip 工具链版本）；**仅精确匹配**（无 `restore-keys`）。串行 `serial-v4`，并行 `parallel-v4-d{dim}`，互不共用。
 - 四 shard 各编 shared obj；link 仅使用 **lock `opt_dim` 第一档**（当前 `32`）的 shared obj。
 
 ### 构建阶段

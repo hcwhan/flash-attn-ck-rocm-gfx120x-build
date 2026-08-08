@@ -1,10 +1,13 @@
-name: FA MSVC toolset fingerprint
-description: Emit a short SHA-256 of the MSVC VC tools version and ROCm clang version for ninja cache key isolation (windows-2022 image updates change the MSVC toolset; the pip-pinned rocm[devel] ships the clang compiler). Objects compiled with a different toolchain must not be reused
+name: FA toolchain fingerprint
+description: Emit short SHA-256 fingerprints of the MSVC VC tools version, ROCm clang version, and installed pip toolchain for ninja cache key isolation (windows-2022 image updates change the MSVC toolset; the pip-pinned rocm[devel] ships the clang compiler; pip toolchain installs are unpinned). Objects compiled with a different toolchain must not be reused
 
 outputs:
   msvc-hash:
     description: 12-hex fingerprint of the MSVC VC tools version + ROCm clang version
     value: ${{ steps.fp.outputs.msvc-hash }}
+  pip-hash:
+    description: 12-hex fingerprint of the installed pip toolchain (pip/setuptools/wheel/ninja/packaging/psutil)
+    value: ${{ steps.fp.outputs.pip-hash }}
 
 runs:
   using: composite
@@ -36,3 +39,20 @@ runs:
         $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes("$toolset|$clangVersion"))).Substring(0, 12).ToLowerInvariant()
         Write-Host "MSVC toolset: $toolset | clang: $clangVersion (cache fingerprint $hash)"
         "msvc-hash=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+        # pip toolchain fingerprint: pip/setuptools/wheel/ninja/packaging/psutil are
+        # installed unpinned by fa-rocm-toolchain, so their versions are external
+        # inputs that change compiled output -- observe at runtime like the
+        # MSVC/clang toolchain instead of trusting an unpinned install.
+        $pipPkgs = @('pip', 'setuptools', 'wheel', 'ninja', 'packaging', 'psutil')
+        $pipFreeze = python -m pip freeze 2>$null
+        $pipVersions = foreach ($pkg in $pipPkgs) {
+            $line = $pipFreeze | Where-Object { $_ -like "$pkg==*" } | Select-Object -First 1
+            if (-not $line) {
+                throw "pip toolchain package not found: $pkg"
+            }
+            $line
+        }
+        $pipHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($pipVersions | Sort-Object) -join ';'))).Substring(0, 12).ToLowerInvariant()
+        Write-Host "pip toolchain: $($pipVersions -join ';') (fingerprint $pipHash)"
+        "pip-hash=$pipHash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8

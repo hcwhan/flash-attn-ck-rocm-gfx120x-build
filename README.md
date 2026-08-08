@@ -44,8 +44,8 @@ Prep clones **`flash_attention_build_commit`** (`fetch` + `checkout FETCH_HEAD`)
 
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
-| **Build FlashAttention CK serial (Windows gfx1201)** | Single-job full build + cache (`serial-v3`) | **Manual only** |
-| **Build FlashAttention CK parallel (Windows gfx1201)** | OPT_DIM shard compile + link (`parallel-v3-d{dim}`) | **Manual only** |
+| **Build FlashAttention CK serial (Windows gfx1201)** | Single-job full build + cache (`serial-v4`) | **Manual only** |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | OPT_DIM shard compile + link (`parallel-v4-d{dim}`) | **Manual only** |
 
 Push to `main` does **not** auto-trigger builds.
 
@@ -71,7 +71,7 @@ Push to `main` does **not** auto-trigger builds.
 | `compile-d32` … `d256` | one OPT_DIM shard each, upload `.obj` | 6 h each |
 | `link-wheel` | merge objs + link + wheel + CPU smoke test | 6 h |
 
-Cache keys include FA commit SHA and a toolchain fingerprint (MSVC toolset + ROCm clang); **exact match only** (no `restore-keys`). Serial uses `serial-v3`, parallel uses `parallel-v3-d{dim}` — isolated from each other. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
+Cache keys include the repository commit SHA and a toolchain fingerprint (MSVC toolset + ROCm clang + pip toolchain versions); **exact match only** (no `restore-keys`). Serial uses `serial-v4`, parallel uses `parallel-v4-d{dim}` — isolated from each other. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
 
 ## Output
 

@@ -9,10 +9,7 @@ inputs:
     description: Artifact name for upload-artifact
     required: true
 
-outputs:
-  fa-commit-sha:
-    description: Resolved flash-attention commit SHA after clone and patch
-    value: ${{ steps.prep.outputs.fa-commit-sha }}
+outputs: {}
 
 runs:
   using: composite

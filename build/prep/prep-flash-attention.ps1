@@ -38,10 +38,6 @@ function Initialize-FlashAttentionRepo {
 Initialize-FlashAttentionRepo -Root $FlashAttentionRoot -Repo $FLASH_ATTENTION_REPO -Ref $FLASH_ATTENTION_BUILD_COMMIT
 git -C $FlashAttentionRoot submodule update --init --depth 1 csrc/composable_kernel csrc/cutlass
 
-if ($env:GITHUB_OUTPUT) {
-    "fa-commit-sha=$FLASH_ATTENTION_BUILD_COMMIT" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-}
-
 . (Join-Path $BuildRoot "patch\patch-fa-inference.ps1") -FlashAttentionRoot $FlashAttentionRoot
 
 Remove-Item -Recurse -Force (Join-Path $FlashAttentionRoot ".git")
