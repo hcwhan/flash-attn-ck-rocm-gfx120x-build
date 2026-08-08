@@ -5,22 +5,10 @@
   "hip": "7.14.0",
   "rocm_index": "https://repo.amd.com/rocm/whl-multi-arch/",
   "gpu_archs": "gfx1201",
-  "gpu_arch_note": "RDNA4 Navi 48",
-  "supported_gpus_gfx1201": [
-    "Radeon RX 9070 XT",
-    "Radeon RX 9070",
-    "Radeon RX 9070 GRE",
-    "Radeon AI PRO R9700",
-    "Radeon AI PRO R9700S",
-    "Radeon AI PRO R9600D"
-  ],
   "opt_dim": "32,64,128,256",
-  "inference_only": true,
-  "flash_attention_ref": "main",
-  "flash_attention_min_commit": "5301a359f59ef8fa10f211618d9f7a69716a8898",
-  "flash_attention_note": "v2.8.3.post1 lacks gfx1201 in allowed_archs; need main after PR #2400",
   "flash_attention_repo": "https://github.com/Dao-AILab/flash-attention.git",
-  "cxx11_abi": true,
+  "flash_attention_min_commit": "5301a359f59ef8fa10f211618d9f7a69716a8898",
+  "flash_attention_build_commit": "5301a359f59ef8fa10f211618d9f7a69716a8898",
   "expected_wheel_pattern": "flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl",
-  "link_parallel_wheel_note": "build/link_parallel_wheel.py monkey-patches torch.utils.cpp_extension._run_ninja_build; validated against pytorch above"
+  "wheel_artifact_name": "flash-attn-ck-gfx1201-cp312-rocm714"
 }

@@ -2,17 +2,53 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
 import sys
+import time
 from pathlib import Path
 
 _PATCHED = False
 _ORIGINAL_RUN_NINJA = None
 
-EXPECTED_DIMS = ("32", "64", "128", "256")
 DIM_PATTERN = re.compile(r"_d(\d+)_")
+
+
+def load_opt_dims(workspace_root: Path | None = None) -> tuple[str, ...]:
+    """Resolve full OPT_DIM tiers from env or VERSION.lock.json."""
+    opt_dim = os.environ.get("OPT_DIM", "").strip()
+    if opt_dim and "," in opt_dim:
+        dims = tuple(part.strip() for part in opt_dim.split(",") if part.strip())
+        if dims:
+            return dims
+
+    if workspace_root is not None:
+        lock_path = workspace_root / "VERSION.lock.json"
+        if lock_path.is_file():
+            lock = json.loads(lock_path.read_text(encoding="utf-8"))
+            raw = str(lock.get("opt_dim", "")).strip()
+            dims = tuple(part.strip() for part in raw.split(",") if part.strip())
+            if dims:
+                return dims
+
+    if opt_dim:
+        return (opt_dim,)
+
+    raise SystemExit(
+        "Cannot resolve OPT_DIM list: set comma-separated OPT_DIM env or pass --workspace-root"
+    )
+
+
+def resolve_primary_dim(primary_dim: str, expected_dims: tuple[str, ...]) -> str:
+    if primary_dim:
+        if primary_dim not in expected_dims:
+            raise SystemExit(
+                f"primary_dim {primary_dim} is not in OPT_DIM list: {', '.join(expected_dims)}"
+            )
+        return primary_dim
+    return expected_dims[0]
 
 
 def _exec_setup_py(fa_src: Path, command_argv: list[str]) -> None:
@@ -39,14 +75,21 @@ def build_ext_only(fa_src: Path, *, verbose: bool = False) -> None:
     _exec_setup_py(fa_src, argv)
 
 
-def validate_staging(staging_root: Path, primary_dim: str = "32") -> None:
+def validate_staging(
+    staging_root: Path,
+    *,
+    expected_dims: tuple[str, ...],
+    primary_dim: str,
+) -> None:
     """Fail fast before link if compile artifacts are missing or cross-contaminated."""
     staging_root = staging_root.resolve()
     if not staging_root.is_dir():
         raise SystemExit(f"Staging root missing: {staging_root}")
 
+    primary_dim = resolve_primary_dim(primary_dim, expected_dims)
+
     summary: dict[str, int] = {}
-    for dim in EXPECTED_DIMS:
+    for dim in expected_dims:
         shard = staging_root / f"d{dim}"
         if not shard.is_dir():
             raise SystemExit(f"Missing OPT_DIM staging dir: {shard}")
@@ -79,12 +122,28 @@ def validate_staging(staging_root: Path, primary_dim: str = "32") -> None:
 
     print(
         "Link staging validation OK: "
-        + ", ".join(f"d{dim}={summary[dim]}" for dim in EXPECTED_DIMS),
+        + ", ".join(f"d{dim}={summary[dim]}" for dim in expected_dims),
         flush=True,
     )
 
 
-def install_patch(staging_root: Path, primary_dim: str = "32") -> None:
+def _newest_generated_cu_mtime(fa_src: Path) -> float:
+    """Return the latest mtime of generate.py outputs under fa_src/build."""
+    build_dir = fa_src / "build"
+    latest = 0.0
+    if build_dir.is_dir():
+        for cu in build_dir.glob("fmha_*.cu"):
+            latest = max(latest, cu.stat().st_mtime)
+    return latest
+
+
+def _stamp_prebuilt_obj(dest: Path, fa_src: Path) -> None:
+    """Mark seeded .obj newer than freshly generated .cu so ninja skips recompile."""
+    stamp = max(time.time(), _newest_generated_cu_mtime(fa_src) + 1.0)
+    os.utime(dest, (stamp, stamp))
+
+
+def install_patch(staging_root: Path, fa_src: Path, primary_dim: str = "") -> None:
     """Patch torch cpp_extension to seed prebuilt .obj files before ninja runs."""
     global _PATCHED, _ORIGINAL_RUN_NINJA
     if _PATCHED:
@@ -111,6 +170,7 @@ def install_patch(staging_root: Path, primary_dim: str = "32") -> None:
             dest = temp_release / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
+            _stamp_prebuilt_obj(dest, fa_src)
             copied += 1
 
         for obj in primary_dir.rglob("*.obj"):
@@ -157,7 +217,8 @@ def main() -> None:
     parser.add_argument("--fa-src", type=Path)
     parser.add_argument("--staging-root", type=Path)
     parser.add_argument("--dist-dir", type=Path)
-    parser.add_argument("--primary-dim", default="32")
+    parser.add_argument("--workspace-root", type=Path)
+    parser.add_argument("--primary-dim", default="")
     parser.add_argument(
         "--compile-only",
         action="store_true",
@@ -181,12 +242,20 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    workspace_root = args.workspace_root
+    expected_dims = load_opt_dims(workspace_root)
+    primary_dim = resolve_primary_dim(args.primary_dim, expected_dims)
+
     if args.validate_only:
         if args.staging_root is None:
             raise SystemExit("--staging-root is required with --validate-only")
         if not args.staging_root.is_dir():
             raise SystemExit(f"Staging root missing: {args.staging_root}")
-        validate_staging(args.staging_root, primary_dim=args.primary_dim)
+        validate_staging(
+            args.staging_root,
+            expected_dims=expected_dims,
+            primary_dim=primary_dim,
+        )
         return
 
     if args.compile_only:
@@ -216,8 +285,12 @@ def main() -> None:
     if not args.fa_src.is_dir():
         raise SystemExit(f"FA source missing: {args.fa_src}")
 
-    validate_staging(args.staging_root, primary_dim=args.primary_dim)
-    install_patch(args.staging_root, primary_dim=args.primary_dim)
+    validate_staging(
+        args.staging_root,
+        expected_dims=expected_dims,
+        primary_dim=primary_dim,
+    )
+    install_patch(args.staging_root, args.fa_src, primary_dim=primary_dim)
     build_wheel(args.fa_src, args.dist_dir, verbose=args.verbose)
 
 

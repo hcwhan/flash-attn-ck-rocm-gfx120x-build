@@ -1,15 +1,12 @@
 name: Restore FA ninja build cache
-description: Restore flash-attention build/ incremental cache (actions/cache/restore)
+description: Restore flash-attention build/ incremental cache (exact cache-key match only; no cross-commit restore-keys fallback)
 
 inputs:
   fa-src:
     description: flash-attention source root
     required: true
   cache-key:
-    description: Primary cache key
-    required: true
-  restore-keys:
-    description: Multiline restore-keys prefix list
+    description: Primary cache key (must include resolved flash-attention commit SHA)
     required: true
 
 outputs:
@@ -29,4 +26,3 @@ runs:
       with:
         path: ${{ inputs.fa-src }}\build
         key: ${{ inputs.cache-key }}
-        restore-keys: ${{ inputs.restore-keys }}

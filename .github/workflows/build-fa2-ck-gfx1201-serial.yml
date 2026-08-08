@@ -3,27 +3,17 @@ name: Build FlashAttention CK serial (Windows gfx1201)
 on:
   workflow_dispatch:
     inputs:
-      flash_attn_ref:
-        description: "flash-attention git ref (tag/branch/commit)"
-        required: false
-        default: "main"
-      max_jobs:
-        description: "Parallel compile jobs (use 2 if OOM on hosted runner)"
+      ninja_workers:
+        description: "Ninja parallel compile workers per build job (use 2 if OOM on hosted runner)"
         required: false
         default: "4"
-      use_locked_commit:
-        description: "Pin FA source to VERSION.lock.json flash_attention_min_commit"
-        required: false
-        default: false
-        type: boolean
 
 concurrency:
   group: build-fa2-ck-gfx1201-serial
   cancel-in-progress: true
 
 env:
-  FLASH_ATTN_REF: ${{ github.event.inputs.flash_attn_ref || 'main' }}
-  MAX_JOBS: ${{ github.event.inputs.max_jobs || '4' }}
+  MAX_JOBS: ${{ github.event.inputs.ninja_workers || '4' }}
   FA_SRC: C:\fa\flash-attention
   FA_ARTIFACT: fa-src-patched-gfx1201
 
@@ -43,10 +33,8 @@ jobs:
         id: fa-prep
         uses: ./.github/actions/fa-prep-artifact
         with:
-          flash-attn-ref: ${{ env.FLASH_ATTN_REF }}
           fa-src: ${{ env.FA_SRC }}
           artifact-name: ${{ env.FA_ARTIFACT }}
-          use-locked-commit: ${{ github.event.inputs.use_locked_commit && 'true' || 'false' }}
 
   build:
     name: build-win-gfx1201
@@ -82,8 +70,6 @@ jobs:
         with:
           fa-src: ${{ env.FA_SRC }}
           cache-key: fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-${{ needs.prep.outputs.fa-commit-sha }}
-          restore-keys: |
-            fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-
 
       - name: Report cache status
         shell: pwsh
@@ -121,13 +107,17 @@ jobs:
         run: |
           . $env:GITHUB_WORKSPACE\build\smoke-test-wheel.ps1 `
             -DistDir $env:GITHUB_WORKSPACE\dist `
-            -WorkspaceRoot $env:GITHUB_WORKSPACE
+            -WorkspaceRoot $env:GITHUB_WORKSPACE `
+            -FaCommitSha "${{ needs.prep.outputs.fa-commit-sha }}"
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v7
         with:
-          name: flash-attn-ck-gfx1201-cp312-rocm714
-          path: dist/*.whl
+          name: ${{ env.WHEEL_ARTIFACT_NAME }}
+          path: |
+            dist/*.whl
+            dist/*.sha256
+            dist/wheel.manifest.json
           retention-days: 30
 
       - name: Collect build logs on failure

@@ -10,7 +10,7 @@ param(
 
     [string]$StagingRoot = "",
 
-    [string]$PrimaryDim = "32",
+    [string]$PrimaryDim = "",
 
     [string]$PythonExe = "python"
 )
@@ -21,6 +21,12 @@ if (-not (Test-Path $FaSrc)) {
     throw "flash-attention source not found: $FaSrc"
 }
 
+. (Join-Path $WorkspaceRoot "build\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
+
+if ($StagingRoot -and -not $PrimaryDim) {
+    $PrimaryDim = $PrimaryOptDim
+}
+
 . (Join-Path $WorkspaceRoot "build\init-fa-build-env.ps1") `
     -WorkspaceRoot $WorkspaceRoot `
     -PythonExe $PythonExe
@@ -29,10 +35,14 @@ $wheelScript = Join-Path $WorkspaceRoot "build\link_parallel_wheel.py"
 $wheelArgs = @(
     "--fa-src", $FaSrc,
     "--dist-dir", $DistDir,
+    "--workspace-root", $WorkspaceRoot,
     "-v"
 )
 
 if ($StagingRoot) {
+    if (-not $PrimaryDim) {
+        throw "PrimaryDim is required when StagingRoot is set"
+    }
     $wheelArgs += @(
         "--staging-root", $StagingRoot,
         "--primary-dim", $PrimaryDim

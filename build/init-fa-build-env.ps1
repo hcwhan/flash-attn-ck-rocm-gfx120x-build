@@ -15,6 +15,8 @@ if ($OptDim) {
     $env:OPT_DIM = $OptDim
 }
 
-. (Join-Path $WorkspaceRoot "build\setup-rocm-env.ps1") -PythonExe $PythonExe
+. (Join-Path $WorkspaceRoot "build\setup-rocm-env.ps1") `
+    -PythonExe $PythonExe `
+    -WorkspaceRoot $WorkspaceRoot
 
-Write-Host "Build env ready (OPT_DIM=$env:OPT_DIM)"
+Write-Host "Build env ready (GPU_ARCHS=$env:GPU_ARCHS, OPT_DIM=$env:OPT_DIM)"

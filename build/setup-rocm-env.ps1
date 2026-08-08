@@ -1,16 +1,35 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$PythonExe
+    [string]$PythonExe,
+
+    [Parameter(Mandatory = $true)]
+    [string]$WorkspaceRoot
 )
 
 $ErrorActionPreference = "Stop"
+
+$lockPath = Join-Path $WorkspaceRoot "VERSION.lock.json"
+if (-not (Test-Path $lockPath)) {
+    throw "VERSION.lock.json not found: $lockPath"
+}
+
+$lock = Get-Content $lockPath -Raw | ConvertFrom-Json
+$gpuArchs = [string]$lock.gpu_archs
+$optDim = [string]$lock.opt_dim
+
+if (-not $gpuArchs) {
+    throw "VERSION.lock.json gpu_archs is missing"
+}
+if (-not $optDim) {
+    throw "VERSION.lock.json opt_dim is missing"
+}
 
 $pyCode = @"
 import importlib.util, os, subprocess, sys
 
 spec = importlib.util.find_spec('_rocm_sdk_core')
 if spec is None:
-    raise SystemExit('ERROR: _rocm_sdk_core not found. Install torch[device-gfx1201] first.')
+    raise SystemExit('ERROR: _rocm_sdk_core not found. Install torch[device-$gpuArchs] first.')
 core_root = os.path.dirname(spec.origin)
 
 devel_root = None
@@ -65,17 +84,19 @@ $env:PATH = "$llvmBin;$rocmBin;$env:PATH"
 $env:CC = "clang-cl"
 $env:CXX = "clang-cl"
 $env:DISTUTILS_USE_SDK = "1"
-$env:GPU_ARCHS = "gfx1201"
+$env:GPU_ARCHS = $gpuArchs
 if (-not $env:OPT_DIM) {
-    $env:OPT_DIM = "32,64,128,256"
+    $env:OPT_DIM = $optDim
 }
 $env:FLASHATTENTION_DISABLE_BACKWARD = "TRUE"
 if (-not $env:MAX_JOBS) {
+    # PyTorch cpp_extension reads MAX_JOBS for ninja -j N (not GitHub Actions job count).
     $env:MAX_JOBS = "4"
 }
 $env:FLASH_ATTENTION_FORCE_BUILD = "TRUE"
 $env:BUILD_TARGET = "rocm"
 
+Write-Host "GPU_ARCHS=$env:GPU_ARCHS"
 Write-Host "OPT_DIM=$env:OPT_DIM"
 Write-Host "ROCM_HOME=$env:ROCM_HOME"
 Write-Host "HIP_INCLUDE_PATH=$env:HIP_INCLUDE_PATH"

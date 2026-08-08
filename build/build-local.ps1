@@ -3,11 +3,7 @@ param(
 
     [string]$DistDir = "",
 
-    [string]$FlashAttentionRef = "main",
-
-    [string]$MaxJobs = "4",
-
-    [switch]$UseLockedCommit,
+    [string]$NinjaWorkers = "4",
 
     [switch]$SkipPrep,
 
@@ -25,18 +21,12 @@ if (-not $DistDir) {
 
 . (Join-Path $PSScriptRoot "read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
-$env:MAX_JOBS = $MaxJobs
+$env:MAX_JOBS = $NinjaWorkers
 
 if (-not $SkipPrep) {
-    $prepParams = @{
-        FlashAttentionRoot = $FaSrc
-        FlashAttentionRef  = $FlashAttentionRef
-        WorkspaceRoot      = $WorkspaceRoot
-    }
-    if ($UseLockedCommit) {
-        $prepParams.UseLockedCommit = $true
-    }
-    . (Join-Path $PSScriptRoot "prep-flash-attention.ps1") @prepParams
+    . (Join-Path $PSScriptRoot "prep-flash-attention.ps1") `
+        -FlashAttentionRoot $FaSrc `
+        -WorkspaceRoot $WorkspaceRoot
 }
 
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null

@@ -15,8 +15,24 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded into CI via 
 | OS | Windows |
 | Python | 3.12 |
 | PyTorch | `2.12.0+rocm7.14.0` |
-| flash-attention | `main` (includes RDNA4 via PR [#2400](https://github.com/Dao-AILab/flash-attention/pull/2400); tag `v2.8.3.post1` lacks `gfx1201`) |
+| flash-attention | `5301a359…` (`VERSION.lock.json` **`flash_attention_build_commit`**) |
 | Runner | `windows-2022` (hosted only) |
+
+### FlashAttention source pins (`VERSION.lock.json`)
+
+| Field | Role |
+|-------|------|
+| `flash_attention_repo` | Upstream git URL |
+| `flash_attention_min_commit` | Minimum commit with gfx1201 support ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); rarely changed |
+| `flash_attention_build_commit` | Exact commit cloned for each build; **bump this to upgrade FA** |
+| `expected_wheel_pattern` | Glob for the built `.whl` filename (smoke test) |
+| `wheel_artifact_name` | GitHub Actions artifact name for the published wheel bundle |
+
+Rules:
+
+- CI/local always clone **`flash_attention_build_commit`** (no workflow ref input).
+- Prep verifies **`flash_attention_build_commit`** is **not earlier than** **`flash_attention_min_commit`** (`git merge-base --is-ancestor`).
+- Tag `v2.8.3.post1` lacks `gfx1201` in `allowed_archs` — do not set `flash_attention_build_commit` before the minimum.
 
 ### Supported GPUs (`gfx1201`)
 
@@ -39,7 +55,10 @@ This workflow builds an **inference-only** wheel for ComfyUI:
 
 - CK kernels: **fwd + fwd_appendkv + fwd_splitkv** (`generate.py` skips **bwd** → no `fmha_bwd_*` backward kernels in the wheel; forward inference works; **not for** workloads that need attention gradients, e.g. diffusion training or LoRA/fine-tuning with `flash_attn` backward)
 - Compile flag **`-DFLASHATTENTION_DISABLE_BACKWARD`** (enabled by `patch-fa-inference.ps1` with pre/post checks; `setup-rocm-env.ps1` sets `FLASHATTENTION_DISABLE_BACKWARD=TRUE`) — strips backward C++ dispatch in the extension; complements the line above; **no training / backward pass**
+- **Inference-only scope** (not stored in `VERSION.lock.json`): this repo always builds forward-only wheels; do not expect `flash_attn` backward APIs or training workflows to work
+- **C++11 ABI (`cxx11abiTRUE`)** (not stored in `VERSION.lock.json`): the extension must match the pinned PyTorch build using `_GLIBCXX_USE_CXX11_ABI=1` (official ROCm 2.12 wheels). ABI mismatch typically breaks `import flash_attn_2_cuda`. Smoke test checks `expected_wheel_pattern` in `VERSION.lock.json`, which includes the `cxx11abiTRUE` tag
 - `OPT_DIM=32,64,128,256` (same head-dim tiers as upstream default)
+- **`link_parallel_wheel.py` monkey-patch** (not stored in `VERSION.lock.json`): parallel link patches `torch.utils.cpp_extension._run_ninja_build` to merge prebuilt `.obj` files; re-validate when bumping the pinned PyTorch version
 - Fits GitHub hosted runner **6h** timeout; full upstream build needs ~20h+
 
 ### Ninja build scale (inference profile)
@@ -56,7 +75,7 @@ This workflow builds an **inference-only** wheel for ComfyUI:
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
 | **Build FlashAttention CK serial (Windows gfx1201)** | Single-job build + cache resume (`serial-v2`) | **Manual only** |
-| **Build FlashAttention CK parallel (Windows gfx1201)** | 4-way `OPT_DIM` compile + artifact sharding + cache resume (`parallel-v2-d{dim}`) + link | **Manual only** |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | `OPT_DIM` shards from lock (compile + artifact sharding + cache resume `parallel-v2-d{dim}`) + link | **Manual only** |
 
 > Push to `main` does **not** auto-trigger builds.
 
@@ -64,9 +83,9 @@ This workflow builds an **inference-only** wheel for ComfyUI:
 
 | Input | Default | Description |
 |-------|---------|-------------|
-| `flash_attn_ref` | `main` | branch / tag / **commit SHA** |
-| `max_jobs` | `4` | ninja parallelism (use `2` if OOM) |
-| `use_locked_commit` | `false` | when `true`, pin FA source to **`flash_attention_min_commit`** in `VERSION.lock.json` (**recommended for release builds**) |
+| `ninja_workers` | `4` | Ninja parallel compile workers per build job (not CI job count; use `2` if OOM) |
+
+> FA source is always cloned at **`flash_attention_build_commit`** in `VERSION.lock.json` and must meet **`flash_attention_min_commit`**.
 
 ### Shared components
 
@@ -79,7 +98,7 @@ Both workflows share:
 - `build/patch-fa-inference.ps1` — direct `setup.py` edits with pre/post verification
 - `build/prep-flash-attention.ps1`, `build/init-fa-build-env.ps1`, `build/setup-rocm-env.ps1`, `build/build-bdist-wheel.ps1`, `build/smoke-test-wheel.ps1`
 
-Serial / parallel link / parallel compile share `init-fa-build-env.ps1` + in-process `link_parallel_wheel.py`; parallel compile additionally uses `build/compile-opt-dim.ps1`, `build/validate-link-staging.ps1`.
+Serial / parallel link / parallel compile share `init-fa-build-env.ps1` + in-process `link_parallel_wheel.py`; parallel compile additionally uses `build/compile-opt-dim.ps1`. `build/validate-link-staging.ps1` is a manual CLI wrapper only (CI validates inside `link_parallel_wheel.py` during link).
 
 ### Aligned build paths
 
@@ -101,30 +120,36 @@ All three use **in-process `exec_module(setup.py)`** and the same `NinjaBuildExt
 | `build-win-gfx1201` | toolchain, cache restore, `build-bdist-wheel.ps1` | 6 h |
 
 - **Prep / Build split** + **`actions/cache/restore` + `actions/cache/save`** on `build/` (key prefix `serial-v2`, save step runs with `if: always()`) for timeout resume (**Re-run all jobs**).
-- **Cache key** includes the **resolved flash-attention commit SHA** from prep (not just the input ref like `main`), so upstream moves do not reuse stale `.obj` files.
+- **Cache key** includes the **resolved flash-attention commit SHA** from prep (`VERSION.lock.json` pin), so lock bumps do not reuse stale `.obj` files. **Exact key match only** — no `restore-keys` fallback across commits.
 
 ### Parallel (`build-fa2-ck-gfx1201-parallel.yml`, OPT_DIM ×4)
 
 | Job | Role | Timeout |
 |-----|------|---------|
 | `prep-fa-src` | same prep action | 45 min |
-| `compile-d32` … `compile-d256` | one `OPT_DIM` shard each, cache restore, upload `.obj` | 6 h each |
+| `compile-d*` … | one `OPT_DIM` shard each (from lock), cache restore, upload `.obj` | 6 h each |
 | `link-wheel` | validate staging → merge objs + link + wheel | 6 h |
 
 Shorter wall clock (~1–2h) but more total runner minutes. Same wheel artifact as serial.
 
-- **Link pre-check**: `validate-link-staging.ps1` ensures all four staging dirs exist, each shard has dim-specific kernel objs, no cross-shard contamination.
-- **actions/cache** per shard on `build/`, key prefix `parallel-v2-d{dim}` (includes resolved FA commit SHA); restore-keys match hash prefix only (no broad `-gfx1201-` fallback); timeout resume via **Re-run failed jobs** (obj/source artifacts retained **7 days**).
+- **Link pre-check**: `link_parallel_wheel.py` validates staging (four dirs, dim-specific kernel objs, no cross-shard contamination) before merge/link.
+- **actions/cache** per shard on `build/`, key prefix `parallel-v2-d{dim}` (includes resolved FA commit SHA); **exact key match only** (no cross-commit `restore-keys`); timeout resume via **Re-run failed jobs** (obj/source artifacts retained **7 days**).
 - **link-wheel** still requires all four compile jobs to succeed and upload obj artifacts.
-- Each compile shard also builds shared `csrc/flash_attn_ck` objects; link uses **d32** shard for shared objects only (duplicate compile is intentional).
+- Each compile shard also builds shared `csrc/flash_attn_ck` objects; link uses the **first lock `opt_dim` tier** for shared objects only (duplicate compile is intentional).
 
 > Cache keys are isolated: serial uses `serial-v2`, parallel uses `parallel-v2-` (`d32` / `d64` / `d128` / `d256`) — the two workflows do not share cache entries.
 
 ## Output
 
-Artifact: `flash-attn-ck-gfx1201-cp312-rocm714`
+Artifact: **`wheel_artifact_name`** in `VERSION.lock.json` (currently `flash-attn-ck-gfx1201-cp312-rocm714`)
 
-Expected wheel name pattern:
+Includes:
+
+- `flash_attn-*.whl`
+- `flash_attn-*.whl.sha256` (GNU `sha256sum` format)
+- `wheel.manifest.json` (sha256, size, toolchain pins, FA commit)
+
+Expected wheel name pattern (`expected_wheel_pattern` in lock):
 
 ```text
 flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
@@ -134,7 +159,7 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 | Check | Where | What it proves |
 |-------|-------|----------------|
-| CI CPU smoke test | `build/smoke-test-wheel.ps1` | wheel name matches `VERSION.lock.json`, pip install, extension import |
+| CI CPU smoke test | `build/smoke-test-wheel.ps1` | wheel name matches `VERSION.lock.json`, SHA256 checksum + manifest, pip install, extension import |
 | Local GPU smoke test | `build/gpu-smoke-test.ps1` | actual `flash_attn_func` forward on gfx1201 (requires ROCm PyTorch + GPU) |
 
 > CI runs on GitHub **hosted** runners without AMD GPU — **CI pass does not prove GPU kernel correctness**. Run `gpu-smoke-test.ps1` on your RX 9070 machine before deploying to ComfyUI.
@@ -145,10 +170,10 @@ On a Windows machine with MSVC, Python 3.12, and PyTorch ROCm already installed:
 
 ```powershell
 cd flash-attn-rocm-gfx1201-build
-. .\build\build-local.ps1 -UseLockedCommit -GpuSmokeTest
+. .\build\build-local.ps1 -GpuSmokeTest
 ```
 
-Options: `-SkipPrep` (reuse existing `$FaSrc`), `-MaxJobs 2` (if OOM), `-FlashAttentionRef main`.
+Options: `-SkipPrep` (reuse existing `$FaSrc`), `-NinjaWorkers 2` (if OOM).
 
 ## Install on ComfyUI portable Python
 

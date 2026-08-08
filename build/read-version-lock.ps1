@@ -17,18 +17,37 @@ if (-not (Test-Path $lockPath)) {
 
 $lock = Get-Content $lockPath -Raw | ConvertFrom-Json
 
+$optDimString = [string]$lock.opt_dim
+$optDimList = @(
+    $optDimString -split "," |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ }
+)
+if ($optDimList.Count -lt 1) {
+    throw "VERSION.lock.json opt_dim is missing or empty"
+}
+
+$wheelArtifactName = [string]$lock.wheel_artifact_name
+if (-not $wheelArtifactName) {
+    throw "VERSION.lock.json wheel_artifact_name is missing"
+}
+
 $vars = @{
-    PYTHON_VERSION  = [string]$lock.python
-    PYTORCH_VERSION = [string]$lock.pytorch
-    TORCH_DEVICE    = [string]$lock.torch_device_extra
-    ROCM_INDEX      = [string]$lock.rocm_index
-    GPU_ARCHS       = [string]$lock.gpu_archs
-    HIP_VERSION     = [string]$lock.hip
+    PYTHON_VERSION      = [string]$lock.python
+    PYTORCH_VERSION     = [string]$lock.pytorch
+    TORCH_DEVICE        = [string]$lock.torch_device_extra
+    ROCM_INDEX          = [string]$lock.rocm_index
+    GPU_ARCHS           = [string]$lock.gpu_archs
+    HIP_VERSION         = [string]$lock.hip
+    OPT_DIM             = $optDimString
+    PRIMARY_OPT_DIM     = [string]$optDimList[0]
+    WHEEL_ARTIFACT_NAME = $wheelArtifactName
 }
 
 foreach ($name in $vars.Keys) {
     Set-Variable -Name $name -Value $vars[$name] -Scope Script
 }
+Set-Variable -Name OptDimList -Value $optDimList -Scope Script
 
 if ($ExportToGitHubEnv -and $env:GITHUB_ENV) {
     foreach ($name in $vars.Keys) {
@@ -37,4 +56,4 @@ if ($ExportToGitHubEnv -and $env:GITHUB_ENV) {
     Write-Host "Exported VERSION.lock.json to GITHUB_ENV"
 }
 
-Write-Host "VERSION.lock: python=$($vars.PYTHON_VERSION) pytorch=$($vars.PYTORCH_VERSION) gpu=$($vars.GPU_ARCHS)"
+Write-Host "VERSION.lock: python=$($vars.PYTHON_VERSION) pytorch=$($vars.PYTORCH_VERSION) gpu=$($vars.GPU_ARCHS) opt_dim=$optDimString wheel_artifact=$wheelArtifactName"
