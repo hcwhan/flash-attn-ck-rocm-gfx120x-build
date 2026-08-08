@@ -26,6 +26,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `.github
 | `flash_attention_min_commit` | Minimum gfx1201 commit ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); **human-readable lock marker** |
 | `flash_attention_build_commit_date` | UTC date for that commit; **human-readable only**, not used by scripts/CI |
 | `expected_wheel_pattern` | Glob for smoke-test wheel name |
+| `wheel_local_version` | `+local` tag appended to the wheel version (fed to `FLASH_ATTN_LOCAL_VERSION`) |
 | `wheel_artifact_name` | GitHub Actions artifact name |
 
 Prep clones **`flash_attention_build_commit`** (`fetch` + `checkout FETCH_HEAD`).
@@ -70,7 +71,7 @@ Push to `main` does **not** auto-trigger builds.
 | `compile-d32` … `d256` | one OPT_DIM shard each, upload `.obj` | 6 h each |
 | `link-wheel` | merge objs + link + wheel + CPU smoke test | 6 h |
 
-Cache keys include FA commit SHA; **exact match only** (no `restore-keys`). Serial uses `serial-v3`, parallel uses `parallel-v3-d{dim}` — isolated from each other. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
+Cache keys include FA commit SHA and an MSVC toolset fingerprint; **exact match only** (no `restore-keys`). Serial uses `serial-v3`, parallel uses `parallel-v3-d{dim}` — isolated from each other. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
 
 ## Output
 

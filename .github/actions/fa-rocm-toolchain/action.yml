@@ -27,7 +27,7 @@ runs:
         python-version: ${{ inputs.python-version }}
 
     - name: Setup MSVC
-      uses: TheMrMilchmann/setup-msvc-dev@v4
+      uses: TheMrMilchmann/setup-msvc-dev@368ef7d1ee4d1171b31d4a7f67f4d954f903f5a9 # v4.1.0
       with:
         arch: x64
 

@@ -32,3 +32,4 @@ runs:
         path: ${{ inputs.fa-src }}
         retention-days: 7
         if-no-files-found: error
+        compression-level: 9

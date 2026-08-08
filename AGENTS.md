@@ -59,9 +59,11 @@ prep clone `flash_attention_build_commit` 并输出 `fa-commit-sha`（lock 值�
 - **不为不可能场景加诊断**
 - **干净 runner**：compile 后仅一棵 `temp.win-*`；不为脏 workspace / 人工改目录加兜底。
 - **连续 CI 链**：prep → compile/link → smoke 自动跑完；staging/shard 齐全等流水线检查保留。
-- **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=FALSE` + prebuilt `.obj` 时间戳 merge。
+- **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=TRUE`（避免 FA `CachedWheelsCommand` 下载上游 wheel 短路）+ prebuilt `.obj` 时间戳 merge。
 - **`PRIMARY_OPT_DIM`** = lock `opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
 - **`ninja_workers` 默认 4**（OOM 改 2）；**`skip_cache_restore` 默认 true**（测试阶段，save 仍开；稳定后再改 false）。
+- **全模式 prebuilt obj stamp**：compile/serial 恢复缓存后、link 合并后，均对既有 `.obj` 打未来时间戳（setup.py 每次 `build_ext` 重拷 `fmha_*.cu` 刷新 mtime，不 stamp 则 ninja 必然全量重编，缓存形同虚设）。
+- **link 排除 `*_api.obj`**：`fmha_*_api.cu.obj` 是 per-shard 部分分发表（只含本 shard hdim），合并 primary 副本会静默丢失其它 dim 分发；link job 必须从全量再生成的源码重编这 3 个 obj。
 
 ## 编写规范
 
@@ -79,5 +81,5 @@ prep clone `flash_attention_build_commit` 并输出 `fa-commit-sha`（lock 值�
 ## 维护
 
 - 升级 FA：改 `flash_attention_build_commit`
-- bump PyTorch/ROCm：同步 `expected_wheel_pattern` 等
+- bump PyTorch/ROCm：同步 `expected_wheel_pattern`、`wheel_local_version` 等
 - 部署前：`gpu-smoke-test.ps1`（gfx1201 真机）

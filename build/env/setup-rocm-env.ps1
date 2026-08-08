@@ -31,8 +31,8 @@ proc = subprocess.run(
 )
 devel_root = proc.stdout.strip()
 
-print(core_root)
-print(devel_root)
+print(f'CORE_ROOT={core_root}')
+print(f'DEVEL_ROOT={devel_root}')
 "@
 
 $paths = & $PythonExe -c $pyCode
@@ -40,8 +40,13 @@ if ($LASTEXITCODE -ne 0) {
     throw "Failed to locate ROCm SDK paths via $PythonExe"
 }
 
-$coreRoot = $paths[0]
-$develRoot = $paths[1]
+$coreRootLine = $paths | Where-Object { $_ -like 'CORE_ROOT=*' } | Select-Object -First 1
+$develRootLine = $paths | Where-Object { $_ -like 'DEVEL_ROOT=*' } | Select-Object -First 1
+if (-not $coreRootLine -or -not $develRootLine) {
+    throw "Failed to parse ROCm SDK paths from $PythonExe output"
+}
+$coreRoot = $coreRootLine.Substring('CORE_ROOT='.Length)
+$develRoot = $develRootLine.Substring('DEVEL_ROOT='.Length)
 $rocmRoot = $develRoot
 
 $llvmBin = Join-Path $coreRoot "lib\llvm\bin"

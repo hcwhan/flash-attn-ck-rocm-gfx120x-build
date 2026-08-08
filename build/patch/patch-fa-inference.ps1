@@ -20,20 +20,27 @@ $patchPoints = @(
     },
     @{
         Name    = "enable-disable-backward-flag"
-        Before  = '# "-DFLASHATTENTION_DISABLE_BACKWARD",'
-        After   = '"-DFLASHATTENTION_DISABLE_BACKWARD",'
+        # Regex (with before-state check): uncomment ONLY the CK extension flags
+        # occurrence. setup.py has a second commented occurrence in the CUDA
+        # nvcc flags list; a plain Replace would uncomment both. The pattern is
+        # CRLF/LF agnostic for Windows checkout line endings.
+        Regex   = $true
+        Before  = '(?m)(-DUSE_PROF_API=1",\r?\n\s*)# "-DFLASHATTENTION_DISABLE_BACKWARD",'
+        After   = '${1}"-DFLASHATTENTION_DISABLE_BACKWARD",'
     }
 )
 
 foreach ($point in $patchPoints) {
-    if (-not $content.Contains($point.Before)) {
+    $pattern = if ($point.Regex) { $point.Before } else { [regex]::Escape($point.Before) }
+    if (-not [regex]::IsMatch($content, $pattern)) {
         throw "patch-fa-inference.ps1: before-state not found for '$($point.Name)'"
     }
     Write-Host "  OK $($point.Name): before-state found"
 }
 
 foreach ($point in $patchPoints) {
-    $content = $content.Replace($point.Before, $point.After)
+    $pattern = if ($point.Regex) { $point.Before } else { [regex]::Escape($point.Before) }
+    $content = [regex]::Replace($content, $pattern, $point.After)
     Write-Host "  OK $($point.Name): patched"
 }
 

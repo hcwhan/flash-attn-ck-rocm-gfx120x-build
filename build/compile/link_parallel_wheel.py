@@ -12,6 +12,13 @@ from pathlib import Path
 _ORIGINAL_RUN_NINJA = None
 
 DIM_PATTERN = re.compile(r"_d(\d+)_")
+# Generated API dispatch objects (fmha_fwd_api.cu.obj, fmha_fwd_appendkv_api.cu.obj,
+# fmha_fwd_splitkv_api.cu.obj) are per-shard partial: each shard only renders the
+# hdim cases for its own OPT_DIM. Merging the primary shard's copy would silently
+# drop the other dims' dispatch, so these must always be recompiled in the link job
+# from the regenerated all-dim sources. (csrc/flash_attn_ck/flash_api.cu.obj is a
+# fixed dim-independent source and must still be merged.)
+API_OBJ_PATTERN = re.compile(r"^fmha_.*_api\.cu\.obj$")
 
 
 def load_opt_dims() -> tuple[str, ...]:
@@ -119,65 +126,106 @@ def _stamp_prebuilt_obj(dest: Path, fa_src: Path) -> None:
     os.utime(dest, (stamp, stamp))
 
 
-def require_parallel_link_force_build_false() -> None:
+def stamp_prebuilt_objects(temp_release: Path, fa_src: Path) -> int:
+    """Bump every existing .obj under the ninja build dir past the regenerated
+    sources so ninja treats restored/prebuilt objects as up to date.
+
+    Needed because setup.py re-copies fmha_*.cpp -> fmha_*.cu on every build_ext,
+    refreshing the .cu mtimes; without the stamp, a restored ninja cache would be
+    fully rebuilt and the cache would never pay off.
+    """
+    if not temp_release.is_dir():
+        return 0
+    stamp = max(time.time(), _newest_generated_cu_mtime(fa_src) + 1.0)
+    count = 0
+    for obj in temp_release.rglob("*.obj"):
+        os.utime(obj, (stamp, stamp))
+        count += 1
+    return count
+
+
+def merge_prebuilt_objects(
+    staging_root: Path,
+    temp_release: Path,
+    fa_src: Path,
+    primary_dim: str,
+) -> int:
+    """Merge shard .obj files into the ninja build dir before the link build.
+
+    - Primary shard: every .obj except the generated API dispatch objects
+      (fmha_*_api.cu.obj) -- those are per-shard partial and must be recompiled
+      in the link job from the regenerated all-dim sources.
+    - Other shards: dim-specific kernel objects only (build/*_d<N>_*).
+    """
+    primary_dir = staging_root / f"d{primary_dim}"
+    if not primary_dir.is_dir():
+        raise SystemExit(f"Primary staging dir missing: {primary_dir}")
+
+    staging_dirs = sorted(p for p in staging_root.iterdir() if p.is_dir())
+    temp_release.mkdir(parents=True, exist_ok=True)
+    copied = 0
+
+    def copy_obj(src: Path, rel: Path) -> None:
+        nonlocal copied
+        dest = temp_release / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        _stamp_prebuilt_obj(dest, fa_src)
+        copied += 1
+
+    for obj in primary_dir.rglob("*.obj"):
+        if API_OBJ_PATTERN.match(obj.name):
+            print(f"  skip {obj.relative_to(primary_dir).as_posix()} (recompiled in link job)", flush=True)
+            continue
+        copy_obj(obj, obj.relative_to(primary_dir))
+
+    for staging in staging_dirs:
+        if staging.resolve() == primary_dir.resolve():
+            continue
+        for obj in staging.rglob("*.obj"):
+            rel = obj.relative_to(staging)
+            rel_posix = rel.as_posix()
+            if rel_posix.startswith("csrc/flash_attn_ck/"):
+                continue
+            if not rel_posix.startswith("build/"):
+                continue
+            if not DIM_PATTERN.search(obj.name):
+                continue
+            dest = temp_release / rel
+            if not dest.exists():
+                copy_obj(obj, rel)
+
+    return copied
+
+
+def require_parallel_link_force_build_true() -> None:
     value = os.environ.get("FLASH_ATTENTION_FORCE_BUILD", "").strip().upper()
-    if value != "FALSE":
+    if value != "TRUE":
         raise SystemExit(
-            "Parallel link requires FLASH_ATTENTION_FORCE_BUILD=FALSE "
-            f"(got {os.environ.get('FLASH_ATTENTION_FORCE_BUILD')!r})"
+            "Parallel link requires FLASH_ATTENTION_FORCE_BUILD=TRUE "
+            "(FALSE would make FA's CachedWheelsCommand try to download an "
+            "upstream prebuilt wheel and silently bypass the merged objects; "
+            f"got {os.environ.get('FLASH_ATTENTION_FORCE_BUILD')!r})"
         )
 
 
-def install_patch(staging_root: Path, fa_src: Path, primary_dim: str) -> None:
+def install_patch(staging_root: Path | None, fa_src: Path, primary_dim: str) -> None:
     global _ORIGINAL_RUN_NINJA
 
     import torch.utils.cpp_extension as cpp_ext
 
     _ORIGINAL_RUN_NINJA = cpp_ext._run_ninja_build
 
-    primary_dir = staging_root / f"d{primary_dim}"
-    if not primary_dir.is_dir():
-        raise SystemExit(f"Primary staging dir missing: {primary_dir}")
-
-    staging_dirs = sorted(p for p in staging_root.iterdir() if p.is_dir())
-
-    def merge_prebuilt_objects(temp_release: Path) -> int:
-        temp_release.mkdir(parents=True, exist_ok=True)
-        copied = 0
-
-        def copy_obj(src: Path, rel: Path) -> None:
-            nonlocal copied
-            dest = temp_release / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dest)
-            _stamp_prebuilt_obj(dest, fa_src)
-            copied += 1
-
-        for obj in primary_dir.rglob("*.obj"):
-            copy_obj(obj, obj.relative_to(primary_dir))
-
-        for staging in staging_dirs:
-            if staging.resolve() == primary_dir.resolve():
-                continue
-            for obj in staging.rglob("*.obj"):
-                rel = obj.relative_to(staging)
-                rel_posix = rel.as_posix()
-                if rel_posix.startswith("csrc/flash_attn_ck/"):
-                    continue
-                if not rel_posix.startswith("build/"):
-                    continue
-                if not DIM_PATTERN.search(obj.name):
-                    continue
-                dest = temp_release / rel
-                if not dest.exists():
-                    copy_obj(obj, rel)
-
-        return copied
-
     def patched_run_ninja(build_directory, *args, **kwargs):
         build_dir = Path(build_directory)
-        count = merge_prebuilt_objects(build_dir)
-        print(f"Merged {count} prebuilt .obj files into {build_dir}", flush=True)
+        if staging_root is not None:
+            merged = merge_prebuilt_objects(
+                staging_root, build_dir, fa_src, primary_dim=primary_dim
+            )
+            print(f"Merged {merged} prebuilt .obj files into {build_dir}", flush=True)
+        stamped = stamp_prebuilt_objects(build_dir, fa_src)
+        if stamped:
+            print(f"Stamped {stamped} prebuilt .obj files in {build_dir}", flush=True)
         return _ORIGINAL_RUN_NINJA(build_directory, *args, **kwargs)
 
     cpp_ext._run_ninja_build = patched_run_ninja
@@ -208,7 +256,10 @@ def main() -> None:
     if not args.fa_src.is_dir():
         raise SystemExit(f"FA source missing: {args.fa_src}")
 
+    # Stamp restored prebuilt objects in every mode so the ninja cache actually
+    # pays off (setup.py refreshes all fmha_*.cu mtimes on each build_ext).
     if args.compile_only:
+        install_patch(None, args.fa_src, primary_dim="")
         build_ext_only(args.fa_src, verbose=args.verbose)
         return
 
@@ -216,6 +267,7 @@ def main() -> None:
         raise SystemExit("--dist-dir is required unless --compile-only")
 
     if args.staging_root is None:
+        install_patch(None, args.fa_src, primary_dim="")
         build_wheel(args.fa_src, args.dist_dir, verbose=args.verbose)
         return
 
@@ -230,7 +282,7 @@ def main() -> None:
         expected_dims=expected_dims,
         primary_dim=primary_dim,
     )
-    require_parallel_link_force_build_false()
+    require_parallel_link_force_build_true()
     install_patch(args.staging_root, args.fa_src, primary_dim=primary_dim)
     build_wheel(args.fa_src, args.dist_dir, verbose=args.verbose)
 

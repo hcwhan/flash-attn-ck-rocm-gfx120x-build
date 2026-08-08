@@ -34,6 +34,11 @@ if (-not $wheelArtifactName) {
     throw "VERSION.lock.json wheel_artifact_name is missing"
 }
 
+$wheelLocalVersion = [string]$lock.wheel_local_version
+if (-not $wheelLocalVersion) {
+    throw "VERSION.lock.json wheel_local_version is missing"
+}
+
 $flashAttentionRepo = [string]$lock.flash_attention_repo
 $flashAttentionBuildCommit = [string]$lock.flash_attention_build_commit
 if (-not $flashAttentionRepo) {
@@ -54,6 +59,7 @@ $vars = @{
     PRIMARY_OPT_DIM               = [string]$optDimList[0]
     WHEEL_ARTIFACT_NAME           = $wheelArtifactName
     EXPECTED_WHEEL_PATTERN        = $expectedWheelPattern
+    FLASH_ATTN_LOCAL_VERSION      = $wheelLocalVersion
     FLASH_ATTENTION_REPO          = $flashAttentionRepo
     FLASH_ATTENTION_BUILD_COMMIT  = $flashAttentionBuildCommit
 }

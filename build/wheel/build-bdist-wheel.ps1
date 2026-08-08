@@ -28,12 +28,16 @@ if ($StagingRoot) {
     if (-not $PrimaryDim) {
         throw "PrimaryDim is required when StagingRoot is set"
     }
-    $env:FLASH_ATTENTION_FORCE_BUILD = "FALSE"
-} else {
-    $env:FLASH_ATTENTION_FORCE_BUILD = "TRUE"
 }
+# Always force a local build: with FLASH_ATTENTION_FORCE_BUILD=FALSE, FA's
+# CachedWheelsCommand tries to download an upstream prebuilt wheel (whose name
+# carries no GPU arch) and would silently bypass the merged objects on a hit.
+$env:FLASH_ATTENTION_FORCE_BUILD = "TRUE"
 
 $env:OPT_DIM = [string]$LockOptDim
+# FA's get_package_version() only appends the +local tag when this env is set;
+# without it the wheel name would not match expected_wheel_pattern.
+$env:FLASH_ATTN_LOCAL_VERSION = $FLASH_ATTN_LOCAL_VERSION
 
 . (Join-Path $BuildRoot "env\init-fa-build-env.ps1") `
     -WorkspaceRoot $WorkspaceRoot `

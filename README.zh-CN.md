@@ -26,6 +26,7 @@
 | `flash_attention_min_commit` | gfx1201 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**lock 内人类可读参考** |
 | `flash_attention_build_commit_date` | 上述 commit 的 UTC 时间；**lock 内人类可读参考**，不参与脚本/CI |
 | `expected_wheel_pattern` | smoke test 校验 wheel 文件名 glob |
+| `wheel_local_version` | wheel 版本号后的 `+local` 标签（注入 `FLASH_ATTN_LOCAL_VERSION`） |
 | `wheel_artifact_name` | GitHub Actions 发布的 artifact 名称 |
 
 规则：CI 始终 clone **`flash_attention_build_commit`**（`fetch` + `checkout FETCH_HEAD`）。
@@ -84,7 +85,7 @@ ComfyUI **推理专用** wheel：
 | `compile-d32` … `d256` | 各编一个 OPT_DIM shard，上传 `.obj` | 各 6 h |
 | `link-wheel` | 合并 obj + link + 打 wheel + CPU smoke test | 6 h |
 
-- Cache key 含 FA commit SHA；**仅精确匹配**（无 `restore-keys`）。串行 `serial-v3`，并行 `parallel-v3-d{dim}`，互不共用。
+- Cache key 含 FA commit SHA 与 MSVC 工具集指纹；**仅精确匹配**（无 `restore-keys`）。串行 `serial-v3`，并行 `parallel-v3-d{dim}`，互不共用。
 - 四 shard 各编 shared obj；link 仅使用 **lock `opt_dim` 第一档**（当前 `32`）的 shared obj。
 
 ### 构建阶段
