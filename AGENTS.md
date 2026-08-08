@@ -41,7 +41,7 @@
 | `fa-prep-artifact` / `fa-plan-opt-dim-matrix` | prep / parallel matrix |
 | `fa-read-version-lock` 等 | 被 bootstrap 调用 |
 
-Job `env` 统一：`FA_CACHE_HASH`（单一 `hashFiles` 列表；workflow 级 `env` 解析期求值、不支持 `hashFiles`）。Workflow `env`：`MAX_JOBS`/`FA_SRC`/`FA_ARTIFACT`/`FA_STAGING`/`SKIP_CACHE_RESTORE`。
+`hashFiles` 内联于 `fa-build-with-cache` 的 `cache-key`（workflow/job `env` 均不支持；parallel/serial 共用同一文件列表）。Workflow `env`：`MAX_JOBS`/`FA_SRC`/`FA_ARTIFACT`/`FA_STAGING`/`SKIP_CACHE_RESTORE`。
 
 **有意不合并：** compile 阶段 `get-fa-release-dir.ps1` dim 校验 vs link 阶段 `validate_staging`；四 shard 重复编 shared obj（link 只用 d32）；parallel link-wheel 无 ninja cache；obj artifact 名 `d{dim}` 即 staging 子目录名（勿 normalize）。
 

@@ -53,8 +53,6 @@ jobs:
     needs: prep
     runs-on: windows-2022
     timeout-minutes: 360
-    env:
-      FA_CACHE_HASH: ${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/compile/compile-opt-dim.ps1', 'build/compile/link_parallel_wheel.py', 'build/wheel/build-bdist-wheel.ps1', 'build/common/paths.ps1', 'build/common/get-fa-release-dir.ps1', 'build/common/get-rocm-sdk-paths.ps1', 'VERSION.lock.json') }}
 
     steps:
       - name: Checkout build repo
@@ -74,7 +72,7 @@ jobs:
         uses: ./.github/actions/fa-build-with-cache
         with:
           fa-src: ${{ env.FA_SRC }}
-          cache-key: fa2-ck-gfx1201-serial-v3-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ env.FA_CACHE_HASH }}-${{ needs.prep.outputs.fa-commit-sha }}-msvc${{ steps.msvc-fp.outputs.msvc-hash }}
+          cache-key: fa2-ck-gfx1201-serial-v3-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/compile/compile-opt-dim.ps1', 'build/compile/link_parallel_wheel.py', 'build/wheel/build-bdist-wheel.ps1', 'build/common/paths.ps1', 'build/common/get-fa-release-dir.ps1', 'build/common/get-rocm-sdk-paths.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}-msvc${{ steps.msvc-fp.outputs.msvc-hash }}
           skip-restore: ${{ env.SKIP_CACHE_RESTORE }}
           run: |
             . $env:GITHUB_WORKSPACE\build\wheel\build-bdist-wheel.ps1 `
