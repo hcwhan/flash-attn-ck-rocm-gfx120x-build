@@ -93,7 +93,10 @@ if (-not $env:MAX_JOBS) {
     # PyTorch cpp_extension reads MAX_JOBS for ninja -j N (not GitHub Actions job count).
     $env:MAX_JOBS = "4"
 }
-$env:FLASH_ATTENTION_FORCE_BUILD = "TRUE"
+if (-not $env:FLASH_ATTENTION_FORCE_BUILD) {
+    # Serial / compile-only: force extension rebuild. Parallel link sets FALSE before init.
+    $env:FLASH_ATTENTION_FORCE_BUILD = "TRUE"
+}
 $env:BUILD_TARGET = "rocm"
 
 Write-Host "GPU_ARCHS=$env:GPU_ARCHS"

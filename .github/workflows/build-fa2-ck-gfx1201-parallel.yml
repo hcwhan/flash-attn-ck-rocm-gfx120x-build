@@ -42,11 +42,11 @@ jobs:
         shell: pwsh
         run: |
           . $env:GITHUB_WORKSPACE\build\config\read-version-lock.ps1 -WorkspaceRoot $env:GITHUB_WORKSPACE
-          $json = ($OptDimList | ConvertTo-Json -Compress)
+          $json = ConvertTo-Json -InputObject @($OptDimList) -Compress
           Write-Host "OPT_DIM matrix from lock: $json"
-          Write-Host "Primary OPT_DIM shard: $PrimaryOptDim"
+          Write-Host "Primary OPT_DIM shard: $PRIMARY_OPT_DIM"
           "opt_dims_json=$json" >> $env:GITHUB_OUTPUT
-          "primary_opt_dim=$PrimaryOptDim" >> $env:GITHUB_OUTPUT
+          "primary_opt_dim=$PRIMARY_OPT_DIM" >> $env:GITHUB_OUTPUT
 
       - name: Prepare patched flash-attention source
         id: fa-prep
@@ -92,7 +92,7 @@ jobs:
         uses: ./.github/actions/fa-ninja-cache-restore
         with:
           fa-src: ${{ env.FA_SRC }}
-          cache-key: fa2-ck-gfx1201-parallel-v2-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/compile/compile-opt-dim.ps1', 'build/common/paths.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}
+          cache-key: fa2-ck-gfx1201-parallel-v3-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/config/wheel-pattern.ps1', 'build/compile/compile-opt-dim.ps1', 'build/compile/link_parallel_wheel.py', 'build/wheel/build-bdist-wheel.ps1', 'build/common/paths.ps1', 'build/common/get-fa-release-dir.ps1', 'build/common/git-sha.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}
           skip-restore: ${{ github.event.inputs.skip_cache_restore != false && 'true' || 'false' }}
 
       - name: Report cache status
@@ -119,10 +119,8 @@ jobs:
             -OptDim "${{ matrix.opt_dim }}" `
             -WorkspaceRoot $env:GITHUB_WORKSPACE `
             -FaSrc $env:FA_SRC
-          $release = Get-ChildItem -Path (Join-Path $env:FA_SRC "build") -Directory -Filter "temp.win-*" |
-            Select-Object -First 1
-          if (-not $release) { throw "temp.win-* missing after compile" }
-          "RELEASE_DIR=$(Join-Path $release.FullName 'Release')" >> $env:GITHUB_ENV
+          if (-not $env:RELEASE_DIR) { throw "RELEASE_DIR not set by compile-opt-dim.ps1" }
+          Write-Host "Uploading object files from $env:RELEASE_DIR"
 
       - name: Save ninja incremental build cache
         if: always()

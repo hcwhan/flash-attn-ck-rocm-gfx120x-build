@@ -26,7 +26,17 @@ $BuildRoot = Join-Path $WorkspaceRoot "build"
 . (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
 if ($StagingRoot -and -not $PrimaryDim) {
-    $PrimaryDim = $PrimaryOptDim
+    if ($PRIMARY_OPT_DIM) {
+        $PrimaryDim = $PRIMARY_OPT_DIM
+    } elseif ($env:PRIMARY_OPT_DIM) {
+        $PrimaryDim = $env:PRIMARY_OPT_DIM
+    }
+}
+
+if ($StagingRoot) {
+    # Prebuilt .obj merge during link relies on ninja incremental skip; FORCE_BUILD would rebuild all.
+    $env:FLASH_ATTENTION_FORCE_BUILD = "FALSE"
+    Write-Host "Parallel link: FLASH_ATTENTION_FORCE_BUILD=FALSE (preserve prebuilt .obj merge)"
 }
 
 . (Join-Path $BuildRoot "env\init-fa-build-env.ps1") `

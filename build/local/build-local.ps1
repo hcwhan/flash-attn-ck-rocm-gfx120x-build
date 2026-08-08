@@ -47,7 +47,9 @@ New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
     -PythonExe $PythonExe
 
 if ($GpuSmokeTest) {
-    . (Join-Path $BuildRoot "test\gpu-smoke-test.ps1") -PythonExe $PythonExe
+    . (Join-Path $BuildRoot "test\gpu-smoke-test.ps1") `
+        -PythonExe $PythonExe `
+        -WorkspaceRoot $WorkspaceRoot
 }
 
 Write-Host "Local build complete. Wheel(s) in $DistDir"

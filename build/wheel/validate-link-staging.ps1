@@ -4,7 +4,9 @@ param(
 
     [string]$WorkspaceRoot = "",
 
-    [string]$PrimaryDim = ""
+    [string]$PrimaryDim = "",
+
+    [string]$PythonExe = "python"
 )
 
 # Manual/local CLI wrapper for link_parallel_wheel.py --validate-only.
@@ -19,12 +21,16 @@ $BuildRoot = $script:BuildRoot
 . (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
 if (-not $PrimaryDim) {
-    $PrimaryDim = $PrimaryOptDim
+    if ($PRIMARY_OPT_DIM) {
+        $PrimaryDim = $PRIMARY_OPT_DIM
+    } elseif ($env:PRIMARY_OPT_DIM) {
+        $PrimaryDim = $env:PRIMARY_OPT_DIM
+    }
 }
 
 $env:OPT_DIM = $LockOptDim
 
-python (Join-Path $BuildRoot "compile\link_parallel_wheel.py") `
+& $PythonExe (Join-Path $BuildRoot "compile\link_parallel_wheel.py") `
     --validate-only `
     --staging-root $StagingRoot `
     --workspace-root $WorkspaceRoot `

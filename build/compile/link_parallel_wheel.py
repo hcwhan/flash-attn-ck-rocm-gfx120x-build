@@ -75,6 +75,32 @@ def build_ext_only(fa_src: Path, *, verbose: bool = False) -> None:
     _exec_setup_py(fa_src, argv)
 
 
+def validate_compile_shard(release_dir: Path, opt_dim: str) -> None:
+    """Fail fast after compile if shard kernel objects are missing or cross-contaminated."""
+    release_dir = release_dir.resolve()
+    if not release_dir.is_dir():
+        raise SystemExit(f"Release dir missing: {release_dir}")
+
+    objs = list(release_dir.rglob("*.obj"))
+    if not objs:
+        raise SystemExit(f"No .obj files under {release_dir}")
+
+    dim_kernel_objs = [obj for obj in objs if DIM_PATTERN.search(obj.name)]
+    foreign = [obj for obj in dim_kernel_objs if f"_d{opt_dim}_" not in obj.name]
+    if foreign:
+        sample = ", ".join(obj.name for obj in foreign[:3])
+        raise SystemExit(f"Release dir contains foreign-dim kernel objs: {sample}")
+
+    dim_specific = [obj for obj in dim_kernel_objs if f"_d{opt_dim}_" in obj.name]
+    if not dim_specific:
+        raise SystemExit(f"Release dir has no *_d{opt_dim}_* kernel objects")
+
+    print(
+        f"Compile shard validation OK: d{opt_dim} objs={len(objs)} kernel={len(dim_specific)}",
+        flush=True,
+    )
+
+
 def validate_staging(
     staging_root: Path,
     *,
@@ -143,8 +169,23 @@ def _stamp_prebuilt_obj(dest: Path, fa_src: Path) -> None:
     os.utime(dest, (stamp, stamp))
 
 
+def require_parallel_link_force_build_false() -> None:
+    """Parallel link must not force a full recompile over merged prebuilt .obj files."""
+    value = os.environ.get("FLASH_ATTENTION_FORCE_BUILD", "").strip().upper()
+    if value and value not in ("FALSE", "0", "NO"):
+        raise SystemExit(
+            "Parallel link requires FLASH_ATTENTION_FORCE_BUILD=FALSE "
+            f"(got {os.environ.get('FLASH_ATTENTION_FORCE_BUILD')!r})"
+        )
+    os.environ["FLASH_ATTENTION_FORCE_BUILD"] = "FALSE"
+
+
 def install_patch(staging_root: Path, fa_src: Path, primary_dim: str = "") -> None:
-    """Patch torch cpp_extension to seed prebuilt .obj files before ninja runs."""
+    """Patch torch cpp_extension to seed prebuilt .obj files before ninja runs.
+
+    Callers must set FLASH_ATTENTION_FORCE_BUILD=FALSE during parallel link so ninja
+    respects stamped prebuilt objects instead of forcing a full recompile.
+    """
     global _PATCHED, _ORIGINAL_RUN_NINJA
     if _PATCHED:
         return
@@ -230,6 +271,13 @@ def main() -> None:
         help="Full single-pass bdist_wheel (no OPT_DIM obj merge)",
     )
     parser.add_argument(
+        "--validate-compile-shard",
+        action="store_true",
+        help="Validate a single compile shard Release dir and exit",
+    )
+    parser.add_argument("--release-dir", type=Path)
+    parser.add_argument("--opt-dim", default="")
+    parser.add_argument(
         "--validate-only",
         action="store_true",
         help="Validate staging layout and exit without building",
@@ -241,6 +289,12 @@ def main() -> None:
         help="Verbose setuptools/ninja output",
     )
     args = parser.parse_args()
+
+    if args.validate_compile_shard:
+        if args.release_dir is None or not args.opt_dim.strip():
+            raise SystemExit("--release-dir and --opt-dim are required with --validate-compile-shard")
+        validate_compile_shard(args.release_dir, args.opt_dim.strip())
+        return
 
     workspace_root = args.workspace_root
     expected_dims = load_opt_dims(workspace_root)
@@ -290,6 +344,7 @@ def main() -> None:
         expected_dims=expected_dims,
         primary_dim=primary_dim,
     )
+    require_parallel_link_force_build_false()
     install_patch(args.staging_root, args.fa_src, primary_dim=primary_dim)
     build_wheel(args.fa_src, args.dist_dir, verbose=args.verbose)
 

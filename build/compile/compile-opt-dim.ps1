@@ -31,7 +31,7 @@ if ($shardOptDim -notin $OptDimList) {
     -OptDim $shardOptDim
 
 Write-Host "Compiling OPT_DIM=$shardOptDim via in-process build_ext (same setuptools path as serial/link)"
-Write-Host "Note: each shard also builds shared csrc/flash_attn_ck objs; link uses d$PrimaryOptDim shard for shared objects only"
+Write-Host "Note: each shard also builds shared csrc/flash_attn_ck objs; link uses d$PRIMARY_OPT_DIM shard for shared objects only"
 
 $wheelScript = Join-Path $BuildRoot "compile\link_parallel_wheel.py"
 & $PythonExe $wheelScript --compile-only --fa-src $FaSrc -v
@@ -39,18 +39,25 @@ if ($LASTEXITCODE -ne 0) {
     throw "build_ext failed for OPT_DIM=$shardOptDim (exit $LASTEXITCODE)"
 }
 
-$tempRoot = Get-ChildItem -Path (Join-Path $FaSrc "build") -Directory -Filter "temp.win-*" |
-    Select-Object -First 1
-if (-not $tempRoot) {
-    throw "No build/temp.win-* directory after build_ext"
-}
-$releaseDir = Join-Path $tempRoot.FullName "Release"
-if (-not (Test-Path $releaseDir)) {
-    throw "Release directory missing: $releaseDir"
+$releaseInfo = . (Join-Path $BuildRoot "common\get-fa-release-dir.ps1") `
+    -FaSrc $FaSrc `
+    -OptDim $shardOptDim `
+    -PassThru
+$releaseDir = $releaseInfo.ReleaseDir
+Write-Host (
+    "OPT_DIM=$shardOptDim produced $($releaseInfo.ObjCount) object files " +
+    "($($releaseInfo.DimKernelCount) dim-kernel) under $releaseDir"
+)
+
+& $PythonExe $wheelScript `
+    --validate-compile-shard `
+    --release-dir $releaseDir `
+    --opt-dim $shardOptDim
+if ($LASTEXITCODE -ne 0) {
+    throw "Compile shard validation failed for OPT_DIM=$shardOptDim (exit $LASTEXITCODE)"
 }
 
-$objCount = (Get-ChildItem $releaseDir -Recurse -Filter "*.obj").Count
-Write-Host "OPT_DIM=$shardOptDim produced $objCount object files under $releaseDir"
-if ($objCount -lt 1) {
-    throw "No .obj files produced for OPT_DIM=$shardOptDim"
+$env:RELEASE_DIR = $releaseDir
+if ($env:GITHUB_ENV) {
+    "RELEASE_DIR=$releaseDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 }

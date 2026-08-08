@@ -15,6 +15,10 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "common\paths.ps1") -WorkspaceRoot $WorkspaceRoot
 $WorkspaceRoot = $script:WorkspaceRoot
+$BuildRoot = $script:BuildRoot
+
+. (Join-Path $BuildRoot "common\git-sha.ps1")
+. (Join-Path $BuildRoot "config\wheel-pattern.ps1")
 
 $skipExtensionImport = ($env:FA_SKIP_EXTENSION_IMPORT -eq "1")
 $smokeReport = [ordered]@{
@@ -22,22 +26,11 @@ $smokeReport = [ordered]@{
     pip_install     = "pending"
     extension_import = if ($skipExtensionImport) { "skipped" } else { "pending" }
     cuda_available  = $null
+    cxx11_abi       = $null
     extension_origin = ""
     public_symbol_count = 0
     dumpbin_checked = $false
     dumpbin_hip_dll = $false
-}
-
-function Test-GitShaMatches {
-    param(
-        [string]$Left,
-        [string]$Right
-    )
-
-    if (-not $Left -or -not $Right) {
-        return $false
-    }
-    return ($Left.StartsWith($Right) -or $Right.StartsWith($Left))
 }
 
 function Invoke-PythonCheck {
@@ -77,6 +70,7 @@ function Write-SmokeStepSummary {
         "| pip install | $($Report.pip_install) |",
         "| Extension import (L3) | $($Report.extension_import) |",
         "| ``torch.cuda.is_available()`` | $cuda |",
+        "| ``_GLIBCXX_USE_CXX11_ABI`` | $(if ($null -eq $Report.cxx11_abi) { 'n/a' } else { [string]$Report.cxx11_abi }) |",
         "| Extension path | $($Report.extension_origin) |",
         "| Public symbol count | $($Report.public_symbol_count) |",
         "| dumpbin HIP DLL deps | $(if ($Report.dumpbin_checked) { [string]$Report.dumpbin_hip_dll } else { 'skipped' }) |",
@@ -105,14 +99,13 @@ $expectedPattern = "flash_attn-*.whl"
 $lock = $null
 if (Test-Path $lockPath) {
     $lock = Get-Content $lockPath -Raw | ConvertFrom-Json
-    if ($lock.expected_wheel_pattern) {
-        $expectedPattern = [string]$lock.expected_wheel_pattern
-    }
+    $expectedPattern = Assert-ExpectedWheelPatternConsistent -Lock $lock -PythonExe $PythonExe
 }
 
 if ($FaCommitSha -and $lock -and $lock.flash_attention_build_commit) {
     $buildCommit = [string]$lock.flash_attention_build_commit
-    if (-not (Test-GitShaMatches -Left $FaCommitSha -Right $buildCommit)) {
+    $repoRoot = if ($FaSrc -and (Test-Path (Join-Path $FaSrc ".git"))) { $FaSrc } else { "" }
+    if (-not (Test-GitShaEqual -Left $FaCommitSha -Right $buildCommit -RepoRoot $repoRoot)) {
         throw "FaCommitSha '$FaCommitSha' does not match VERSION.lock.json flash_attention_build_commit '$buildCommit'"
     }
 }
@@ -205,19 +198,35 @@ if ($LASTEXITCODE -ne 0) {
 $smokeReport.pip_install = "pass"
 
 if (-not $skipExtensionImport) {
-    Invoke-PythonCheck -Label "torch runtime" -Code @"
+    Write-Host "=== torch runtime ==="
+    $torchRuntimeOutput = & $PythonExe -c @"
 import torch
+abi = torch._C._GLIBCXX_USE_CXX11_ABI
+cuda = torch.cuda.is_available()
 print('torch', torch.__version__)
 print('hip', torch.version.hip)
-print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)
-print('cuda_available', torch.cuda.is_available())
+print('CXX11_ABI', abi)
+print('CUDA_AVAILABLE', cuda)
+if not abi:
+    raise SystemExit('ERROR: _GLIBCXX_USE_CXX11_ABI is False; wheel requires cxx11abiTRUE')
 "@
-
-    $cudaAvailableLine = & $PythonExe -c "import torch; print(torch.cuda.is_available())"
     if ($LASTEXITCODE -ne 0) {
-        throw "torch.cuda.is_available() check failed (exit $LASTEXITCODE)"
+        throw "torch runtime failed (exit $LASTEXITCODE)"
     }
-    $smokeReport.cuda_available = ($cudaAvailableLine.Trim() -eq "True")
+    $torchRuntimeOutput | ForEach-Object { Write-Host $_ }
+
+    $cxx11Line = $torchRuntimeOutput | Where-Object { $_ -like "CXX11_ABI *" } | Select-Object -First 1
+    if ($cxx11Line -match "CXX11_ABI\s+(True|False)") {
+        $smokeReport.cxx11_abi = ($Matches[1] -eq "True")
+    }
+    if (-not $smokeReport.cxx11_abi) {
+        throw "torch._C._GLIBCXX_USE_CXX11_ABI is False; expected cxx11abiTRUE build"
+    }
+
+    $cudaLine = $torchRuntimeOutput | Where-Object { $_ -like "CUDA_AVAILABLE *" } | Select-Object -First 1
+    if ($cudaLine -match "CUDA_AVAILABLE\s+(True|False)") {
+        $smokeReport.cuda_available = ($Matches[1] -eq "True")
+    }
     Write-Host "torch.cuda.is_available() = $($smokeReport.cuda_available)"
 
     Invoke-PythonCheck -Label "flash_attn python package" -Code "import flash_attn; print('OK', flash_attn.__file__)"
@@ -263,9 +272,13 @@ if len(public) < 1:
         $depText = $depOutput -join "`n"
         $depOutput | ForEach-Object { Write-Host $_ }
         $smokeReport.dumpbin_checked = $true
-        $smokeReport.dumpbin_hip_dll = ($depText -match '(?i)(amdhip|hip(?:64)?|rocblas|torch)')
+        $smokeReport.dumpbin_hip_dll = ($depText -match '(?i)(amdhip|hip(?:64)?|rocblas|torch|hsa-runtime)')
         if (-not $smokeReport.dumpbin_hip_dll) {
-            Write-Warning "dumpbin output did not list expected HIP/torch dependencies; review manually"
+            $dumpbinMsg = "dumpbin /DEPENDENTS did not list expected HIP/torch dependencies; review output above"
+            if ($env:FA_STRICT_DUMPBIN -eq "1") {
+                throw $dumpbinMsg
+            }
+            Write-Warning $dumpbinMsg
         }
     } else {
         Write-Host "dumpbin not available or extension path missing; skipping DLL dependency listing"
@@ -283,15 +296,12 @@ print('OK', spec.origin)
 "@
 }
 
-if ($FaCommitSha) {
-    $manifest.flash_attention_commit = $FaCommitSha
-}
-
 $manifest.smoke_test = [ordered]@{
     wheel_structure     = [string]$smokeReport.wheel_structure
     pip_install         = [string]$smokeReport.pip_install
     extension_import    = [string]$smokeReport.extension_import
     cuda_available      = $smokeReport.cuda_available
+    cxx11_abi           = $smokeReport.cxx11_abi
     extension_origin    = [string]$smokeReport.extension_origin
     public_symbol_count = $smokeReport.public_symbol_count
     dumpbin_checked     = [bool]$smokeReport.dumpbin_checked
@@ -305,7 +315,8 @@ Write-Host "Manifest file: $manifestPath"
 if ($FaCommitSha) {
     $manifestRead = Get-Content $manifestPath -Raw | ConvertFrom-Json
     $manifestCommit = [string]$manifestRead.flash_attention_commit
-    if ($manifestCommit -ne $FaCommitSha) {
+    $repoRoot = if ($FaSrc -and (Test-Path (Join-Path $FaSrc ".git"))) { $FaSrc } else { "" }
+    if (-not (Test-GitShaEqual -Left $manifestCommit -Right $FaCommitSha -RepoRoot $repoRoot)) {
         throw "wheel.manifest.json flash_attention_commit '$manifestCommit' does not match expected '$FaCommitSha'"
     }
     Write-Host "Manifest flash_attention_commit OK: $FaCommitSha"

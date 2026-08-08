@@ -5,6 +5,7 @@
   "hip": "7.14.0",
   "rocm_index": "https://repo.amd.com/rocm/whl-multi-arch/",
   "gpu_archs": "gfx1201",
+  "cxx11_abi": true,
   "opt_dim": "32,64,128,256",
   "flash_attention_repo": "https://github.com/Dao-AILab/flash-attention.git",
   "flash_attention_min_commit": "5301a359f59ef8fa10f211618d9f7a69716a8898",

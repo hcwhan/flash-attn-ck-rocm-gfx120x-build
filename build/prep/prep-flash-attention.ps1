@@ -52,6 +52,79 @@ function Assert-GitCommitRef {
 Assert-GitCommitRef -Name "flash_attention_build_commit" -Ref $buildCommit
 Assert-GitCommitRef -Name "flash_attention_min_commit" -Ref $minCommit
 
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "common\git-sha.ps1")
+
+function Test-IsGitAncestor {
+    param(
+        [string]$Root,
+        [string]$Ancestor,
+        [string]$Descendant
+    )
+
+    git -C $Root merge-base --is-ancestor $Ancestor $Descendant
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Assert-BuildCommitMeetsMin {
+    param(
+        [string]$Root,
+        [string]$BuildCommit,
+        [string]$MinCommit
+    )
+
+    $head = Normalize-GitSha -Sha (git -C $Root rev-parse HEAD) -RepoRoot $Root
+    $expectedBuild = Normalize-GitSha -Sha $BuildCommit -RepoRoot $Root
+    if ($head -ne $expectedBuild) {
+        throw "Resolved flash-attention commit ($head) does not match flash_attention_build_commit ($expectedBuild)"
+    }
+
+    $minFull = Normalize-GitSha -Sha $MinCommit -RepoRoot $Root
+    if ($head -eq $minFull) {
+        Write-Host "Verified build commit $head equals flash_attention_min_commit"
+        return
+    }
+
+    if (Test-IsGitAncestor -Root $Root -Ancestor $minFull -Descendant $head) {
+        Write-Host "Verified build commit $head is not earlier than flash_attention_min_commit $minFull"
+        return
+    }
+
+    git -c core.longpaths=true -C $Root fetch --depth 1 origin $MinCommit
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to fetch flash_attention_min_commit $MinCommit"
+    }
+
+    if (Test-IsGitAncestor -Root $Root -Ancestor $minFull -Descendant $head) {
+        Write-Host "Verified build commit $head is not earlier than flash_attention_min_commit $minFull"
+        return
+    }
+
+    Write-Host "Shallow clone lacks ancestry link; deepening fetch for min-commit check..."
+    $deepenAttempts = 0
+    $maxDeepen = 20
+    while (-not (Test-IsGitAncestor -Root $Root -Ancestor $minFull -Descendant $head)) {
+        if ($deepenAttempts -ge $maxDeepen) {
+            Write-Host "Deepen limit reached; attempting unshallow fetch..."
+            git -c core.longpaths=true -C $Root fetch --unshallow origin
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to unshallow flash-attention clone for min-commit ancestry check"
+            }
+            if (Test-IsGitAncestor -Root $Root -Ancestor $minFull -Descendant $head) {
+                break
+            }
+            throw "flash_attention_build_commit ($head) is older than flash_attention_min_commit ($minFull)"
+        }
+
+        git -c core.longpaths=true -C $Root fetch --deepen=2000 origin
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to deepen flash-attention clone for min-commit ancestry check"
+        }
+        $deepenAttempts++
+    }
+
+    Write-Host "Verified build commit $head is not earlier than flash_attention_min_commit $minFull"
+}
+
 function Initialize-FlashAttentionRepo {
     param(
         [string]$Root,
@@ -71,46 +144,6 @@ function Initialize-FlashAttentionRepo {
     git -c core.longpaths=true clone --filter=blob:none --no-checkout $Repo $Root
     git -c core.longpaths=true -C $Root fetch --depth 1 origin $Ref
     git -C $Root checkout FETCH_HEAD
-}
-
-function Assert-BuildCommitMeetsMin {
-    param(
-        [string]$Root,
-        [string]$BuildCommit,
-        [string]$MinCommit
-    )
-
-    $head = (git -C $Root rev-parse HEAD).Trim()
-    if (-not ($head.StartsWith($BuildCommit) -or $BuildCommit.StartsWith($head))) {
-        throw "Resolved flash-attention commit ($head) does not match flash_attention_build_commit ($BuildCommit)"
-    }
-
-    if ($head.StartsWith($MinCommit) -or $MinCommit.StartsWith($head)) {
-        Write-Host "Verified build commit $head meets flash_attention_min_commit $MinCommit"
-        return
-    }
-
-    git -c core.longpaths=true -C $Root fetch --depth 1 origin $MinCommit
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to fetch flash_attention_min_commit $MinCommit"
-    }
-
-    git -C $Root merge-base --is-ancestor $MinCommit HEAD
-    if ($LASTEXITCODE -ne 0) {
-        # depth-1 clone/fetch leaves min and build commits disconnected; deepen before re-check
-        Write-Host "Shallow clone lacks ancestry link; deepening fetch for min-commit check..."
-        git -c core.longpaths=true -C $Root fetch --deepen=2000 origin
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to deepen flash-attention clone for min-commit ancestry check"
-        }
-
-        git -C $Root merge-base --is-ancestor $MinCommit HEAD
-        if ($LASTEXITCODE -ne 0) {
-            throw "flash_attention_build_commit ($head) is older than flash_attention_min_commit ($MinCommit)"
-        }
-    }
-
-    Write-Host "Verified build commit $head is not earlier than flash_attention_min_commit $MinCommit"
 }
 
 Initialize-FlashAttentionRepo -Root $FlashAttentionRoot -Repo $repoUrl -Ref $buildCommit

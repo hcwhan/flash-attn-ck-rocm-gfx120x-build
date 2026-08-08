@@ -16,6 +16,9 @@ if (-not (Test-Path $lockPath)) {
 
 $lock = Get-Content $lockPath -Raw | ConvertFrom-Json
 
+. (Join-Path $PSScriptRoot "wheel-pattern.ps1")
+$null = Assert-ExpectedWheelPatternConsistent -Lock $lock
+
 $optDimString = [string]$lock.opt_dim
 $optDimList = @(
     $optDimString -split "," |
