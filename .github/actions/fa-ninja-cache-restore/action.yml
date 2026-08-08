@@ -1,0 +1,32 @@
+name: Restore FA ninja build cache
+description: Restore flash-attention build/ incremental cache (actions/cache/restore)
+
+inputs:
+  fa-src:
+    description: flash-attention source root
+    required: true
+  cache-key:
+    description: Primary cache key
+    required: true
+  restore-keys:
+    description: Multiline restore-keys prefix list
+    required: true
+
+outputs:
+  cache-hit:
+    description: Exact cache key match
+    value: ${{ steps.fa-build-cache.outputs.cache-hit }}
+  cache-primary-key:
+    description: Resolved primary cache key
+    value: ${{ steps.fa-build-cache.outputs.cache-primary-key }}
+
+runs:
+  using: composite
+  steps:
+    - name: Restore ninja incremental build cache
+      uses: actions/cache/restore@v6
+      id: fa-build-cache
+      with:
+        path: ${{ inputs.fa-src }}\build
+        key: ${{ inputs.cache-key }}
+        restore-keys: ${{ inputs.restore-keys }}

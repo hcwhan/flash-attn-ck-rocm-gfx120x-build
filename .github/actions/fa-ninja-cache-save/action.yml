@@ -1,0 +1,20 @@
+name: Save FA ninja build cache
+description: Save flash-attention build/ incremental cache on success or timeout (actions/cache/save)
+
+inputs:
+  fa-src:
+    description: flash-attention source root
+    required: true
+  cache-primary-key:
+    description: cache-primary-key from fa-ninja-cache-restore
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Save ninja incremental build cache
+      if: inputs.cache-primary-key != ''
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ inputs.fa-src }}\build
+        key: ${{ inputs.cache-primary-key }}

@@ -75,14 +75,13 @@ jobs:
           fa-src: ${{ env.FA_SRC }}
 
       - name: Restore ninja incremental build cache
-        uses: actions/cache@v6
         id: fa-build-cache
+        uses: ./.github/actions/fa-ninja-cache-restore
         with:
-          path: ${{ env.FA_SRC }}\build
-          key: fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-${{ env.FLASH_ATTN_REF }}
+          fa-src: ${{ env.FA_SRC }}
+          cache-key: fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-${{ env.FLASH_ATTN_REF }}
           restore-keys: |
             fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-
-          save-always: true
 
       - name: Report cache status
         shell: pwsh
@@ -106,6 +105,13 @@ jobs:
             -DistDir $env:GITHUB_WORKSPACE\dist `
             -WorkspaceRoot $env:GITHUB_WORKSPACE
           Get-ChildItem $env:GITHUB_WORKSPACE\dist
+
+      - name: Save ninja incremental build cache
+        if: always()
+        uses: ./.github/actions/fa-ninja-cache-save
+        with:
+          fa-src: ${{ env.FA_SRC }}
+          cache-primary-key: ${{ steps.fa-build-cache.outputs.cache-primary-key }}
 
       - name: CPU smoke test
         shell: pwsh
