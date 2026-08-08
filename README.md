@@ -8,12 +8,28 @@ GitHub Actions workflow to build **FlashAttention 2 CK backend** for **Windows /
 
 | Item | Value |
 |------|-------|
-| GPU | AMD RDNA4 (`gfx1201`, e.g. RX 9070) |
+| GPU arch | `gfx1201` (RDNA4, Navi 48) |
+| Supported GPUs | See table below |
 | OS | Windows |
 | Python | 3.12 |
 | PyTorch | `2.12.0+rocm7.14.0` |
 | flash-attention | `main` (includes RDNA4 via PR [#2400](https://github.com/Dao-AILab/flash-attention/pull/2400); tag `v2.8.3.post1` lacks `gfx1201`) |
 | Runner | `windows-2022` (hosted only) |
+
+### Supported GPUs (`gfx1201`)
+
+Per [AMD ROCm GPU specifications](https://rocm.docs.amd.com/en/latest/reference/gpu-arch-specs.html):
+
+| Category | Model |
+|----------|-------|
+| Consumer | Radeon RX 9070 XT |
+| Consumer | Radeon RX 9070 |
+| Consumer | Radeon RX 9070 GRE |
+| Workstation | Radeon AI PRO R9700 |
+| Workstation | Radeon AI PRO R9700S |
+| Workstation | Radeon AI PRO R9600D |
+
+> RDNA4 **`gfx1200`** models (e.g. RX 9060 / RX 9060 XT) use a different LLVM target and are **not** included in this wheel.
 
 ## Trigger
 

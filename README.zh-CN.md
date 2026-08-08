@@ -8,12 +8,28 @@
 
 | 项 | 值 |
 |----|-----|
-| GPU | AMD RDNA4（`gfx1201`，如 RX 9070） |
+| GPU 架构 | `gfx1201`（RDNA4，Navi 48） |
+| 适用显卡 | 见下表 |
 | 系统 | Windows |
 | Python | 3.12 |
 | PyTorch | `2.12.0+rocm7.14.0` |
 | flash-attention | `main`（含 PR [#2400](https://github.com/Dao-AILab/flash-attention/pull/2400) RDNA4 支持；tag `v2.8.3.post1` 不含 `gfx1201`） |
 | Runner | `windows-2022`（仅 GitHub 托管） |
+
+### 适用显卡（`gfx1201`）
+
+来源：[AMD ROCm GPU specifications](https://rocm.docs.amd.com/en/latest/reference/gpu-arch-specs.html)
+
+| 类别 | 型号 |
+|------|------|
+| 消费级 | Radeon RX 9070 XT |
+| 消费级 | Radeon RX 9070 |
+| 消费级 | Radeon RX 9070 GRE |
+| 专业级 | Radeon AI PRO R9700 |
+| 专业级 | Radeon AI PRO R9700S |
+| 专业级 | Radeon AI PRO R9600D |
+
+> RDNA4 **`gfx1200`** 型号（如 RX 9060 / RX 9060 XT）为不同 LLVM target，**不包含**在本 wheel 中。
 
 ## 触发方式
 

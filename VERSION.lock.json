@@ -5,6 +5,15 @@
   "hip": "7.14.0",
   "rocm_index": "https://repo.amd.com/rocm/whl-multi-arch/",
   "gpu_archs": "gfx1201",
+  "gpu_arch_note": "RDNA4 Navi 48",
+  "supported_gpus_gfx1201": [
+    "Radeon RX 9070 XT",
+    "Radeon RX 9070",
+    "Radeon RX 9070 GRE",
+    "Radeon AI PRO R9700",
+    "Radeon AI PRO R9700S",
+    "Radeon AI PRO R9600D"
+  ],
   "opt_dim": "32,64,128,256",
   "inference_only": true,
   "flash_attention_ref": "main",
