@@ -4,7 +4,7 @@
 
 GitHub Actions workflow to build **FlashAttention 2 CK backend** for **Windows / gfx1201 / PyTorch 2.12.0+rocm7.14.0**.
 
-Toolchain versions are pinned in **`VERSION.lock.json`** and loaded into CI via `.github/actions/fa-read-version-lock` (workflows no longer duplicate version strings).
+Toolchain versions are pinned in **`VERSION.lock.json`** and loaded into CI via `.github/actions/fa-read-version-lock`.
 
 ## Target
 
@@ -15,7 +15,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded into CI via 
 | OS | Windows |
 | Python | 3.12 |
 | PyTorch | `2.12.0+rocm7.14.0` |
-| flash-attention | `5301a359…` (`VERSION.lock.json` **`flash_attention_build_commit`**) |
+| flash-attention | `VERSION.lock.json` **`flash_attention_build_commit`** |
 | Runner | `windows-2022` (hosted only) |
 
 ### FlashAttention source pins (`VERSION.lock.json`)
@@ -54,11 +54,9 @@ Per [AMD ROCm GPU specifications](https://rocm.docs.amd.com/en/latest/reference/
 This workflow builds an **inference-only** wheel for ComfyUI:
 
 - CK kernels: **fwd + fwd_appendkv + fwd_splitkv** (`generate.py` skips **bwd** → no `fmha_bwd_*` backward kernels in the wheel; forward inference works; **not for** workloads that need attention gradients, e.g. diffusion training or LoRA/fine-tuning with `flash_attn` backward)
-- Compile flag **`-DFLASHATTENTION_DISABLE_BACKWARD`** (enabled by `patch-fa-inference.ps1` with pre/post checks; `setup-rocm-env.ps1` sets `FLASHATTENTION_DISABLE_BACKWARD=TRUE`) — strips backward C++ dispatch in the extension; complements the line above; **no training / backward pass**
-- **Inference-only scope** (not stored in `VERSION.lock.json`): this repo always builds forward-only wheels; do not expect `flash_attn` backward APIs or training workflows to work
-- **C++11 ABI (`cxx11abiTRUE`)** (not stored in `VERSION.lock.json`): the extension must match the pinned PyTorch build using `_GLIBCXX_USE_CXX11_ABI=1` (official ROCm 2.12 wheels). ABI mismatch typically breaks `import flash_attn_2_cuda`. Smoke test checks `expected_wheel_pattern` in `VERSION.lock.json`, which includes the `cxx11abiTRUE` tag
+- Compile flag **`-DFLASHATTENTION_DISABLE_BACKWARD`** — strips backward C++ dispatch in the extension; complements the line above; **no training / backward pass**
+- **C++11 ABI (`cxx11abiTRUE`)**: the extension must match the pinned PyTorch build using `_GLIBCXX_USE_CXX11_ABI=1` (official ROCm 2.12 wheels). ABI mismatch typically breaks `import flash_attn_2_cuda`. Smoke test checks `expected_wheel_pattern` in `VERSION.lock.json`, which includes the `cxx11abiTRUE` tag
 - `OPT_DIM=32,64,128,256` (same head-dim tiers as upstream default)
-- **`link_parallel_wheel.py` monkey-patch** (not stored in `VERSION.lock.json`): parallel link patches `torch.utils.cpp_extension._run_ninja_build` to merge prebuilt `.obj` files; re-validate when bumping the pinned PyTorch version
 - Fits GitHub hosted runner **6h** timeout; full upstream build needs ~20h+
 
 ### Ninja build scale (inference profile)
@@ -84,8 +82,6 @@ This workflow builds an **inference-only** wheel for ComfyUI:
 | Input | Default | Description |
 |-------|---------|-------------|
 | `ninja_workers` | `4` | Ninja parallel compile workers per build job (not CI job count; use `2` if OOM) |
-
-> FA source is always cloned at **`flash_attention_build_commit`** in `VERSION.lock.json` and must meet **`flash_attention_min_commit`**.
 
 ### Shared components
 
@@ -141,7 +137,7 @@ Shorter wall clock (~1–2h) but more total runner minutes. Same wheel artifact 
 
 ## Output
 
-Artifact: **`wheel_artifact_name`** in `VERSION.lock.json` (currently `flash-attn-ck-gfx1201-cp312-rocm714`)
+Artifact: **`wheel_artifact_name`** in `VERSION.lock.json`
 
 Includes:
 
@@ -162,7 +158,7 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 | CI CPU smoke test | `build/smoke-test-wheel.ps1` | wheel name matches `VERSION.lock.json`, SHA256 checksum + manifest, pip install, extension import |
 | Local GPU smoke test | `build/gpu-smoke-test.ps1` | actual `flash_attn_func` forward on gfx1201 (requires ROCm PyTorch + GPU) |
 
-> CI runs on GitHub **hosted** runners without AMD GPU — **CI pass does not prove GPU kernel correctness**. Run `gpu-smoke-test.ps1` on your RX 9070 machine before deploying to ComfyUI.
+> CI runs on GitHub **hosted** runners without AMD GPU — **CI pass does not prove GPU kernel correctness**. Run `gpu-smoke-test.ps1` on a **gfx1201** GPU before deploying to ComfyUI.
 
 ## Local build (outside CI)
 
@@ -185,7 +181,3 @@ $PY = "<ComfyUI>\python_embeded\python.exe"
 ```
 
 Then switch ComfyUI launch arg from `--use-pytorch-cross-attention` to `--use-flash-attention`.
-
-## Repository
-
-https://github.com/hcwhan/flash-attn-rocm-gfx1201-build

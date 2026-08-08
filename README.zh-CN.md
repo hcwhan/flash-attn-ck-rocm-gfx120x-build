@@ -4,7 +4,7 @@
 
 使用 GitHub Actions 为 **Windows / gfx1201 / PyTorch 2.12.0+rocm7.14.0** 编译 **FlashAttention 2 CK 后端** wheel。
 
-工具链版本以 **`VERSION.lock.json`** 为唯一来源，经 `.github/actions/fa-read-version-lock` 注入 CI（workflow 不再重复硬编码版本号）。
+工具链版本以 **`VERSION.lock.json`** 为唯一来源，经 `.github/actions/fa-read-version-lock` 注入 CI。
 
 ## 目标环境
 
@@ -15,7 +15,7 @@
 | 系统 | Windows |
 | Python | 3.12 |
 | PyTorch | `2.12.0+rocm7.14.0` |
-| flash-attention | `5301a359…`（`VERSION.lock.json` **`flash_attention_build_commit`**） |
+| flash-attention | `VERSION.lock.json` **`flash_attention_build_commit`** |
 | Runner | `windows-2022`（仅 GitHub 托管） |
 
 ### FlashAttention 源码 pin（`VERSION.lock.json`）
@@ -54,11 +54,9 @@
 本 workflow 为 ComfyUI **推理专用** wheel：
 
 - CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（`generate.py` 不跑 **bwd** 方向 → wheel 内**不含** `fmha_bwd_*` backward kernel；前向推理正常，**不支持**需对 attention 求梯度的场景，如扩散模型训练、LoRA/微调中对 `flash_attn` 的反传）
-- 编译宏 **`-DFLASHATTENTION_DISABLE_BACKWARD`**（`patch-fa-inference.ps1` 直接修改并经修改前/后校验；`setup-rocm-env.ps1` 设 `FLASHATTENTION_DISABLE_BACKWARD=TRUE`）— 编译期去掉 extension 内 backward 相关 C++ 分支；与上条互补，**不支持训练/反传**
-- **推理专用范围**（不在 `VERSION.lock.json` 中）：本仓库始终构建仅前向 wheel；勿期望 `flash_attn` 反传 API 或训练流程可用
-- **C++11 ABI（`cxx11abiTRUE`）**（不在 `VERSION.lock.json` 中）：extension 须与 pin 的 PyTorch 一致，使用 `_GLIBCXX_USE_CXX11_ABI=1`（官方 ROCm 2.12 wheel）。ABI 不一致通常导致 `import flash_attn_2_cuda` 失败。smoke test 通过 `VERSION.lock.json` 的 `expected_wheel_pattern` 间接校验（含 `cxx11abiTRUE` 标签）
+- 编译宏 **`-DFLASHATTENTION_DISABLE_BACKWARD`** — 编译期去掉 extension 内 backward 相关 C++ 分支；与上条互补，**不支持训练/反传**
+- **C++11 ABI（`cxx11abiTRUE`）**：extension 须与 pin 的 PyTorch 一致，使用 `_GLIBCXX_USE_CXX11_ABI=1`（官方 ROCm 2.12 wheel）。ABI 不一致通常导致 `import flash_attn_2_cuda` 失败。smoke test 通过 `VERSION.lock.json` 的 `expected_wheel_pattern` 间接校验（含 `cxx11abiTRUE` 标签）
 - `OPT_DIM=32,64,128,256`（与 upstream 默认 head dim 档一致）
-- **`link_parallel_wheel.py` monkey-patch**（不在 `VERSION.lock.json` 中）：并行 link 会 patch `torch.utils.cpp_extension._run_ninja_build` 以合并预编译 `.obj`；升级 pin 的 PyTorch 版本后须重新验证
 - 适配 GitHub 托管 runner **6 小时**上限；完整 upstream 编译需 20 小时+
 
 ### Ninja 编译规模（推理专用配置）
@@ -84,8 +82,6 @@
 | 输入 | 默认 | 说明 |
 |------|------|------|
 | `ninja_workers` | `4` | Ninja 并行编译 worker 数（非 CI job 数；OOM 时可改为 `2`） |
-
-> FA 源码始终 clone **`VERSION.lock.json`** 的 **`flash_attention_build_commit`**，且须满足 **`flash_attention_min_commit`** 下限。
 
 ### 共用组件
 
@@ -142,7 +138,7 @@
 
 ## 产物
 
-Artifact 名称：**`VERSION.lock.json` 的 `wheel_artifact_name`**（当前为 `flash-attn-ck-gfx1201-cp312-rocm714`）
+Artifact 名称：**`VERSION.lock.json` 的 `wheel_artifact_name`**
 
 包含：
 
@@ -163,11 +159,11 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 | CI CPU smoke test | `build/smoke-test-wheel.ps1` | wheel 文件名匹配 `VERSION.lock.json`、SHA256 校验和 + manifest、pip 安装、extension import |
 | 本地 GPU smoke test | `build/gpu-smoke-test.ps1` | gfx1201 上实际运行 `flash_attn_func` 前向（需 ROCm PyTorch + GPU） |
 
-> CI 运行在 GitHub **托管** runner 上，无 AMD GPU — **CI 通过不等于 GPU 内核正确**。部署到 ComfyUI 前请在 RX 9070 机器上运行 `gpu-smoke-test.ps1`。
+> CI 运行在 GitHub **托管** runner 上，无 AMD GPU — **CI 通过不等于 GPU 内核正确**。部署到 ComfyUI 前请在 **gfx1201** GPU 上运行 `gpu-smoke-test.ps1`。
 
-## 本地构建（CI 外）
+## 本地构建
 
-在已安装 MSVC、Python 3.12、PyTorch ROCm 的 Windows 机器上：
+在已安装 MSVC、Python 3.12、PyTorch ROCm 的 Windows 机器上，也支持本地构建：
 
 ```powershell
 cd flash-attn-rocm-gfx1201-build
@@ -186,7 +182,3 @@ $PY = "<ComfyUI>\python_embeded\python.exe"
 ```
 
 然后将 ComfyUI 启动参数从 `--use-pytorch-cross-attention` 改为 `--use-flash-attention`。
-
-## 仓库地址
-
-https://github.com/hcwhan/flash-attn-rocm-gfx1201-build
