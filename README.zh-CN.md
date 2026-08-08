@@ -30,34 +30,18 @@
 - `OPT_DIM=32,64,128,256`（与 upstream 默认 head dim 档一致）
 - 适配 GitHub 托管 runner **6 小时**上限；完整 upstream 编译需 20 小时+
 
-### CI 策略（两 job + 断点续编）
+## CI 策略（两 job + 断点续编）
 
 | Job | 作用 | 超时 |
-|-----|------|------|
-| `prep-fa-src` | clone + patch，上传源码 artifact | 45 min |
-| `build-win-gfx1201` | 装 toolchain、恢复 cache、`pip wheel` | 6 h |
-
-- **Prep / Build 拆分**：编译 job 不再消耗 clone/patch 时间，多争取约 20–40 min 缓冲。
-- **actions/cache**：缓存 `build/`（含 ninja `.obj`）；`save-always: true`，6h 超时后 **Re-run workflow** 可增量续编（同一 `flash_attn_ref` + 相同 patch 脚本）。
-
-> 超时续编：Actions → 失败/取消的 run → **Re-run all jobs**（不要 Re-run failed jobs only，否则 prep artifact 可能缺失）。
-
-## Workflow 结构
-
-两阶段 job，各自独立计时：
-
-| Job | 内容 | 超时 |
 |-----|------|------|
 | `prep-fa-src` | clone + patch flash-attention，上传源码 artifact | 45 min |
 | `build-win-gfx1201` | 安装 torch/rocm、恢复 cache、编译 wheel | 6 h |
 
-`build` job 不再消耗 clone/patch 时间，编译窗口更长。
+- **Prep / Build 拆分**：编译 job 保留完整 6h 给 ninja（比单 job 多约 20–40 min 缓冲）。
+- **actions/cache**：缓存 `C:\fa\flash-attention\build`（ninja `.obj` + generate 输出）；`save-always: true`。
+- **超时后续编**：用相同 `flash_attn_ref` 且 patch 脚本未改时重新 Run workflow。cache key 绑定 PyTorch 版本、`GPU_ARCHS`、`OPT_DIM`、patch 脚本 hash、`flash_attn_ref`；换 ref 或改 patch 会冷启动。
 
-## 断点续编（cache）
-
-`build` job 用 `actions/cache` 缓存 `C:\fa\flash-attention\build`（含 ninja `.obj` 与 generate 输出）。
-若 6h 超时或编译失败，**用相同 `flash_attn_ref` 重新 Run workflow**（无需改参数）即可增量续编。
-cache key 绑定 PyTorch 版本、`GPU_ARCHS`、`OPT_DIM`、patch 脚本 hash、`flash_attn_ref`；换 ref 或改 patch 会冷启动。
+> Actions → 超时或失败的 run → **Re-run all jobs**（不要 Re-run failed jobs only，否则 prep artifact 可能缺失）。
 
 ## 产物
 
