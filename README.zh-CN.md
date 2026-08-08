@@ -54,7 +54,7 @@
 | Workflow | 用途 | 触发 |
 |----------|------|------|
 | **Build FlashAttention CK serial (Windows gfx1201)** | 单 job 编译 + cache 断点续编（`serial-v2`） | **仅手动** |
-| **Build FlashAttention CK parallel (Windows gfx1201)** | 4 路 `OPT_DIM` 并发编译 + artifact 分片 + cache 断点续编（`parallel-d{dim}-v2`）+ link 汇总 | **仅手动** |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | 4 路 `OPT_DIM` 并发编译 + artifact 分片 + cache 断点续编（`parallel-v2-d{dim}`）+ link 汇总 | **仅手动** |
 
 > 推送到 `main` **不会**自动触发编译。
 
@@ -110,10 +110,10 @@
 墙钟更短（约 1–2h），但总 runner 分钟数更高。产物与串行 workflow 相同。
 
 - **link 前置校验**：`validate-link-staging.ps1` 检查 `d32`/`d64`/`d128`/`d256` 目录齐全、各 shard 含对应 dim kernel obj、无跨 shard 污染。
-- **actions/cache**：各 shard 缓存 `build/`，key 前缀 `parallel-d{dim}-v2`；restore-keys 仅匹配同 hash 前缀（不再宽泛匹配 `-gfx1201-`）；超时后 **Re-run failed jobs** 可增量续编。
+- **actions/cache**：各 shard 缓存 `build/`，key 前缀 `parallel-v2-d{dim}`；restore-keys 仅匹配同 hash 前缀（不再宽泛匹配 `-gfx1201-`）；超时后 **Re-run failed jobs** 可增量续编。
 - **link-wheel** 仍须 4 个 compile job 均成功并上传 obj artifact。
 
-> cache key 互相隔离：串行 `serial-v2`，并行 `parallel-d32-v2` / `d64` / `d128` / `d256`，两个 workflow 不共用 cache 条目。
+> cache key 互相隔离：串行 `serial-v2`，并行 `parallel-v2-d32` / `d64` / `d128` / `d256`，两个 workflow 不共用 cache 条目。
 
 ## 产物
 

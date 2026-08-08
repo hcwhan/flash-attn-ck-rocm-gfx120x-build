@@ -54,7 +54,7 @@ This workflow builds an **inference-only** wheel for ComfyUI:
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
 | **Build FlashAttention CK serial (Windows gfx1201)** | Single-job build + cache resume (`serial-v2`) | **Manual only** |
-| **Build FlashAttention CK parallel (Windows gfx1201)** | 4-way `OPT_DIM` compile + artifact sharding + cache resume (`parallel-d{dim}-v2`) + link | **Manual only** |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | 4-way `OPT_DIM` compile + artifact sharding + cache resume (`parallel-v2-d{dim}`) + link | **Manual only** |
 
 > Push to `main` does **not** auto-trigger builds.
 
@@ -109,10 +109,10 @@ All three use **in-process `exec_module(setup.py)`** and the same `NinjaBuildExt
 Shorter wall clock (~1–2h) but more total runner minutes. Same wheel artifact as serial.
 
 - **Link pre-check**: `validate-link-staging.ps1` ensures all four staging dirs exist, each shard has dim-specific kernel objs, no cross-shard contamination.
-- **actions/cache** per shard on `build/`, key prefix `parallel-d{dim}-v2`; restore-keys match hash prefix only (no broad `-gfx1201-` fallback); timeout resume via **Re-run failed jobs**.
+- **actions/cache** per shard on `build/`, key prefix `parallel-v2-d{dim}`; restore-keys match hash prefix only (no broad `-gfx1201-` fallback); timeout resume via **Re-run failed jobs**.
 - **link-wheel** still requires all four compile jobs to succeed and upload obj artifacts.
 
-> Cache keys are isolated: serial uses `serial-v2`, parallel uses `parallel-d32-v2` / `d64` / `d128` / `d256` — the two workflows do not share cache entries.
+> Cache keys are isolated: serial uses `serial-v2`, parallel uses `parallel-v2-d32` / `d64` / `d128` / `d256` — the two workflows do not share cache entries.
 
 ## Output
 

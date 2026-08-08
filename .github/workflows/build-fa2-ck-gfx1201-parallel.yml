@@ -84,9 +84,9 @@ jobs:
         uses: ./.github/actions/fa-ninja-cache-restore
         with:
           fa-src: ${{ env.FA_SRC }}
-          cache-key: fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-${{ env.FLASH_ATTN_REF }}
+          cache-key: fa2-ck-gfx1201-parallel-v2-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-${{ env.FLASH_ATTN_REF }}
           restore-keys: |
-            fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-
+            fa2-ck-gfx1201-parallel-v2-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-
 
       - name: Report cache status
         shell: pwsh
