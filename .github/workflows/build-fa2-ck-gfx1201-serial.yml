@@ -77,23 +77,6 @@ jobs:
           cache-key: fa2-ck-gfx1201-serial-v3-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/compile/link_parallel_wheel.py', 'build/wheel/build-bdist-wheel.ps1', 'build/common/paths.ps1', 'build/common/get-fa-release-dir.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}
           skip-restore: ${{ github.event.inputs.skip_cache_restore != false && 'true' || 'false' }}
 
-      - name: Report cache status
-        shell: pwsh
-        run: |
-          Write-Host "flash-attention commit: ${{ needs.prep.outputs.fa-commit-sha }}"
-          Write-Host "skip_cache_restore: ${{ github.event.inputs.skip_cache_restore != false }}"
-          if ('${{ github.event.inputs.skip_cache_restore != false }}' -eq 'true') {
-            Write-Host "Cache restore skipped by workflow input; compiling fresh (cache save still enabled)"
-          } elseif ('${{ steps.fa-build-cache.outputs.cache-hit }}' -eq 'true') {
-            Write-Host "Cache hit: resuming incremental ninja build"
-          } else {
-            Write-Host "Cache miss: starting fresh compile (re-run workflow to resume if timed out)"
-          }
-          if (Test-Path "$env:FA_SRC\build") {
-            Get-ChildItem "$env:FA_SRC\build" -Recurse -Filter "*.obj" -ErrorAction SilentlyContinue |
-              Measure-Object | ForEach-Object { Write-Host "Cached object files: $($_.Count)" }
-          }
-
       - name: Build wheel
         shell: pwsh
         run: |
@@ -116,8 +99,7 @@ jobs:
         run: |
           . $env:GITHUB_WORKSPACE\build\test\smoke-test-wheel.ps1 `
             -DistDir $env:GITHUB_WORKSPACE\dist `
-            -WorkspaceRoot $env:GITHUB_WORKSPACE `
-            -FaCommitSha "${{ needs.prep.outputs.fa-commit-sha }}"
+            -WorkspaceRoot $env:GITHUB_WORKSPACE
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v7

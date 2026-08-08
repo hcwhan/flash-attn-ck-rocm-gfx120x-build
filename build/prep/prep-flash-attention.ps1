@@ -8,28 +8,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$lockPath = Join-Path $WorkspaceRoot "VERSION.lock.json"
-if (-not (Test-Path $lockPath)) {
-    throw "VERSION.lock.json not found: $lockPath"
-}
+$BuildRoot = Join-Path $WorkspaceRoot "build"
+. (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
-$lock = Get-Content $lockPath -Raw | ConvertFrom-Json
-
-$repoUrl = [string]$lock.flash_attention_repo
-$buildCommit = [string]$lock.flash_attention_build_commit
-
-if (-not $repoUrl) {
-    throw "VERSION.lock.json flash_attention_repo is missing"
-}
-if (-not $buildCommit) {
-    throw "VERSION.lock.json flash_attention_build_commit is missing"
-}
-if ($buildCommit -notmatch '^[0-9a-fA-F]{40}$') {
-    throw "VERSION.lock.json flash_attention_build_commit must be a 40-char git SHA"
-}
-
-Write-Host "Using flash-attention repo: $repoUrl"
-Write-Host "Using flash-attention build commit: $buildCommit"
+Write-Host "Using flash-attention repo: $FLASH_ATTENTION_REPO"
+Write-Host "Using flash-attention build commit: $FLASH_ATTENTION_BUILD_COMMIT"
 
 function Initialize-FlashAttentionRepo {
     param(
@@ -52,13 +35,12 @@ function Initialize-FlashAttentionRepo {
     git -C $Root checkout FETCH_HEAD
 }
 
-Initialize-FlashAttentionRepo -Root $FlashAttentionRoot -Repo $repoUrl -Ref $buildCommit
+Initialize-FlashAttentionRepo -Root $FlashAttentionRoot -Repo $FLASH_ATTENTION_REPO -Ref $FLASH_ATTENTION_BUILD_COMMIT
 git -C $FlashAttentionRoot submodule update --init --depth 1 csrc/composable_kernel csrc/cutlass
 
-$resolvedCommit = (git -C $FlashAttentionRoot rev-parse HEAD).Trim().ToLowerInvariant()
-$expectedCommit = $buildCommit.ToLowerInvariant()
-if ($resolvedCommit -ne $expectedCommit) {
-    throw "Resolved flash-attention commit ($resolvedCommit) does not match flash_attention_build_commit ($expectedCommit)"
+$resolvedCommit = (git -C $FlashAttentionRoot rev-parse HEAD).Trim()
+if ($resolvedCommit -ne $FLASH_ATTENTION_BUILD_COMMIT) {
+    throw "Resolved flash-attention commit ($resolvedCommit) does not match flash_attention_build_commit ($FLASH_ATTENTION_BUILD_COMMIT)"
 }
 
 Write-Host "Resolved flash-attention commit: $resolvedCommit"
@@ -67,11 +49,8 @@ if ($env:GITHUB_OUTPUT) {
     "fa-commit-sha=$resolvedCommit" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 }
 
-$BuildRoot = Join-Path $WorkspaceRoot "build"
 . (Join-Path $BuildRoot "patch\patch-fa-inference.ps1") -FlashAttentionRoot $FlashAttentionRoot
 
-Remove-Item -Recurse -Force (Join-Path $FlashAttentionRoot ".git") -ErrorAction SilentlyContinue
-Get-ChildItem -Path $FlashAttentionRoot -Recurse -Directory -Filter ".git" -ErrorAction SilentlyContinue |
-    ForEach-Object { Remove-Item -Recurse -Force $_.FullName -ErrorAction SilentlyContinue }
+Remove-Item -Recurse -Force (Join-Path $FlashAttentionRoot ".git")
 
 Write-Host "Prepared flash-attention at $FlashAttentionRoot (commit=$resolvedCommit)"

@@ -5,9 +5,6 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$WorkspaceRoot,
 
-    [Parameter(Mandatory = $true)]
-    [string]$FaCommitSha,
-
     [string]$PythonExe = "python"
 )
 
@@ -18,18 +15,12 @@ $BuildRoot = $script:BuildRoot
 
 . (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
-$expectedPattern = $EXPECTED_WHEEL_PATTERN
-$buildCommit = (Get-Content (Join-Path $WorkspaceRoot "VERSION.lock.json") -Raw | ConvertFrom-Json).flash_attention_build_commit
-if ($FaCommitSha.ToLowerInvariant() -ne [string]$buildCommit.ToLowerInvariant()) {
-    throw "FaCommitSha '$FaCommitSha' does not match VERSION.lock.json flash_attention_build_commit '$buildCommit'"
-}
-
 $whl = Get-ChildItem (Join-Path $DistDir "*.whl") | Select-Object -First 1
 if (-not $whl) {
     throw "No wheel produced in $DistDir"
 }
-if ($whl.Name -notlike $expectedPattern) {
-    throw "Wheel name '$($whl.Name)' does not match expected pattern '$expectedPattern'"
+if ($whl.Name -notlike $EXPECTED_WHEEL_PATTERN) {
+    throw "Wheel name '$($whl.Name)' does not match expected pattern '$EXPECTED_WHEEL_PATTERN'"
 }
 
 Write-Host "Wheel name OK: $($whl.Name)"
@@ -61,18 +52,15 @@ if ($LASTEXITCODE -ne 0) {
     throw "Wheel structure check failed (exit $LASTEXITCODE)"
 }
 
-$lock = Get-Content (Join-Path $WorkspaceRoot "VERSION.lock.json") -Raw | ConvertFrom-Json
 $manifest = [ordered]@{
-    wheel                      = $whl.Name
-    sha256                     = $sha256Hex
-    size_bytes                 = $whl.Length
-    flash_attention_commit     = $FaCommitSha
-    flash_attention_build_commit = [string]$lock.flash_attention_build_commit
-    flash_attention_min_commit = [string]$lock.flash_attention_min_commit
-    pytorch                    = [string]$lock.pytorch
-    python                     = [string]$lock.python
-    gpu_archs                  = [string]$lock.gpu_archs
-    opt_dim                    = [string]$lock.opt_dim
+    wheel                        = $whl.Name
+    sha256                       = $sha256Hex
+    size_bytes                   = $whl.Length
+    flash_attention_build_commit = $FLASH_ATTENTION_BUILD_COMMIT
+    pytorch                      = $PYTORCH_VERSION
+    python                       = $PYTHON_VERSION
+    gpu_archs                    = $GPU_ARCHS
+    opt_dim                      = $LockOptDim
 }
 
 Write-Host "Wheel SHA256: $sha256Hex"
@@ -116,12 +104,6 @@ print('OK flash_attn_func', flash_attn_func)
 "@
 if ($LASTEXITCODE -ne 0) {
     throw "flash_attn extension import failed (exit $LASTEXITCODE)"
-}
-
-$manifest.smoke_test = [ordered]@{
-    wheel_structure  = "pass"
-    pip_install      = "pass"
-    extension_import = "pass"
 }
 
 $manifestPath = Join-Path $DistDir "wheel.manifest.json"

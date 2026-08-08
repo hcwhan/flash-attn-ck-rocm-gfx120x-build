@@ -36,12 +36,9 @@ New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
     -WorkspaceRoot $WorkspaceRoot `
     -PythonExe $PythonExe
 
-$lock = Get-Content (Join-Path $WorkspaceRoot "VERSION.lock.json") -Raw | ConvertFrom-Json
-
 . (Join-Path $BuildRoot "test\smoke-test-wheel.ps1") `
     -DistDir $DistDir `
     -WorkspaceRoot $WorkspaceRoot `
-    -FaCommitSha ([string]$lock.flash_attention_build_commit) `
     -PythonExe $PythonExe
 
 if ($GpuSmokeTest) {

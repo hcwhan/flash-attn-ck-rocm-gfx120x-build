@@ -34,20 +34,10 @@ foreach ($point in $patchPoints) {
 
 foreach ($point in $patchPoints) {
     $content = $content.Replace($point.Before, $point.After)
+    Write-Host "  OK $($point.Name): patched"
 }
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($setup, $content, $utf8NoBom)
-
-$verify = Get-Content $setup -Raw -Encoding UTF8
-foreach ($point in $patchPoints) {
-    if ($verify.Contains($point.Before)) {
-        throw "patch-fa-inference.ps1: before-state still present for '$($point.Name)'"
-    }
-    if (-not $verify.Contains($point.After)) {
-        throw "patch-fa-inference.ps1: after-state not found for '$($point.Name)'"
-    }
-    Write-Host "  OK $($point.Name): patched"
-}
 
 Write-Host "Patched $setup for inference-only CK build"

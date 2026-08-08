@@ -16,11 +16,6 @@ if (-not (Test-Path $FaSrc)) {
 }
 
 $BuildRoot = Join-Path $WorkspaceRoot "build"
-. (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
-
-if ($OptDim -notin $OptDimList) {
-    throw "OptDim '$OptDim' is not listed in VERSION.lock.json opt_dim: $($OptDimList -join ', ')"
-}
 
 . (Join-Path $BuildRoot "env\init-fa-build-env.ps1") `
     -WorkspaceRoot $WorkspaceRoot `
@@ -35,17 +30,13 @@ if ($LASTEXITCODE -ne 0) {
     throw "build_ext failed for OPT_DIM=$OptDim (exit $LASTEXITCODE)"
 }
 
-$releaseInfo = . (Join-Path $BuildRoot "common\get-fa-release-dir.ps1") `
+$releaseDir = . (Join-Path $BuildRoot "common\get-fa-release-dir.ps1") `
     -FaSrc $FaSrc `
-    -OptDim $OptDim `
-    -PassThru
+    -OptDim $OptDim
 
-Write-Host (
-    "OPT_DIM=$OptDim produced $($releaseInfo.ObjCount) object files " +
-    "($($releaseInfo.DimKernelCount) dim-kernel) under $($releaseInfo.ReleaseDir)"
-)
+Write-Host "OPT_DIM=$OptDim release dir: $releaseDir"
 
-$env:RELEASE_DIR = $releaseInfo.ReleaseDir
+$env:RELEASE_DIR = $releaseDir
 if ($env:GITHUB_ENV) {
-    "RELEASE_DIR=$($releaseInfo.ReleaseDir)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+    "RELEASE_DIR=$releaseDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 }

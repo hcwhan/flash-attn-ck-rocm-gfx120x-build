@@ -3,9 +3,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$FaSrc,
 
-    [string]$OptDim = "",
-
-    [switch]$PassThru
+    [Parameter(Mandatory = $true)]
+    [string]$OptDim
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,14 +24,14 @@ if (-not (Test-Path $releaseDir)) {
     throw "Release directory missing: $releaseDir"
 }
 
-$dimToken = if ($OptDim) { "_d${OptDim}_" } else { $null }
+$dimToken = "_d${OptDim}_"
 $objCount = 0
 $dimKernelCount = 0
 
 Get-ChildItem -Path $releaseDir -Recurse -Filter "*.obj" -File |
     ForEach-Object {
         $objCount++
-        if ($dimToken -and $_.Name -like "*${dimToken}*") {
+        if ($_.Name -like "*${dimToken}*") {
             $dimKernelCount++
         }
     }
@@ -40,24 +39,9 @@ Get-ChildItem -Path $releaseDir -Recurse -Filter "*.obj" -File |
 if ($objCount -lt 1) {
     throw "No .obj files under $releaseDir"
 }
-if ($dimToken -and $dimKernelCount -lt 1) {
+if ($dimKernelCount -lt 1) {
     throw "No *_d${OptDim}_* kernel objects under $releaseDir"
 }
 
-$result = [PSCustomObject]@{
-    TempRoot       = $candidates[0].FullName
-    ReleaseDir     = $releaseDir
-    ObjCount       = $objCount
-    DimKernelCount = $dimKernelCount
-}
-
-Write-Host (
-    "Release dir: $($result.ReleaseDir) " +
-    "($($result.ObjCount) objs, $($result.DimKernelCount) dim-kernel)"
-)
-
-if ($PassThru) {
-    return $result
-}
-
-return $result.ReleaseDir
+Write-Host "Release dir: $releaseDir ($objCount objs, $dimKernelCount dim-kernel)"
+return $releaseDir

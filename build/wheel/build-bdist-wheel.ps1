@@ -25,11 +25,12 @@ $BuildRoot = Join-Path $WorkspaceRoot "build"
 . (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
 if ($StagingRoot) {
-    $env:FLASH_ATTENTION_FORCE_BUILD = "FALSE"
     if (-not $PrimaryDim) {
         throw "PrimaryDim is required when StagingRoot is set"
     }
-    Write-Host "Parallel link: FLASH_ATTENTION_FORCE_BUILD=FALSE"
+    $env:FLASH_ATTENTION_FORCE_BUILD = "FALSE"
+} else {
+    $env:FLASH_ATTENTION_FORCE_BUILD = "TRUE"
 }
 
 . (Join-Path $BuildRoot "env\init-fa-build-env.ps1") `

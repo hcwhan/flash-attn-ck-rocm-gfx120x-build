@@ -67,12 +67,6 @@ if (-not $env:OPT_DIM) {
     $env:OPT_DIM = [string]$lock.opt_dim
 }
 $env:FLASHATTENTION_DISABLE_BACKWARD = "TRUE"
-if (-not $env:MAX_JOBS) {
-    $env:MAX_JOBS = "4"
-}
-if (-not $env:FLASH_ATTENTION_FORCE_BUILD) {
-    $env:FLASH_ATTENTION_FORCE_BUILD = "TRUE"
-}
 $env:BUILD_TARGET = "rocm"
 
 Write-Host "GPU_ARCHS=$env:GPU_ARCHS"

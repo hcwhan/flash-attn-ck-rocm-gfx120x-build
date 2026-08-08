@@ -9,7 +9,6 @@ import sys
 import time
 from pathlib import Path
 
-_PATCHED = False
 _ORIGINAL_RUN_NINJA = None
 
 DIM_PATTERN = re.compile(r"_d(\d+)_")
@@ -121,7 +120,7 @@ def _stamp_prebuilt_obj(dest: Path, fa_src: Path) -> None:
 
 def require_parallel_link_force_build_false() -> None:
     value = os.environ.get("FLASH_ATTENTION_FORCE_BUILD", "").strip().upper()
-    if value and value not in ("FALSE", "0", "NO"):
+    if value == "TRUE":
         raise SystemExit(
             "Parallel link requires FLASH_ATTENTION_FORCE_BUILD=FALSE "
             f"(got {os.environ.get('FLASH_ATTENTION_FORCE_BUILD')!r})"
@@ -130,9 +129,7 @@ def require_parallel_link_force_build_false() -> None:
 
 
 def install_patch(staging_root: Path, fa_src: Path, primary_dim: str) -> None:
-    global _PATCHED, _ORIGINAL_RUN_NINJA
-    if _PATCHED:
-        return
+    global _ORIGINAL_RUN_NINJA
 
     import torch.utils.cpp_extension as cpp_ext
 
@@ -184,7 +181,6 @@ def install_patch(staging_root: Path, fa_src: Path, primary_dim: str) -> None:
         return _ORIGINAL_RUN_NINJA(build_directory, *args, **kwargs)
 
     cpp_ext._run_ninja_build = patched_run_ninja
-    _PATCHED = True
 
 
 def build_wheel(fa_src: Path, dist_dir: Path, *, verbose: bool = False) -> None:

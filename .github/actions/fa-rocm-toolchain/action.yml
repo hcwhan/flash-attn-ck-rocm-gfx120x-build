@@ -57,9 +57,3 @@ runs:
         python -m rocm_sdk init --quiet
         python -m rocm_sdk path --root
         python -c "from pathlib import Path; import subprocess; r=Path(subprocess.check_output(['python','-m','rocm_sdk','path','--root'], text=True).strip()); p=r/'include'/'thrust'/'complex.h'; print('thrust header:', p, p.is_file()); assert p.is_file()"
-
-    - name: Verify torch and rocm toolchain
-      shell: pwsh
-      run: |
-        python -c "import torch; print('torch', torch.__version__); print('hip', torch.version.hip); print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)"
-        python -c "import importlib.util, os; s=importlib.util.find_spec('_rocm_sdk_core'); print('rocm_sdk_core', os.path.dirname(s.origin))"
