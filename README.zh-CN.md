@@ -53,13 +53,18 @@
 
 | Workflow | 用途 | 触发 |
 |----------|------|------|
-| **Build FlashAttention CK serial (Windows gfx1201)** | 单 job 编译 + cache 断点续编（`serial-v2`） | 手动 / tag `fa-ck-v*` |
+| **Build FlashAttention CK serial (Windows gfx1201)** | 单 job 编译 + cache 断点续编（`serial-v2`） | **仅手动** |
 | **Build FlashAttention CK parallel (Windows gfx1201)** | 4 路 `OPT_DIM` 并发编译 + artifact 分片 + cache 断点续编（`parallel-d{dim}-v2`）+ link 汇总 | **仅手动** |
 
 > 推送到 `main` **不会**自动触发编译。
 
-- **手动触发**：`flash_attn_ref` 支持 branch / tag / **commit SHA**；未指定时默认 `main`。
-- **tag `fa-ck-v*` 触发串行 workflow**：使用 `VERSION.lock.json` 中的 **`flash_attention_min_commit`** 锁定 FA 源码（可复现发布），而非浮动 `main`。
+**手动输入（两个 workflow 均有）：**
+
+| 输入 | 默认 | 说明 |
+|------|------|------|
+| `flash_attn_ref` | `main` | branch / tag / **commit SHA** |
+| `max_jobs` | `4` | ninja 并行度（OOM 时可改为 `2`） |
+| `use_locked_commit` | `false` | 为 `true` 时使用 `VERSION.lock.json` 的 **`flash_attention_min_commit`** 锁定 FA 源码 |
 
 ### 共用组件
 
@@ -68,16 +73,23 @@
 - `.github/actions/fa-prep-artifact` — clone + patch + 上传源码
 - `.github/actions/fa-rocm-toolchain` — Python / MSVC / torch / rocm devel
 - `.github/actions/fa-download-src` — 下载 prep artifact
-- `build/prep-flash-attention.ps1`、`build/setup-rocm-env.ps1`、`build/smoke-test-wheel.ps1`
+- `build/prep-flash-attention.ps1`、`build/setup-rocm-env.ps1`、`build/build-bdist-wheel.ps1`、`build/smoke-test-wheel.ps1`
 
-并行 workflow（`build-fa2-ck-gfx1201-parallel.yml`）额外使用：`build/compile-opt-dim.ps1`、`build/link_parallel_wheel.py`、`build/validate-link-staging.ps1`。
+串行 / 并行 link 共用 `build-bdist-wheel.ps1` → 同进程 `bdist_wheel -v`（`link_parallel_wheel.py`）；并行 compile 额外使用 `build/compile-opt-dim.ps1`、`build/validate-link-staging.ps1`。
+
+### 串行 build / 并行 link 打 wheel（共用路径）
+
+| 步骤 | 脚本 |
+|------|------|
+| 装 numpy + ROCm env | `build-bdist-wheel.ps1` |
+| 打 wheel | `link_parallel_wheel.py --serial -v`（串行）或带 `--staging-root`（并行 link） |
 
 ### 并行 compile / link 分工
 
 | 阶段 | 命令 | 原因 |
 |------|------|------|
-| **compile**（各 shard） | `setup.py build_ext --inplace` | 只编译单个 `OPT_DIM` 的 ninja 图，产出 `.obj` artifact |
-| **link** | `bdist_wheel`（同进程 + ninja patch 合并 obj） | 需要完整 `OPT_DIM=32,64,128,256` 的 setup 图做最终链接；prebuilt obj 注入后 ninja 跳过已编译单元 |
+| **compile**（各 shard） | `setup.py build_ext --inplace -v` | 只编译单个 `OPT_DIM` 的 ninja 图，产出 `.obj` artifact |
+| **串行 build / parallel link** | `build-bdist-wheel.ps1` → `bdist_wheel -v` | 同进程 setuptools；并行 link 额外 ninja patch 合并 prebuilt obj |
 
 两者共用同一 `NinjaBuildExtension`，Release 目录布局一致。
 
@@ -88,7 +100,7 @@
 | Job | 作用 | 超时 |
 |-----|------|------|
 | `prep-fa-src` | clone + patch，上传源码 artifact | 45 min |
-| `build-win-gfx1201` | 装 toolchain、恢复 cache、`pip wheel` | 6 h |
+| `build-win-gfx1201` | 装 toolchain、恢复 cache、`build-bdist-wheel.ps1` | 6 h |
 
 - **Prep / Build 拆分**：编译 job 保留完整 6h 给 ninja。
 - **actions/cache**：缓存 `build/`，key 前缀 `serial-v2`；超时后 **Re-run all jobs** 可增量续编。

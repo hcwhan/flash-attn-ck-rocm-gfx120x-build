@@ -11,6 +11,11 @@ on:
         description: "Parallel compile jobs per OPT_DIM shard (use 2 if OOM)"
         required: false
         default: "4"
+      use_locked_commit:
+        description: "Pin FA source to VERSION.lock.json flash_attention_min_commit"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: build-fa2-ck-gfx1201-parallel
@@ -44,7 +49,7 @@ jobs:
           flash-attn-ref: ${{ env.FLASH_ATTN_REF }}
           fa-src: ${{ env.FA_SRC }}
           artifact-name: ${{ env.FA_ARTIFACT }}
-          use-locked-commit: "false"
+          use-locked-commit: ${{ github.event.inputs.use_locked_commit && 'true' || 'false' }}
 
   compile:
     name: compile-d${{ matrix.opt_dim }}
@@ -79,9 +84,9 @@ jobs:
         id: fa-build-cache
         with:
           path: ${{ env.FA_SRC }}\build
-          key: fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1') }}-${{ env.FLASH_ATTN_REF }}
+          key: fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-${{ env.FLASH_ATTN_REF }}
           restore-keys: |
-            fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1') }}-
+            fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-
           save-always: true
 
       - name: Report cache status
@@ -172,12 +177,12 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path $env:GITHUB_WORKSPACE\dist | Out-Null
-          . $env:GITHUB_WORKSPACE\build\setup-rocm-env.ps1 -PythonExe python
-          python $env:GITHUB_WORKSPACE\build\link_parallel_wheel.py `
-            --fa-src $env:FA_SRC `
-            --staging-root $env:FA_STAGING `
-            --dist-dir $env:GITHUB_WORKSPACE\dist `
-            --primary-dim 32
+          . $env:GITHUB_WORKSPACE\build\build-bdist-wheel.ps1 `
+            -FaSrc $env:FA_SRC `
+            -DistDir $env:GITHUB_WORKSPACE\dist `
+            -WorkspaceRoot $env:GITHUB_WORKSPACE `
+            -StagingRoot $env:FA_STAGING `
+            -PrimaryDim 32
           Get-ChildItem $env:GITHUB_WORKSPACE\dist
 
       - name: CPU smoke test

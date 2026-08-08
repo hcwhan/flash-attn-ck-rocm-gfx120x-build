@@ -1,4 +1,4 @@
-"""Merge parallel OPT_DIM compile artifacts and build the flash-attn wheel."""
+"""Build flash-attn wheel via in-process bdist_wheel (serial or parallel link)."""
 from __future__ import annotations
 
 import argparse
@@ -120,7 +120,7 @@ def install_patch(staging_root: Path, primary_dim: str = "32") -> None:
     _PATCHED = True
 
 
-def build_wheel(fa_src: Path, dist_dir: Path) -> None:
+def build_wheel(fa_src: Path, dist_dir: Path, *, verbose: bool = False) -> None:
     import importlib.util
 
     dist_dir.mkdir(parents=True, exist_ok=True)
@@ -128,6 +128,8 @@ def build_wheel(fa_src: Path, dist_dir: Path) -> None:
 
     setup_py = fa_src / "setup.py"
     argv = [str(setup_py), "bdist_wheel", "--dist-dir", str(dist_dir)]
+    if verbose:
+        argv.insert(1, "-v")
     sys.argv = argv
     print("Running:", " ".join(argv), flush=True)
 
@@ -141,30 +143,55 @@ def build_wheel(fa_src: Path, dist_dir: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--fa-src", type=Path)
-    parser.add_argument("--staging-root", type=Path, required=True)
+    parser.add_argument("--staging-root", type=Path)
     parser.add_argument("--dist-dir", type=Path)
     parser.add_argument("--primary-dim", default="32")
+    parser.add_argument(
+        "--serial",
+        action="store_true",
+        help="Full single-pass bdist_wheel (no OPT_DIM obj merge)",
+    )
     parser.add_argument(
         "--validate-only",
         action="store_true",
         help="Validate staging layout and exit without building",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Verbose setuptools/ninja output",
+    )
     args = parser.parse_args()
 
-    if not args.staging_root.is_dir():
-        raise SystemExit(f"Staging root missing: {args.staging_root}")
-
-    validate_staging(args.staging_root, primary_dim=args.primary_dim)
     if args.validate_only:
+        if args.staging_root is None:
+            raise SystemExit("--staging-root is required with --validate-only")
+        if not args.staging_root.is_dir():
+            raise SystemExit(f"Staging root missing: {args.staging_root}")
+        validate_staging(args.staging_root, primary_dim=args.primary_dim)
         return
 
+    if args.serial:
+        if args.fa_src is None or args.dist_dir is None:
+            raise SystemExit("--fa-src and --dist-dir are required with --serial")
+        if not args.fa_src.is_dir():
+            raise SystemExit(f"FA source missing: {args.fa_src}")
+        build_wheel(args.fa_src, args.dist_dir, verbose=args.verbose)
+        return
+
+    if args.staging_root is None:
+        raise SystemExit("--staging-root is required unless --serial or --validate-only")
     if args.fa_src is None or args.dist_dir is None:
-        raise SystemExit("--fa-src and --dist-dir are required unless --validate-only is set")
+        raise SystemExit("--fa-src and --dist-dir are required for parallel link")
+    if not args.staging_root.is_dir():
+        raise SystemExit(f"Staging root missing: {args.staging_root}")
     if not args.fa_src.is_dir():
         raise SystemExit(f"FA source missing: {args.fa_src}")
 
+    validate_staging(args.staging_root, primary_dim=args.primary_dim)
     install_patch(args.staging_root, primary_dim=args.primary_dim)
-    build_wheel(args.fa_src, args.dist_dir)
+    build_wheel(args.fa_src, args.dist_dir, verbose=args.verbose)
 
 
 if __name__ == "__main__":

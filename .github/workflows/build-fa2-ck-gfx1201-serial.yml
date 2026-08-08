@@ -11,9 +11,11 @@ on:
         description: "Parallel compile jobs (use 2 if OOM on hosted runner)"
         required: false
         default: "4"
-  push:
-    tags:
-      - "fa-ck-v*"
+      use_locked_commit:
+        description: "Pin FA source to VERSION.lock.json flash_attention_min_commit"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: build-fa2-ck-gfx1201-serial
@@ -46,7 +48,7 @@ jobs:
           flash-attn-ref: ${{ env.FLASH_ATTN_REF }}
           fa-src: ${{ env.FA_SRC }}
           artifact-name: ${{ env.FA_ARTIFACT }}
-          use-locked-commit: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/fa-ck-v') && 'true' || 'false' }}
+          use-locked-commit: ${{ github.event.inputs.use_locked_commit && 'true' || 'false' }}
 
   build:
     name: build-win-gfx1201
@@ -77,9 +79,9 @@ jobs:
         id: fa-build-cache
         with:
           path: ${{ env.FA_SRC }}\build
-          key: fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1') }}-${{ env.FLASH_ATTN_REF }}
+          key: fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-${{ env.FLASH_ATTN_REF }}
           restore-keys: |
-            fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1') }}-
+            fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-
           save-always: true
 
       - name: Report cache status
@@ -97,12 +99,12 @@ jobs:
 
       - name: Build wheel
         shell: pwsh
-        working-directory: ${{ env.FA_SRC }}
         run: |
           New-Item -ItemType Directory -Force -Path $env:GITHUB_WORKSPACE\dist | Out-Null
-          python -m pip install numpy
-          . $env:GITHUB_WORKSPACE\build\setup-rocm-env.ps1 -PythonExe python
-          python -m pip wheel . --no-build-isolation --no-deps -w $env:GITHUB_WORKSPACE\dist -v
+          . $env:GITHUB_WORKSPACE\build\build-bdist-wheel.ps1 `
+            -FaSrc $env:FA_SRC `
+            -DistDir $env:GITHUB_WORKSPACE\dist `
+            -WorkspaceRoot $env:GITHUB_WORKSPACE
           Get-ChildItem $env:GITHUB_WORKSPACE\dist
 
       - name: CPU smoke test

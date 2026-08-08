@@ -53,13 +53,18 @@ This workflow builds an **inference-only** wheel for ComfyUI:
 
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
-| **Build FlashAttention CK serial (Windows gfx1201)** | Single-job build + cache resume (`serial-v2`) | Manual / tag `fa-ck-v*` |
+| **Build FlashAttention CK serial (Windows gfx1201)** | Single-job build + cache resume (`serial-v2`) | **Manual only** |
 | **Build FlashAttention CK parallel (Windows gfx1201)** | 4-way `OPT_DIM` compile + artifact sharding + cache resume (`parallel-d{dim}-v2`) + link | **Manual only** |
 
 > Push to `main` does **not** auto-trigger builds.
 
-- **Manual dispatch**: `flash_attn_ref` accepts branch / tag / **commit SHA**; defaults to `main`.
-- **Tag `fa-ck-v*` (serial)**: pins FA source to **`flash_attention_min_commit`** in `VERSION.lock.json` for reproducible releases (not floating `main`).
+**Manual inputs (both workflows):**
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `flash_attn_ref` | `main` | branch / tag / **commit SHA** |
+| `max_jobs` | `4` | ninja parallelism (use `2` if OOM) |
+| `use_locked_commit` | `false` | when `true`, pin FA source to **`flash_attention_min_commit`** in `VERSION.lock.json` |
 
 ### Shared components
 
@@ -88,7 +93,7 @@ Both use the same `NinjaBuildExtension`; Release layout is compatible.
 | Job | Role | Timeout |
 |-----|------|---------|
 | `prep-fa-src` | clone + patch, upload source artifact | 45 min |
-| `build-win-gfx1201` | toolchain, cache restore, `pip wheel` | 6 h |
+| `build-win-gfx1201` | toolchain, cache restore, `build-bdist-wheel.ps1` | 6 h |
 
 - **Prep / Build split** + **actions/cache** on `build/` (key prefix `serial-v2`, `save-always: true`) for timeout resume (**Re-run all jobs**).
 
