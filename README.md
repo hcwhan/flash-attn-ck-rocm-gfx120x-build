@@ -25,6 +25,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded into CI via 
 | `flash_attention_repo` | Upstream git URL |
 | `flash_attention_min_commit` | Minimum commit with gfx1201 support ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); rarely changed |
 | `flash_attention_build_commit` | Exact commit cloned for each build; **bump this to upgrade FA** |
+| `flash_attention_build_commit_date` | UTC committer date for that commit (ISO 8601); **human-readable lock marker only**, not used by prep/CI |
 | `expected_wheel_pattern` | Glob for the built `.whl` filename (smoke test) |
 | `wheel_artifact_name` | GitHub Actions artifact name for the published wheel bundle |
 

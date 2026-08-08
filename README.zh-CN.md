@@ -25,6 +25,7 @@
 | `flash_attention_repo` | upstream git 地址 |
 | `flash_attention_min_commit` | gfx1201 支持的最低 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；极少修改 |
 | `flash_attention_build_commit` | 每次构建精确 clone 的 commit；**升级 FA 时改此字段** |
+| `flash_attention_build_commit_date` | 上述 commit 的 UTC 提交时间（ISO 8601）；**仅 lock 内人类可读标记**，不参与 prep/CI 逻辑 |
 | `expected_wheel_pattern` | 构建产物 `.whl` 文件名 glob（smoke test 校验） |
 | `wheel_artifact_name` | GitHub Actions 发布的 wheel -bundle artifact 名称 |
 
