@@ -9,43 +9,25 @@ param(
 $ErrorActionPreference = "Stop"
 
 $lockPath = Join-Path $WorkspaceRoot "VERSION.lock.json"
-if (-not (Test-Path $lockPath)) {
-    throw "VERSION.lock.json not found: $lockPath"
-}
-
 $lock = Get-Content $lockPath -Raw | ConvertFrom-Json
-$gpuArchs = [string]$lock.gpu_archs
-$optDim = [string]$lock.opt_dim
-
-if (-not $gpuArchs) {
-    throw "VERSION.lock.json gpu_archs is missing"
-}
-if (-not $optDim) {
-    throw "VERSION.lock.json opt_dim is missing"
-}
 
 $pyCode = @"
 import importlib.util, os, subprocess, sys
 
 spec = importlib.util.find_spec('_rocm_sdk_core')
 if spec is None:
-    raise SystemExit('ERROR: _rocm_sdk_core not found. Install torch[device-$gpuArchs] first.')
+    raise SystemExit('ERROR: _rocm_sdk_core not found. Install torch[device-$($lock.gpu_archs)] first.')
 core_root = os.path.dirname(spec.origin)
 
-devel_root = None
-try:
-    proc = subprocess.run(
-        [sys.executable, '-m', 'rocm_sdk', 'path', '--root'],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    devel_root = proc.stdout.strip()
-except subprocess.CalledProcessError as exc:
-    print(exc.stderr or exc.stdout, file=sys.stderr)
-    raise SystemExit('ERROR: rocm[devel] not initialized. Run: python -m rocm_sdk init')
+proc = subprocess.run(
+    [sys.executable, '-m', 'rocm_sdk', 'path', '--root'],
+    capture_output=True,
+    text=True,
+    check=True,
+)
+devel_root = proc.stdout.strip()
+rocm_root = devel_root
 
-rocm_root = devel_root if devel_root else core_root
 thrust_hdr = os.path.join(rocm_root, 'include', 'thrust', 'complex.h')
 if not os.path.isfile(thrust_hdr):
     raise SystemExit(f'ERROR: thrust header missing: {thrust_hdr}')
@@ -61,7 +43,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $coreRoot = $paths[0]
 $develRoot = $paths[1]
-$rocmRoot = if ($develRoot) { $develRoot } else { $coreRoot }
+$rocmRoot = $develRoot
 
 $llvmBin = Join-Path $coreRoot "lib\llvm\bin"
 $rocmBin = Join-Path $rocmRoot "bin"
@@ -74,27 +56,21 @@ $env:HIP_PATH = $rocmRoot
 $env:HIP_INCLUDE_PATH = $hipInclude
 $env:HIP_DEVICE_LIB_PATH = $deviceLibPath
 $env:DEVICE_LIB_PATH = $deviceLibPath
-$env:CPATH = if ($env:CPATH) { "$hipInclude;$env:CPATH" } else { $hipInclude }
-if ($env:INCLUDE) {
-    $env:INCLUDE = "$hipInclude;$env:INCLUDE"
-} else {
-    $env:INCLUDE = $hipInclude
-}
+$env:CPATH = $hipInclude
+$env:INCLUDE = $hipInclude
 $env:PATH = "$llvmBin;$rocmBin;$env:PATH"
 $env:CC = "clang-cl"
 $env:CXX = "clang-cl"
 $env:DISTUTILS_USE_SDK = "1"
-$env:GPU_ARCHS = $gpuArchs
+$env:GPU_ARCHS = [string]$lock.gpu_archs
 if (-not $env:OPT_DIM) {
-    $env:OPT_DIM = $optDim
+    $env:OPT_DIM = [string]$lock.opt_dim
 }
 $env:FLASHATTENTION_DISABLE_BACKWARD = "TRUE"
 if (-not $env:MAX_JOBS) {
-    # PyTorch cpp_extension reads MAX_JOBS for ninja -j N (not GitHub Actions job count).
     $env:MAX_JOBS = "4"
 }
 if (-not $env:FLASH_ATTENTION_FORCE_BUILD) {
-    # Serial / compile-only: force extension rebuild. Parallel link sets FALSE before init.
     $env:FLASH_ATTENTION_FORCE_BUILD = "TRUE"
 }
 $env:BUILD_TARGET = "rocm"
@@ -102,10 +78,5 @@ $env:BUILD_TARGET = "rocm"
 Write-Host "GPU_ARCHS=$env:GPU_ARCHS"
 Write-Host "OPT_DIM=$env:OPT_DIM"
 Write-Host "ROCM_HOME=$env:ROCM_HOME"
-Write-Host "HIP_INCLUDE_PATH=$env:HIP_INCLUDE_PATH"
-Write-Host "HIP_DEVICE_LIB_PATH=$env:HIP_DEVICE_LIB_PATH"
-Write-Host "thrust=$hipInclude\thrust\complex.h"
-Write-Host "hipcc=$(Get-Command hipcc -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
-Write-Host "clang-cl=$(Get-Command clang-cl -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
 
 & $PythonExe -c "import torch; print('torch', torch.__version__); print('hip', torch.version.hip); print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)"

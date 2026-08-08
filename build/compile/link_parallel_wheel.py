@@ -1,8 +1,7 @@
-"""Build flash-attn via in-process setuptools (compile-only, serial, or parallel link)."""
+"""Build flash-attn via in-process setuptools (compile-only or parallel link)."""
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import shutil
@@ -16,43 +15,30 @@ _ORIGINAL_RUN_NINJA = None
 DIM_PATTERN = re.compile(r"_d(\d+)_")
 
 
-def load_opt_dims(workspace_root: Path | None = None) -> tuple[str, ...]:
-    """Resolve full OPT_DIM tiers from env or VERSION.lock.json."""
+def load_opt_dims() -> tuple[str, ...]:
     opt_dim = os.environ.get("OPT_DIM", "").strip()
-    if opt_dim and "," in opt_dim:
+    if not opt_dim:
+        raise SystemExit("OPT_DIM env is required")
+    if "," in opt_dim:
         dims = tuple(part.strip() for part in opt_dim.split(",") if part.strip())
-        if dims:
-            return dims
-
-    if workspace_root is not None:
-        lock_path = workspace_root / "VERSION.lock.json"
-        if lock_path.is_file():
-            lock = json.loads(lock_path.read_text(encoding="utf-8"))
-            raw = str(lock.get("opt_dim", "")).strip()
-            dims = tuple(part.strip() for part in raw.split(",") if part.strip())
-            if dims:
-                return dims
-
-    if opt_dim:
-        return (opt_dim,)
-
-    raise SystemExit(
-        "Cannot resolve OPT_DIM list: set comma-separated OPT_DIM env or pass --workspace-root"
-    )
+    else:
+        dims = (opt_dim,)
+    if not dims:
+        raise SystemExit("OPT_DIM is empty")
+    return dims
 
 
 def resolve_primary_dim(primary_dim: str, expected_dims: tuple[str, ...]) -> str:
-    if primary_dim:
-        if primary_dim not in expected_dims:
-            raise SystemExit(
-                f"primary_dim {primary_dim} is not in OPT_DIM list: {', '.join(expected_dims)}"
-            )
-        return primary_dim
-    return expected_dims[0]
+    if not primary_dim:
+        raise SystemExit("primary_dim is required")
+    if primary_dim not in expected_dims:
+        raise SystemExit(
+            f"primary_dim {primary_dim} is not in OPT_DIM list: {', '.join(expected_dims)}"
+        )
+    return primary_dim
 
 
 def _exec_setup_py(fa_src: Path, command_argv: list[str]) -> None:
-    """Run setup.py in-process (same invocation model as bdist_wheel / build_ext)."""
     import importlib.util
 
     os.chdir(fa_src)
@@ -68,37 +54,10 @@ def _exec_setup_py(fa_src: Path, command_argv: list[str]) -> None:
 
 
 def build_ext_only(fa_src: Path, *, verbose: bool = False) -> None:
-    """Compile extension objects only (parallel OPT_DIM shard; no --inplace)."""
     argv = ["build_ext"]
     if verbose:
         argv.append("-v")
     _exec_setup_py(fa_src, argv)
-
-
-def validate_compile_shard(release_dir: Path, opt_dim: str) -> None:
-    """Fail fast after compile if shard kernel objects are missing or cross-contaminated."""
-    release_dir = release_dir.resolve()
-    if not release_dir.is_dir():
-        raise SystemExit(f"Release dir missing: {release_dir}")
-
-    objs = list(release_dir.rglob("*.obj"))
-    if not objs:
-        raise SystemExit(f"No .obj files under {release_dir}")
-
-    dim_kernel_objs = [obj for obj in objs if DIM_PATTERN.search(obj.name)]
-    foreign = [obj for obj in dim_kernel_objs if f"_d{opt_dim}_" not in obj.name]
-    if foreign:
-        sample = ", ".join(obj.name for obj in foreign[:3])
-        raise SystemExit(f"Release dir contains foreign-dim kernel objs: {sample}")
-
-    dim_specific = [obj for obj in dim_kernel_objs if f"_d{opt_dim}_" in obj.name]
-    if not dim_specific:
-        raise SystemExit(f"Release dir has no *_d{opt_dim}_* kernel objects")
-
-    print(
-        f"Compile shard validation OK: d{opt_dim} objs={len(objs)} kernel={len(dim_specific)}",
-        flush=True,
-    )
 
 
 def validate_staging(
@@ -107,14 +66,13 @@ def validate_staging(
     expected_dims: tuple[str, ...],
     primary_dim: str,
 ) -> None:
-    """Fail fast before link if compile artifacts are missing or cross-contaminated."""
     staging_root = staging_root.resolve()
     if not staging_root.is_dir():
         raise SystemExit(f"Staging root missing: {staging_root}")
 
     primary_dim = resolve_primary_dim(primary_dim, expected_dims)
-
     summary: dict[str, int] = {}
+
     for dim in expected_dims:
         shard = staging_root / f"d{dim}"
         if not shard.is_dir():
@@ -125,13 +83,7 @@ def validate_staging(
         if not objs:
             raise SystemExit(f"No .obj files under {shard}")
 
-        dim_kernel_objs = [obj for obj in objs if DIM_PATTERN.search(obj.name)]
-        foreign = [obj for obj in dim_kernel_objs if f"_d{dim}_" not in obj.name]
-        if foreign:
-            sample = ", ".join(obj.name for obj in foreign[:3])
-            raise SystemExit(f"Shard d{dim} contains foreign-dim kernel objs: {sample}")
-
-        dim_specific = [obj for obj in dim_kernel_objs if f"_d{dim}_" in obj.name]
+        dim_specific = [obj for obj in objs if DIM_PATTERN.search(obj.name) and f"_d{dim}_" in obj.name]
         if not dim_specific:
             raise SystemExit(f"Shard d{dim} has no *_d{dim}_* kernel objects")
 
@@ -154,7 +106,6 @@ def validate_staging(
 
 
 def _newest_generated_cu_mtime(fa_src: Path) -> float:
-    """Return the latest mtime of generate.py outputs under fa_src/build."""
     build_dir = fa_src / "build"
     latest = 0.0
     if build_dir.is_dir():
@@ -164,13 +115,11 @@ def _newest_generated_cu_mtime(fa_src: Path) -> float:
 
 
 def _stamp_prebuilt_obj(dest: Path, fa_src: Path) -> None:
-    """Mark seeded .obj newer than freshly generated .cu so ninja skips recompile."""
     stamp = max(time.time(), _newest_generated_cu_mtime(fa_src) + 1.0)
     os.utime(dest, (stamp, stamp))
 
 
 def require_parallel_link_force_build_false() -> None:
-    """Parallel link must not force a full recompile over merged prebuilt .obj files."""
     value = os.environ.get("FLASH_ATTENTION_FORCE_BUILD", "").strip().upper()
     if value and value not in ("FALSE", "0", "NO"):
         raise SystemExit(
@@ -180,12 +129,7 @@ def require_parallel_link_force_build_false() -> None:
     os.environ["FLASH_ATTENTION_FORCE_BUILD"] = "FALSE"
 
 
-def install_patch(staging_root: Path, fa_src: Path, primary_dim: str = "") -> None:
-    """Patch torch cpp_extension to seed prebuilt .obj files before ninja runs.
-
-    Callers must set FLASH_ATTENTION_FORCE_BUILD=FALSE during parallel link so ninja
-    respects stamped prebuilt objects instead of forcing a full recompile.
-    """
+def install_patch(staging_root: Path, fa_src: Path, primary_dim: str) -> None:
     global _PATCHED, _ORIGINAL_RUN_NINJA
     if _PATCHED:
         return
@@ -194,13 +138,11 @@ def install_patch(staging_root: Path, fa_src: Path, primary_dim: str = "") -> No
 
     _ORIGINAL_RUN_NINJA = cpp_ext._run_ninja_build
 
-    staging_dirs = sorted(p for p in staging_root.iterdir() if p.is_dir())
-    if not staging_dirs:
-        raise SystemExit(f"No OPT_DIM staging dirs under {staging_root}")
-
     primary_dir = staging_root / f"d{primary_dim}"
     if not primary_dir.is_dir():
-        primary_dir = staging_dirs[0]
+        raise SystemExit(f"Primary staging dir missing: {primary_dir}")
+
+    staging_dirs = sorted(p for p in staging_root.iterdir() if p.is_dir())
 
     def merge_prebuilt_objects(temp_release: Path) -> int:
         temp_release.mkdir(parents=True, exist_ok=True)
@@ -255,89 +197,37 @@ def build_wheel(fa_src: Path, dist_dir: Path, *, verbose: bool = False) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--fa-src", type=Path)
-    parser.add_argument("--staging-root", type=Path)
+    parser.add_argument("--fa-src", type=Path, required=True)
     parser.add_argument("--dist-dir", type=Path)
-    parser.add_argument("--workspace-root", type=Path)
+    parser.add_argument("--staging-root", type=Path)
     parser.add_argument("--primary-dim", default="")
     parser.add_argument(
         "--compile-only",
         action="store_true",
         help="In-process build_ext only (parallel OPT_DIM shard compile)",
     )
-    parser.add_argument(
-        "--serial",
-        action="store_true",
-        help="Full single-pass bdist_wheel (no OPT_DIM obj merge)",
-    )
-    parser.add_argument(
-        "--validate-compile-shard",
-        action="store_true",
-        help="Validate a single compile shard Release dir and exit",
-    )
-    parser.add_argument("--release-dir", type=Path)
-    parser.add_argument("--opt-dim", default="")
-    parser.add_argument(
-        "--validate-only",
-        action="store_true",
-        help="Validate staging layout and exit without building",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Verbose setuptools/ninja output",
-    )
+    parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
-    if args.validate_compile_shard:
-        if args.release_dir is None or not args.opt_dim.strip():
-            raise SystemExit("--release-dir and --opt-dim are required with --validate-compile-shard")
-        validate_compile_shard(args.release_dir, args.opt_dim.strip())
-        return
-
-    workspace_root = args.workspace_root
-    expected_dims = load_opt_dims(workspace_root)
-    primary_dim = resolve_primary_dim(args.primary_dim, expected_dims)
-
-    if args.validate_only:
-        if args.staging_root is None:
-            raise SystemExit("--staging-root is required with --validate-only")
-        if not args.staging_root.is_dir():
-            raise SystemExit(f"Staging root missing: {args.staging_root}")
-        validate_staging(
-            args.staging_root,
-            expected_dims=expected_dims,
-            primary_dim=primary_dim,
-        )
-        return
+    if not args.fa_src.is_dir():
+        raise SystemExit(f"FA source missing: {args.fa_src}")
 
     if args.compile_only:
-        if args.fa_src is None:
-            raise SystemExit("--fa-src is required with --compile-only")
-        if not args.fa_src.is_dir():
-            raise SystemExit(f"FA source missing: {args.fa_src}")
         build_ext_only(args.fa_src, verbose=args.verbose)
         return
 
-    if args.serial:
-        if args.fa_src is None or args.dist_dir is None:
-            raise SystemExit("--fa-src and --dist-dir are required with --serial")
-        if not args.fa_src.is_dir():
-            raise SystemExit(f"FA source missing: {args.fa_src}")
+    if args.dist_dir is None:
+        raise SystemExit("--dist-dir is required unless --compile-only")
+
+    if args.staging_root is None:
         build_wheel(args.fa_src, args.dist_dir, verbose=args.verbose)
         return
 
-    if args.staging_root is None:
-        raise SystemExit(
-            "--staging-root is required unless --serial, --compile-only, or --validate-only"
-        )
-    if args.fa_src is None or args.dist_dir is None:
-        raise SystemExit("--fa-src and --dist-dir are required for parallel link")
     if not args.staging_root.is_dir():
         raise SystemExit(f"Staging root missing: {args.staging_root}")
-    if not args.fa_src.is_dir():
-        raise SystemExit(f"FA source missing: {args.fa_src}")
+
+    expected_dims = load_opt_dims()
+    primary_dim = resolve_primary_dim(args.primary_dim, expected_dims)
 
     validate_staging(
         args.staging_root,

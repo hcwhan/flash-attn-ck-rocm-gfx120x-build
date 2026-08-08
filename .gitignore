@@ -1,7 +1,5 @@
 dist/
-build-logs/
 *.whl
 __pycache__/
 *.pyc
 .pytest_cache/
-.fa-build-meta.json

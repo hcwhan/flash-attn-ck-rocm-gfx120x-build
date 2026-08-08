@@ -5,8 +5,6 @@ param(
 
     [string]$NinjaWorkers = "4",
 
-    [switch]$SkipPrep,
-
     [switch]$GpuSmokeTest,
 
     [string]$PythonExe = "python"
@@ -26,11 +24,9 @@ if (-not $DistDir) {
 
 $env:MAX_JOBS = $NinjaWorkers
 
-if (-not $SkipPrep) {
-    . (Join-Path $BuildRoot "prep\prep-flash-attention.ps1") `
-        -FlashAttentionRoot $FaSrc `
-        -WorkspaceRoot $WorkspaceRoot
-}
+. (Join-Path $BuildRoot "prep\prep-flash-attention.ps1") `
+    -FlashAttentionRoot $FaSrc `
+    -WorkspaceRoot $WorkspaceRoot
 
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 
@@ -40,10 +36,12 @@ New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
     -WorkspaceRoot $WorkspaceRoot `
     -PythonExe $PythonExe
 
+$lock = Get-Content (Join-Path $WorkspaceRoot "VERSION.lock.json") -Raw | ConvertFrom-Json
+
 . (Join-Path $BuildRoot "test\smoke-test-wheel.ps1") `
     -DistDir $DistDir `
     -WorkspaceRoot $WorkspaceRoot `
-    -FaSrc $FaSrc `
+    -FaCommitSha ([string]$lock.flash_attention_build_commit) `
     -PythonExe $PythonExe
 
 if ($GpuSmokeTest) {

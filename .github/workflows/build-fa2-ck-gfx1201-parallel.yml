@@ -61,7 +61,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 360
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         opt_dim: ${{ fromJson(needs.prep.outputs.opt-dims-json) }}
 
@@ -92,7 +92,7 @@ jobs:
         uses: ./.github/actions/fa-ninja-cache-restore
         with:
           fa-src: ${{ env.FA_SRC }}
-          cache-key: fa2-ck-gfx1201-parallel-v3-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/config/wheel-pattern.ps1', 'build/compile/compile-opt-dim.ps1', 'build/compile/link_parallel_wheel.py', 'build/wheel/build-bdist-wheel.ps1', 'build/common/paths.ps1', 'build/common/get-fa-release-dir.ps1', 'build/common/git-sha.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}
+          cache-key: fa2-ck-gfx1201-parallel-v3-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/compile/compile-opt-dim.ps1', 'build/compile/link_parallel_wheel.py', 'build/wheel/build-bdist-wheel.ps1', 'build/common/paths.ps1', 'build/common/get-fa-release-dir.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}
           skip-restore: ${{ github.event.inputs.skip_cache_restore != false && 'true' || 'false' }}
 
       - name: Report cache status
@@ -136,23 +136,6 @@ jobs:
           path: ${{ env.RELEASE_DIR }}
           retention-days: 7
           if-no-files-found: error
-
-      - name: Collect build logs on failure
-        if: failure()
-        shell: pwsh
-        run: |
-          . $env:GITHUB_WORKSPACE\build\common\collect-build-logs.ps1 `
-            -WorkspaceRoot $env:GITHUB_WORKSPACE `
-            -FaSrc $env:FA_SRC
-
-      - name: Upload build logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: build-logs-d${{ matrix.opt_dim }}
-          path: build-logs
-          retention-days: 7
-          if-no-files-found: ignore
 
   link:
     name: link-wheel
@@ -221,7 +204,6 @@ jobs:
           . $env:GITHUB_WORKSPACE\build\test\smoke-test-wheel.ps1 `
             -DistDir $env:GITHUB_WORKSPACE\dist `
             -WorkspaceRoot $env:GITHUB_WORKSPACE `
-            -FaSrc $env:FA_SRC `
             -FaCommitSha "${{ needs.prep.outputs.fa-commit-sha }}"
 
       - name: Upload wheel artifact
@@ -233,21 +215,3 @@ jobs:
             dist/*.sha256
             dist/wheel.manifest.json
           retention-days: 30
-
-      - name: Collect build logs on failure
-        if: failure()
-        shell: pwsh
-        run: |
-          . $env:GITHUB_WORKSPACE\build\common\collect-build-logs.ps1 `
-            -WorkspaceRoot $env:GITHUB_WORKSPACE `
-            -FaSrc $env:FA_SRC `
-            -StagingRoot $env:FA_STAGING
-
-      - name: Upload build logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: build-logs
-          path: build-logs
-          retention-days: 7
-          if-no-files-found: ignore

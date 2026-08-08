@@ -17,7 +17,6 @@ $lock = Get-Content $lockPath -Raw | ConvertFrom-Json
 
 $repoUrl = [string]$lock.flash_attention_repo
 $buildCommit = [string]$lock.flash_attention_build_commit
-$minCommit = [string]$lock.flash_attention_min_commit
 
 if (-not $repoUrl) {
     throw "VERSION.lock.json flash_attention_repo is missing"
@@ -25,105 +24,12 @@ if (-not $repoUrl) {
 if (-not $buildCommit) {
     throw "VERSION.lock.json flash_attention_build_commit is missing"
 }
-if (-not $minCommit) {
-    throw "VERSION.lock.json flash_attention_min_commit is missing"
+if ($buildCommit -notmatch '^[0-9a-fA-F]{40}$') {
+    throw "VERSION.lock.json flash_attention_build_commit must be a 40-char git SHA"
 }
 
-Write-Host "Using flash-attention repo from VERSION.lock.json: $repoUrl"
+Write-Host "Using flash-attention repo: $repoUrl"
 Write-Host "Using flash-attention build commit: $buildCommit"
-Write-Host "flash_attention min commit (build must not be earlier): $minCommit"
-
-function Test-IsGitCommitRef {
-    param([string]$Ref)
-    return $Ref -match '^[0-9a-fA-F]{7,40}$'
-}
-
-function Assert-GitCommitRef {
-    param(
-        [string]$Name,
-        [string]$Ref
-    )
-
-    if (-not (Test-IsGitCommitRef $Ref)) {
-        throw "VERSION.lock.json $Name must be a git commit SHA, got: $Ref"
-    }
-}
-
-Assert-GitCommitRef -Name "flash_attention_build_commit" -Ref $buildCommit
-Assert-GitCommitRef -Name "flash_attention_min_commit" -Ref $minCommit
-
-. (Join-Path (Split-Path $PSScriptRoot -Parent) "common\git-sha.ps1")
-
-function Test-IsGitAncestor {
-    param(
-        [string]$Root,
-        [string]$Ancestor,
-        [string]$Descendant
-    )
-
-    git -C $Root merge-base --is-ancestor $Ancestor $Descendant
-    return ($LASTEXITCODE -eq 0)
-}
-
-function Assert-BuildCommitMeetsMin {
-    param(
-        [string]$Root,
-        [string]$BuildCommit,
-        [string]$MinCommit
-    )
-
-    $head = Normalize-GitSha -Sha (git -C $Root rev-parse HEAD) -RepoRoot $Root
-    $expectedBuild = Normalize-GitSha -Sha $BuildCommit -RepoRoot $Root
-    if ($head -ne $expectedBuild) {
-        throw "Resolved flash-attention commit ($head) does not match flash_attention_build_commit ($expectedBuild)"
-    }
-
-    $minFull = Normalize-GitSha -Sha $MinCommit -RepoRoot $Root
-    if ($head -eq $minFull) {
-        Write-Host "Verified build commit $head equals flash_attention_min_commit"
-        return
-    }
-
-    if (Test-IsGitAncestor -Root $Root -Ancestor $minFull -Descendant $head) {
-        Write-Host "Verified build commit $head is not earlier than flash_attention_min_commit $minFull"
-        return
-    }
-
-    git -c core.longpaths=true -C $Root fetch --depth 1 origin $MinCommit
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to fetch flash_attention_min_commit $MinCommit"
-    }
-
-    if (Test-IsGitAncestor -Root $Root -Ancestor $minFull -Descendant $head) {
-        Write-Host "Verified build commit $head is not earlier than flash_attention_min_commit $minFull"
-        return
-    }
-
-    Write-Host "Shallow clone lacks ancestry link; deepening fetch for min-commit check..."
-    $deepenAttempts = 0
-    $maxDeepen = 20
-    while (-not (Test-IsGitAncestor -Root $Root -Ancestor $minFull -Descendant $head)) {
-        if ($deepenAttempts -ge $maxDeepen) {
-            Write-Host "Deepen limit reached; attempting unshallow fetch..."
-            git -c core.longpaths=true -C $Root fetch --unshallow origin
-            if ($LASTEXITCODE -ne 0) {
-                throw "Failed to unshallow flash-attention clone for min-commit ancestry check"
-            }
-            if (Test-IsGitAncestor -Root $Root -Ancestor $minFull -Descendant $head) {
-                break
-            }
-            throw "flash_attention_build_commit ($head) is older than flash_attention_min_commit ($minFull)"
-        }
-
-        git -c core.longpaths=true -C $Root fetch --deepen=2000 origin
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to deepen flash-attention clone for min-commit ancestry check"
-        }
-        $deepenAttempts++
-    }
-
-    Write-Host "Verified build commit $head is not earlier than flash_attention_min_commit $minFull"
-}
 
 function Initialize-FlashAttentionRepo {
     param(
@@ -149,29 +55,21 @@ function Initialize-FlashAttentionRepo {
 Initialize-FlashAttentionRepo -Root $FlashAttentionRoot -Repo $repoUrl -Ref $buildCommit
 git -C $FlashAttentionRoot submodule update --init --depth 1 csrc/composable_kernel csrc/cutlass
 
-Assert-BuildCommitMeetsMin -Root $FlashAttentionRoot -BuildCommit $buildCommit -MinCommit $minCommit
+$resolvedCommit = (git -C $FlashAttentionRoot rev-parse HEAD).Trim().ToLowerInvariant()
+$expectedCommit = $buildCommit.ToLowerInvariant()
+if ($resolvedCommit -ne $expectedCommit) {
+    throw "Resolved flash-attention commit ($resolvedCommit) does not match flash_attention_build_commit ($expectedCommit)"
+}
 
-$BuildRoot = Join-Path $WorkspaceRoot "build"
-
-$resolvedCommit = (git -C $FlashAttentionRoot rev-parse HEAD).Trim()
 Write-Host "Resolved flash-attention commit: $resolvedCommit"
 
 if ($env:GITHUB_OUTPUT) {
     "fa-commit-sha=$resolvedCommit" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 }
 
+$BuildRoot = Join-Path $WorkspaceRoot "build"
 . (Join-Path $BuildRoot "patch\patch-fa-inference.ps1") -FlashAttentionRoot $FlashAttentionRoot
 
-$metaPath = Join-Path $FlashAttentionRoot ".fa-build-meta.json"
-@{
-    flash_attention_commit               = $resolvedCommit
-    flash_attention_repo                 = $repoUrl
-    flash_attention_build_commit         = $buildCommit
-    flash_attention_min_commit     = $minCommit
-    inference_only                       = $true
-} | ConvertTo-Json | Set-Content -Path $metaPath -Encoding UTF8
-
-# Shrink artifact upload: build only needs sources, not git metadata.
 Remove-Item -Recurse -Force (Join-Path $FlashAttentionRoot ".git") -ErrorAction SilentlyContinue
 Get-ChildItem -Path $FlashAttentionRoot -Recurse -Directory -Filter ".git" -ErrorAction SilentlyContinue |
     ForEach-Object { Remove-Item -Recurse -Force $_.FullName -ErrorAction SilentlyContinue }

@@ -1,5 +1,4 @@
-# Resolve flash-attention build/temp.win-*/Release after build_ext.
-# When -OptDim is set, prefers the tree with the most *_d{OptDim}_* kernel objs.
+# Resolve flash-attention build/temp.win-*/Release after build_ext (single CI compile tree).
 param(
     [Parameter(Mandatory = $true)]
     [string]$FaSrc,
@@ -16,91 +15,49 @@ if (-not (Test-Path $buildDir)) {
     throw "flash-attention build directory missing: $buildDir"
 }
 
-$candidates = @(Get-ChildItem -Path $buildDir -Directory -Filter "temp.win-*" -ErrorAction SilentlyContinue)
-if ($candidates.Count -lt 1) {
-    throw "No build/temp.win-* directory under $buildDir"
+$candidates = @(Get-ChildItem -Path $buildDir -Directory -Filter "temp.win-*")
+if ($candidates.Count -ne 1) {
+    throw "Expected exactly one build/temp.win-* directory under $buildDir, found $($candidates.Count)"
+}
+
+$releaseDir = Join-Path $candidates[0].FullName "Release"
+if (-not (Test-Path $releaseDir)) {
+    throw "Release directory missing: $releaseDir"
 }
 
 $dimToken = if ($OptDim) { "_d${OptDim}_" } else { $null }
+$objCount = 0
+$dimKernelCount = 0
 
-function Get-ReleaseDirStats {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$ReleaseDir,
-
-        [string]$DimToken
-    )
-
-    $objCount = 0
-    $dimKernelCount = 0
-    $latestUtc = [datetime]::MinValue
-
-    Get-ChildItem -Path $ReleaseDir -Recurse -Filter "*.obj" -File -ErrorAction SilentlyContinue |
-        ForEach-Object {
-            $objCount++
-            if ($_.LastWriteTimeUtc -gt $latestUtc) {
-                $latestUtc = $_.LastWriteTimeUtc
-            }
-
-            if ($DimToken) {
-                if ($_.Name -like "*${DimToken}*") {
-                    $dimKernelCount++
-                }
-            } elseif ($_.Name -match '_d\d+_') {
-                $dimKernelCount++
-            }
+Get-ChildItem -Path $releaseDir -Recurse -Filter "*.obj" -File |
+    ForEach-Object {
+        $objCount++
+        if ($dimToken -and $_.Name -like "*${dimToken}*") {
+            $dimKernelCount++
         }
-
-    return [PSCustomObject]@{
-        ObjCount       = $objCount
-        DimKernelCount = $dimKernelCount
-        LatestObjUtc   = $latestUtc
     }
+
+if ($objCount -lt 1) {
+    throw "No .obj files under $releaseDir"
+}
+if ($dimToken -and $dimKernelCount -lt 1) {
+    throw "No *_d${OptDim}_* kernel objects under $releaseDir"
 }
 
-$ranked = foreach ($tempRoot in $candidates) {
-    $releaseDir = Join-Path $tempRoot.FullName "Release"
-    if (-not (Test-Path $releaseDir)) {
-        continue
-    }
-
-    $stats = Get-ReleaseDirStats -ReleaseDir $releaseDir -DimToken $dimToken
-    if ($stats.ObjCount -lt 1) {
-        continue
-    }
-    if ($DimToken -and $stats.DimKernelCount -lt 1) {
-        continue
-    }
-
-    $scoreObjCount = if ($DimToken) { $stats.DimKernelCount } else { $stats.ObjCount }
-
-    [PSCustomObject]@{
-        TempRoot       = $tempRoot.FullName
-        ReleaseDir     = $releaseDir
-        ObjCount       = $stats.ObjCount
-        DimKernelCount = $stats.DimKernelCount
-        ScoreObjCount  = $scoreObjCount
-        LatestObjUtc   = $stats.LatestObjUtc
-    }
-}
-
-$best = @(
-    $ranked |
-        Sort-Object ScoreObjCount, LatestObjUtc, TempRoot -Descending |
-        Select-Object -First 1
-)
-if ($best.Count -lt 1) {
-    $hint = if ($DimToken) { " with *_d${OptDim}_* kernel objs" } else { "" }
-    throw "No temp.win-*/Release directory with .obj files$hint under $buildDir"
+$result = [PSCustomObject]@{
+    TempRoot       = $candidates[0].FullName
+    ReleaseDir     = $releaseDir
+    ObjCount       = $objCount
+    DimKernelCount = $dimKernelCount
 }
 
 Write-Host (
-    "Selected Release dir: $($best[0].ReleaseDir) " +
-    "($($best[0].ObjCount) objs, $($best[0].DimKernelCount) dim-kernel, temp=$($best[0].TempRoot))"
+    "Release dir: $($result.ReleaseDir) " +
+    "($($result.ObjCount) objs, $($result.DimKernelCount) dim-kernel)"
 )
 
 if ($PassThru) {
-    return $best[0]
+    return $result
 }
 
-return $best[0].ReleaseDir
+return $result.ReleaseDir
