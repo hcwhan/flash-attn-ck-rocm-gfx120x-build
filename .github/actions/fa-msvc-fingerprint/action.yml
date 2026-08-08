@@ -1,27 +1,38 @@
 name: FA MSVC toolset fingerprint
-description: Emit a short SHA-256 of the installed MSVC VC tools version for ninja cache key isolation (windows-2022 image updates change the toolset; objects compiled with a different toolset must not be reused)
+description: Emit a short SHA-256 of the MSVC VC tools version and ROCm clang version for ninja cache key isolation (windows-2022 image updates change the MSVC toolset; the pip-pinned rocm[devel] ships the clang compiler). Objects compiled with a different toolchain must not be reused
 
 outputs:
   msvc-hash:
-    description: 12-hex fingerprint of the MSVC VC tools version
+    description: 12-hex fingerprint of the MSVC VC tools version + ROCm clang version
     value: ${{ steps.fp.outputs.msvc-hash }}
 
 runs:
   using: composite
   steps:
-    - name: Fingerprint MSVC VC tools version
+    - name: Fingerprint MSVC VC tools + ROCm clang version
       id: fp
       shell: pwsh
       run: |
+        $ErrorActionPreference = 'Stop'
         $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
         $toolset = 'unknown'
         if (Test-Path $vswhere) {
           $vcRoot = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           $toolsDir = Join-Path $vcRoot 'VC\Tools\MSVC'
           if ($vcRoot -and (Test-Path $toolsDir)) {
-            $toolset = (Get-ChildItem $toolsDir -Directory | Sort-Object Name -Descending | Select-Object -First 1).Name
+            $toolset = (Get-ChildItem $toolsDir -Directory |
+              Sort-Object { try { [version]$_ } catch { [version]'0.0' } } -Descending |
+              Select-Object -First 1).Name
           }
         }
-        $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($toolset))).Substring(0, 12).ToLowerInvariant()
-        Write-Host "MSVC toolset: $toolset (cache fingerprint $hash)"
+        # ROCm clang (installed by fa-rocm-toolchain before this step); guards the
+        # cache against toolchain drift inside the pinned rocm[devel] version.
+        $clangVersion = 'unknown'
+        . $env:GITHUB_WORKSPACE\build\common\get-rocm-sdk-paths.ps1 -PythonExe python
+        $clangExe = Join-Path $script:CoreRoot 'lib\llvm\bin\clang.exe'
+        if (Test-Path $clangExe) {
+          $clangVersion = (& $clangExe --version 2>$null | Select-Object -First 1)
+        }
+        $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes("$toolset|$clangVersion"))).Substring(0, 12).ToLowerInvariant()
+        Write-Host "MSVC toolset: $toolset | clang: $clangVersion (cache fingerprint $hash)"
         "msvc-hash=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8

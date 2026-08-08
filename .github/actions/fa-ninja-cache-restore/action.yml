@@ -9,7 +9,7 @@ inputs:
     description: Primary cache key (must include resolved flash-attention commit SHA)
     required: true
   skip-restore:
-    description: When true, skip cache restore but still emit cache-primary-key for save
+    description: When true, skip cache restore but still look up cache existence (used to gate save)
     required: false
     default: "false"
 
@@ -32,14 +32,23 @@ runs:
         path: ${{ inputs.fa-src }}\build
         key: ${{ inputs.cache-key }}
 
+    - name: Lookup cache existence (restore skipped)
+      if: inputs.skip-restore == 'true'
+      uses: actions/cache/restore@v6
+      id: cache-lookup
+      with:
+        path: ${{ inputs.fa-src }}\build
+        key: ${{ inputs.cache-key }}
+        lookup-only: true
+
     - name: Resolve cache restore outputs
       id: fa-build-cache
       shell: pwsh
       run: |
         if ('${{ inputs.skip-restore }}' -eq 'true') {
-          Write-Host "Cache restore skipped by workflow input; save will use cache-key"
+          Write-Host "Cache restore skipped by workflow input; save gated on lookup"
           "cache-primary-key=${{ inputs.cache-key }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "cache-hit=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "cache-hit=${{ steps.cache-lookup.outputs.cache-hit }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
         } else {
           "cache-primary-key=${{ steps.cache-restore.outputs.cache-primary-key }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "cache-hit=${{ steps.cache-restore.outputs.cache-hit }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8

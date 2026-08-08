@@ -20,5 +20,5 @@ runs:
         $json = ConvertTo-Json -InputObject @($OptDimList) -Compress
         Write-Host "OPT_DIM matrix from lock: $json"
         Write-Host "Primary OPT_DIM shard: $PRIMARY_OPT_DIM"
-        "opt_dims_json=$json" >> $env:GITHUB_OUTPUT
-        "primary_opt_dim=$PRIMARY_OPT_DIM" >> $env:GITHUB_OUTPUT
+        "opt_dims_json=$json" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        "primary_opt_dim=$PRIMARY_OPT_DIM" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8

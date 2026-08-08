@@ -17,6 +17,12 @@ concurrency:
   group: build-fa2-ck-gfx1201-parallel
   cancel-in-progress: true
 
+# actions: write needed for the cache delete-and-refresh flow (REST API);
+# contents: read keeps actions/checkout working (unspecified scopes default to none).
+permissions:
+  actions: write
+  contents: read
+
 env:
   MAX_JOBS: ${{ github.event.inputs.ninja_workers }}
   FA_SRC: C:\fa\flash-attention
@@ -56,7 +62,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 360
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         opt_dim: ${{ fromJson(needs.prep.outputs.opt-dims-json) }}
 

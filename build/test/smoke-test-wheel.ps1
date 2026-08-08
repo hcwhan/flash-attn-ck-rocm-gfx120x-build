@@ -32,11 +32,13 @@ Write-Host "=== Wheel structure (pre-install) ==="
 $wheelInspectCode = @"
 import sys, zipfile
 wheel = sys.argv[1]
-min_pyd_bytes = 1024
+opt_dims = [int(x) for x in sys.argv[2].split(',') if x]
+min_pyd_bytes = 1024 * 1024
 with zipfile.ZipFile(wheel) as zf:
+    names = zf.namelist()
     pyds = [
-        name for name in zf.namelist()
-        if name.endswith('.pyd') and 'flash_attn_2_cuda' in name.replace('\\\\', '/')
+        name for name in names
+        if name.endswith('.pyd') and 'flash_attn_2_cuda' in name
     ]
     if not pyds:
         raise SystemExit('ERROR: flash_attn_2_cuda .pyd not found in wheel archive')
@@ -44,9 +46,23 @@ with zipfile.ZipFile(wheel) as zf:
         info = zf.getinfo(name)
         if info.file_size < min_pyd_bytes:
             raise SystemExit(f'ERROR: {name} too small ({info.file_size} bytes)')
-        print(f'OK {name} size={info.file_size}')
+        # Each OPT_DIM tier must have its kernels inside the .pyd; catches a
+        # parallel merge that silently dropped a shard.
+        data = zf.read(name)
+        missing = [tok for tok in [f'_d{d}_' for d in opt_dims] if tok.encode('ascii') not in data]
+        if missing:
+            raise SystemExit(f'ERROR: {name} missing OPT_DIM kernels {missing}')
+        dims_str = ','.join(str(d) for d in opt_dims)
+        print(f'OK {name} size={info.file_size} dims={dims_str}')
+    meta = [name for name in names if name.endswith('.dist-info/METADATA')]
+    if not meta:
+        raise SystemExit('ERROR: METADATA not found in wheel archive')
+    meta_text = zf.read(meta[0]).decode('utf-8', errors='replace')
+    if 'Requires-Dist: torch' not in meta_text:
+        raise SystemExit('ERROR: wheel METADATA missing Requires-Dist: torch')
+    print('OK METADATA Requires-Dist: torch')
 "@
-& $PythonExe -c $wheelInspectCode $whl.FullName
+& $PythonExe -c $wheelInspectCode $whl.FullName $LockOptDim
 if ($LASTEXITCODE -ne 0) {
     throw "Wheel structure check failed (exit $LASTEXITCODE)"
 }

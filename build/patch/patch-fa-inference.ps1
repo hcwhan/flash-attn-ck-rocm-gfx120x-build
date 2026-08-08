@@ -48,3 +48,23 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($setup, $content, $utf8NoBom)
 
 Write-Host "Patched $setup for inference-only CK build"
+
+# The bwd-free link depends on mha_bwd.cpp / mha_varlen_bwd.cpp stubbing out the
+# fmha_bwd_launcher via TORCH_CHECK(false) BEFORE constructing it: the launcher
+# constructor exists only in the bwd-generated fmha_bwd_api.cpp, which this patch
+# prevents from being generated. Validate that guard placement so an upstream
+# refactor fails fast here instead of at wheel link (LNK2019).
+$ckSrcDir = Join-Path $FlashAttentionRoot "csrc\flash_attn_ck"
+foreach ($bwdFile in @('mha_bwd.cpp', 'mha_varlen_bwd.cpp')) {
+    $bwdPath = Join-Path $ckSrcDir $bwdFile
+    if (-not (Test-Path $bwdPath)) {
+        throw "patch-fa-inference.ps1: before-state not found: $bwdFile missing at $bwdPath"
+    }
+    $bwdContent = Get-Content $bwdPath -Raw -Encoding UTF8
+    $guardIdx = $bwdContent.IndexOf('TORCH_CHECK(false')
+    $launcherIdx = $bwdContent.IndexOf('fmha_bwd_launcher launcher(')
+    if ($guardIdx -lt 0 -or $launcherIdx -lt 0 -or $guardIdx -gt $launcherIdx) {
+        throw "patch-fa-inference.ps1: before-state not found for '$bwdFile' (TORCH_CHECK(false) guard must precede fmha_bwd_launcher construction)"
+    }
+    Write-Host "  OK $bwdFile: backward guard precedes launcher"
+}

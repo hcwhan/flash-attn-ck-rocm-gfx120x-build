@@ -9,7 +9,7 @@
 | **serial** | prep → 全量 `bdist_wheel` → smoke test |
 | **parallel** | prep → compile-d32\|d64\|d128\|d256 → link-wheel → smoke test |
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/compile/link_parallel_wheel.py`。Cache 前缀：`serial-v3` / `parallel-v3-d{dim}`（精确 key，无 `restore-keys`）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/compile/link_parallel_wheel.py`。Cache 前缀：`serial-v3` / `parallel-v3-d{dim}`（精确 key，无 `restore-keys`；指纹含 MSVC 工具集 + ROCm clang）。
 
 ## 复用入口
 
@@ -22,13 +22,14 @@
 | `read-version-lock.ps1` | 读 lock；`-ExportToGitHubEnv` 写 CI env。**唯一直接读 lock 的 PS1** |
 | `paths.ps1` | `BuildRoot`；`-LoadVersionLock` 供测试脚本 |
 | `setup-rocm-env.ps1` | ROCm 编译 env（内部 dot-source lock） |
+| `get-rocm-sdk-paths.ps1` | 输出 `CoreRoot`/`DevelRoot`（setup-rocm-env 与 msvc 指纹共用；唯一 ROCm 路径发现） |
 | `init-fa-build-env.ps1` | numpy + `OPT_DIM` + setup-rocm |
 | `link_parallel_wheel.py` | `--compile-only` / serial wheel / parallel link+staging 校验 |
 | `build-bdist-wheel.ps1` | 设 `FLASH_ATTENTION_FORCE_BUILD`，调 link 脚本 |
 | `compile-opt-dim.ps1` | 单 shard compile + `get-fa-release-dir.ps1` |
 | `smoke-test-wheel.ps1` | CI CPU smoke test |
 
-规则：lock 经 `read-version-lock.ps1`（或 paths/setup-rocm）；编译/打 wheel 只经 `link_parallel_wheel.py`。
+规则：lock 经 `read-version-lock.ps1`（或 paths/setup-rocm）；ROCm 路径发现只经 `get-rocm-sdk-paths.ps1`；编译/打 wheel 只经 `link_parallel_wheel.py`。
 
 **Composite**（封装重复 step 序列；单行转发脚本仍禁止）
 
@@ -61,7 +62,7 @@ prep clone `flash_attention_build_commit` 并输出 `fa-commit-sha`（lock 值�
 - **连续 CI 链**：prep → compile/link → smoke 自动跑完；staging/shard 齐全等流水线检查保留。
 - **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=TRUE`（避免 FA `CachedWheelsCommand` 下载上游 wheel 短路）+ prebuilt `.obj` 时间戳 merge。
 - **`PRIMARY_OPT_DIM`** = lock `opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
-- **`ninja_workers` 默认 4**（OOM 改 2）；**`skip_cache_restore` 默认 true**（测试阶段，save 仍开；稳定后再改 false）。
+- **`ninja_workers` 默认 4**（OOM 改 2）；**`skip_cache_restore` 默认 true**（测试阶段；命中时构建成功后先删旧缓存再重存刷新，构建失败保留旧缓存；skip-restore 时 lookup-only 探测）。
 - **全模式 prebuilt obj stamp**：compile/serial 恢复缓存后、link 合并后，均对既有 `.obj` 打未来时间戳（setup.py 每次 `build_ext` 重拷 `fmha_*.cu` 刷新 mtime，不 stamp 则 ninja 必然全量重编，缓存形同虚设）。
 - **link 排除 `*_api.obj`**：`fmha_*_api.cu.obj` 是 per-shard 部分分发表（只含本 shard hdim），合并 primary 副本会静默丢失其它 dim 分发；link job 必须从全量再生成的源码重编这 3 个 obj。
 
@@ -74,7 +75,7 @@ prep clone `flash_attention_build_commit` 并输出 `fa-commit-sha`（lock 值�
 
 **不要添加：** 双源校验、manifest 读回自证、`FA_SKIP_*`、多候选目录排序、git 考古、薄 one-liner 包装、排障用 build-log artifact、lock 只读字段进逻辑。
 
-**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；patch before-state；smoke 产物校验（.pyd 体积 / CXX11_ABI / 扩展符号）；cache 精确 key 含 FA commit。
+**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；patch before-state（含 mha_bwd guard 前置校验）；smoke 产物校验（.pyd 体积 / CXX11_ABI / dim 符号 / METADATA）；cache 精确 key 含 FA commit。
 
 **改代码前：** 连续 CI 是否必发生？信息是否已在 lock/env/上游 output？能否复用上表入口？能删则删。
 

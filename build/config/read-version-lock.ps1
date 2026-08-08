@@ -48,6 +48,14 @@ if (-not $flashAttentionBuildCommit) {
     throw "VERSION.lock.json flash_attention_build_commit is missing"
 }
 
+# Remaining lock fields feed toolchain/CI directly; fail fast on empty values
+# instead of letting them surface mid-pipeline (e.g. empty GPU_ARCHS).
+foreach ($requiredField in @('python', 'pytorch', 'hip', 'gpu_archs', 'rocm_index', 'torch_device_extra')) {
+    if (-not [string]$lock.$requiredField) {
+        throw "VERSION.lock.json $requiredField is missing"
+    }
+}
+
 $vars = @{
     PYTHON_VERSION                = [string]$lock.python
     PYTORCH_VERSION               = [string]$lock.pytorch

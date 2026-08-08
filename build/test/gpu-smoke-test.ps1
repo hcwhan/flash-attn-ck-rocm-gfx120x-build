@@ -46,6 +46,28 @@ for headdim in opt_dims:
         raise SystemExit(f'ERROR: headdim={headdim} output has non-finite values')
     torch.cuda.synchronize()
     print(f'GPU forward OK headdim={headdim} shape={tuple(out.shape)}')
+
+# kvcache path: exercises the fmha_fwd_appendkv kernels (k_new) plus the
+# fmha_fwd_splitkv kernels (main attention over cache_seqlens + seqlen_knew).
+from flash_attn import flash_attn_with_kvcache
+seqlen_k, seqlen_knew = 8, 8
+for headdim in opt_dims:
+    q = torch.randn(batch, seqlen, nheads, headdim, device=device, dtype=torch.float16)
+    kcache = torch.zeros(batch, seqlen_k, nheads, headdim, device=device, dtype=torch.float16)
+    vcache = torch.zeros(batch, seqlen_k, nheads, headdim, device=device, dtype=torch.float16)
+    k_new = torch.randn(batch, seqlen_knew, nheads, headdim, device=device, dtype=torch.float16)
+    v_new = torch.randn(batch, seqlen_knew, nheads, headdim, device=device, dtype=torch.float16)
+    cache_seqlens = torch.full((batch,), seqlen_k, dtype=torch.int32, device=device)
+    out = flash_attn_with_kvcache(
+        q, kcache, vcache, k_new, v_new,
+        cache_seqlens=cache_seqlens, causal=True,
+    )
+    if out.shape != q.shape:
+        raise SystemExit(f'ERROR: headdim={headdim} unexpected kvcache output shape {out.shape}')
+    if not torch.isfinite(out).all():
+        raise SystemExit(f'ERROR: headdim={headdim} kvcache output has non-finite values')
+    torch.cuda.synchronize()
+    print(f'GPU kvcache OK headdim={headdim} shape={tuple(out.shape)}')
 "@
 
 & $PythonExe -c $pyCode $GPU_ARCHS $optDimsArg

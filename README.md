@@ -71,7 +71,7 @@ Push to `main` does **not** auto-trigger builds.
 | `compile-d32` … `d256` | one OPT_DIM shard each, upload `.obj` | 6 h each |
 | `link-wheel` | merge objs + link + wheel + CPU smoke test | 6 h |
 
-Cache keys include FA commit SHA and an MSVC toolset fingerprint; **exact match only** (no `restore-keys`). Serial uses `serial-v3`, parallel uses `parallel-v3-d{dim}` — isolated from each other. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
+Cache keys include FA commit SHA and a toolchain fingerprint (MSVC toolset + ROCm clang); **exact match only** (no `restore-keys`). Serial uses `serial-v3`, parallel uses `parallel-v3-d{dim}` — isolated from each other. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
 
 ## Output
 

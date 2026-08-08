@@ -85,7 +85,7 @@ ComfyUI **推理专用** wheel：
 | `compile-d32` … `d256` | 各编一个 OPT_DIM shard，上传 `.obj` | 各 6 h |
 | `link-wheel` | 合并 obj + link + 打 wheel + CPU smoke test | 6 h |
 
-- Cache key 含 FA commit SHA 与 MSVC 工具集指纹；**仅精确匹配**（无 `restore-keys`）。串行 `serial-v3`，并行 `parallel-v3-d{dim}`，互不共用。
+- Cache key 含 FA commit SHA 与工具链指纹（MSVC 工具集 + ROCm clang）；**仅精确匹配**（无 `restore-keys`）。串行 `serial-v3`，并行 `parallel-v3-d{dim}`，互不共用。
 - 四 shard 各编 shared obj；link 仅使用 **lock `opt_dim` 第一档**（当前 `32`）的 shared obj。
 
 ### 构建阶段
@@ -119,7 +119,7 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 | CI CPU smoke test | `build/test/smoke-test-wheel.ps1` |
 | 部署前 GPU smoke test（gfx1201 真机） | `build/test/gpu-smoke-test.ps1` |
 
-CPU smoke test：wheel 文件名 → pip 安装 → `import flash_attn_2_cuda`。**不等于** gfx1201 kernel 正确 — 部署前须在 GPU 上跑 `gpu-smoke-test.ps1`。
+CPU smoke test：wheel 文件名/结构（.pyd 体积、OPT_DIM 符号、METADATA）→ pip 安装 → import flash_attn_2_cuda。**不等于** gfx1201 kernel 正确 — 部署前须在 GPU 上跑 `gpu-smoke-test.ps1`（覆盖 fwd + kvcache/appendkv/splitkv）。
 
 ## 安装到 ComfyUI
 
