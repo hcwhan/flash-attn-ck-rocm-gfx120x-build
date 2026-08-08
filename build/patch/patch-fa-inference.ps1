@@ -35,13 +35,13 @@ foreach ($point in $patchPoints) {
     if (-not [regex]::IsMatch($content, $pattern)) {
         throw "patch-fa-inference.ps1: before-state not found for '$($point.Name)'"
     }
-    Write-Host "  OK $($point.Name): before-state found"
+    Write-Host ('  OK {0}: before-state found' -f $point.Name)
 }
 
 foreach ($point in $patchPoints) {
     $pattern = if ($point.Regex) { $point.Before } else { [regex]::Escape($point.Before) }
     $content = [regex]::Replace($content, $pattern, $point.After)
-    Write-Host "  OK $($point.Name): patched"
+    Write-Host ('  OK {0}: patched' -f $point.Name)
 }
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -66,5 +66,5 @@ foreach ($bwdFile in @('mha_bwd.cpp', 'mha_varlen_bwd.cpp')) {
     if ($guardIdx -lt 0 -or $launcherIdx -lt 0 -or $guardIdx -gt $launcherIdx) {
         throw "patch-fa-inference.ps1: before-state not found for '$bwdFile' (TORCH_CHECK(false) guard must precede fmha_bwd_launcher construction)"
     }
-    Write-Host "  OK $bwdFile: backward guard precedes launcher"
+    Write-Host ('  OK {0}: backward guard precedes launcher' -f $bwdFile)
 }
