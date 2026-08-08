@@ -65,6 +65,13 @@ jobs:
             --index-url $env:ROCM_INDEX `
             "rocm[devel]==7.14.0"
 
+      - name: Initialize ROCm devel tree
+        shell: pwsh
+        run: |
+          python -m rocm_sdk init --quiet
+          python -m rocm_sdk path --root
+          python -c "from pathlib import Path; import subprocess; r=Path(subprocess.check_output(['python','-m','rocm_sdk','path','--root'], text=True).strip()); p=r/'include'/'thrust'/'complex.h'; print('thrust header:', p, p.is_file()); assert p.is_file()"
+
       - name: Verify torch and rocm toolchain
         shell: pwsh
         run: |
