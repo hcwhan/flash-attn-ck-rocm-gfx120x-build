@@ -10,8 +10,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-. (Join-Path (Split-Path $PSScriptRoot -Parent) "common\paths.ps1") -WorkspaceRoot $WorkspaceRoot -LoadVersionLock
-$BuildRoot = $script:BuildRoot
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "base\get-build-paths.ps1") -WorkspaceRoot $WorkspaceRoot -LoadVersionLock
 
 $whls = @(Get-ChildItem (Join-Path $DistDir "*.whl") -File)
 if ($whls.Count -ne 1) {

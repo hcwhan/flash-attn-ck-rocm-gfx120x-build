@@ -40,7 +40,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Prepare patched flash-attention source
-        uses: ./.github/actions/fa-prep-artifact
+        uses: ./.github/actions/fa-prep-src
         with:
           fa-src: ${{ env.FA_SRC }}
           artifact-name: ${{ env.FA_ARTIFACT }}
@@ -76,7 +76,7 @@ jobs:
           cache-key: fa2-ck-gfx1201-serial-v4-${{ github.sha }}-msvc${{ steps.msvc-fp.outputs.msvc-hash }}-pip${{ steps.msvc-fp.outputs.pip-hash }}
           skip-restore: ${{ env.SKIP_CACHE_RESTORE }}
           run: |
-            . $env:GITHUB_WORKSPACE\build\compile\compile-fa.ps1 `
+            . "$env:GITHUB_WORKSPACE\build\5.compile - compile-opt-dim.ps1" `
               -OptDim "${{ env.LockOptDim }}" `
               -WorkspaceRoot $env:GITHUB_WORKSPACE `
               -FaSrc $env:FA_SRC
@@ -85,7 +85,7 @@ jobs:
       - name: Link and package wheel from in-place objects
         shell: pwsh
         run: |
-          . $env:GITHUB_WORKSPACE\build\wheel\build-bdist-wheel.ps1 `
+          . "$env:GITHUB_WORKSPACE\build\7.wheel - build-bdist-wheel.ps1" `
             -FaSrc $env:FA_SRC `
             -DistDir $env:GITHUB_WORKSPACE\dist `
             -WorkspaceRoot $env:GITHUB_WORKSPACE

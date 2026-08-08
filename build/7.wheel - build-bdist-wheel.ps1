@@ -21,8 +21,7 @@ if (-not (Test-Path $FaSrc)) {
     throw "flash-attention source not found: $FaSrc"
 }
 
-$BuildRoot = Join-Path $WorkspaceRoot "build"
-. (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
+. (Join-Path $WorkspaceRoot "base\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
 if ($StagingRoot) {
     if (-not $PrimaryDim) {
@@ -39,11 +38,11 @@ $env:OPT_DIM = [string]$LockOptDim
 # without it the wheel name would not match expected_wheel_pattern.
 $env:FLASH_ATTN_LOCAL_VERSION = $FLASH_ATTN_LOCAL_VERSION
 
-. (Join-Path $BuildRoot "env\init-fa-build-env.ps1") `
+. (Join-Path $WorkspaceRoot "base\init-fa-build-env.ps1") `
     -WorkspaceRoot $WorkspaceRoot `
     -PythonExe $PythonExe
 
-$buildScript = Join-Path $BuildRoot "compile\build_fa.py"
+$buildScript = Join-Path $WorkspaceRoot "base\build-fa-steps.py"
 
 $step = if ($StagingRoot) { "merge-and-wheel" } else { "wheel" }
 

@@ -16,7 +16,7 @@ runs:
       id: plan
       shell: pwsh
       run: |
-        . $env:GITHUB_WORKSPACE\build\config\read-version-lock.ps1 -WorkspaceRoot $env:GITHUB_WORKSPACE
+        . "$env:GITHUB_WORKSPACE\build\1.config - read-version-lock.ps1" -WorkspaceRoot $env:GITHUB_WORKSPACE
         $json = ConvertTo-Json -InputObject @($OptDimList) -Compress
         Write-Host "OPT_DIM matrix from lock: $json"
         Write-Host "Primary OPT_DIM shard: $PRIMARY_OPT_DIM"

@@ -9,7 +9,7 @@
 | **serial** | prep → 全量 build_ext → 原地 `bdist_wheel`（同 job 同目录，stamp 跳过重编）→ smoke test |
 | **parallel** | prep → compile-d32\|d64\|d128\|d256 → link-wheel → smoke test |
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/compile/build_fa.py`。Cache 前缀：`serial-v4` / `parallel-v4-d{dim}`（精确 key，无 `restore-keys`；key 含仓库 commit-id + 工具链指纹（MSVC+clang）+ pip 工具链指纹）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`base/build-fa-steps.py`。Cache 前缀：`serial-v4` / `parallel-v4-d{dim}`（精确 key，无 `restore-keys`；key 含仓库 commit-id + 工具链指纹（MSVC+clang）+ pip 工具链指纹）。
 
 ## 复用入口
 
@@ -19,17 +19,24 @@
 
 | 入口 | 职责 |
 |------|------|
-| `read-version-lock.ps1` | 读 lock；`-ExportToGitHubEnv` 写 CI env。**唯一直接读 lock 的 PS1** |
-| `paths.ps1` | `BuildRoot`；`-LoadVersionLock` 供测试脚本 |
-| `setup-rocm-env.ps1` | ROCm 编译 env（内部 dot-source lock） |
-| `get-rocm-sdk-paths.ps1` | 输出 `CoreRoot`/`DevelRoot`（setup-rocm-env 与 msvc 指纹共用；唯一 ROCm 路径发现） |
-| `init-fa-build-env.ps1` | numpy + `OPT_DIM` + setup-rocm |
-| `build_fa.py` | `--step compile` / `--step wheel` / `--step merge-and-wheel`（parallel link+staging 校验） |
-| `build-bdist-wheel.ps1` | 设 `FLASH_ATTENTION_FORCE_BUILD`，调 link 脚本 |
-| `compile-fa.ps1` | 任意 `-OptDim` 编译入口（serial 全量 / parallel 单 dim）；parallel 的 `get-fa-release-dir.ps1` 校验与 `RELEASE_DIR` 输出在 workflow 内单独调 |
-| `smoke-test-wheel.ps1` | CI CPU smoke test |
+| `read-version-lock.ps1`（base 目录） | **唯一直接读 lock 的 PS1**；`$script:` 变量 + `VersionLockVars` 暴露 |
+| `1.config - read-version-lock.ps1` | 调 base 版 + `-ExportToGitHubEnv` 写 CI env（fa-read-version-lock action 专用） |
+| `2.prep - prep-flash-attention.ps1` | clone FA 源码（读 lock 取 repo/commit） |
+| `3.patch - patch-fa-inference.ps1` | 改 setup.py：跳过 bwd + 启用 CK 禁用 backward 标志（fa-prep-src 第二步调） |
+| `get-build-paths.ps1`（base 目录） | `BuildRoot`；`-LoadVersionLock` 供测试脚本 |
+| `get-rocm-sdk-paths.ps1`（base 目录） | 输出 `CoreRoot`/`DevelRoot`（init-fa-build-env 与 msvc 指纹共用；唯一 ROCm 路径发现） |
+| `4.sdk - get-rocm-sdk-paths.ps1` | 调 base 版（fa-toolchain-fingerprint action 专用适配） |
+| `init-fa-build-env.ps1`（base 目录） | numpy + `OPT_DIM` + ROCm 编译 env（内部 dot-source lock） |
+| `build-fa-steps.py`（base 目录） | `--step compile` / `--step wheel` / `--step merge-and-wheel`（parallel link+staging 校验） |
+| `5.compile - compile-opt-dim.ps1` | 任意 `-OptDim` 编译入口（serial 全量 / parallel 单 dim） |
+| `6.shard - validate-shard.ps1` | 校验 compile 产物 .obj（含 `_d{dim}_` kernel）并输出 `RELEASE_DIR`（parallel 专用；workflow 内单独调） |
+| `7.wheel - build-bdist-wheel.ps1` | 设 `FLASH_ATTENTION_FORCE_BUILD`，调 link 脚本 |
+| `8.verify - wheel-smoke-test.ps1` | CI CPU smoke test |
+| `9.test - gpu-smoke-test.ps1` | 部署前真机 GPU smoke（fwd + kvcache；CI 不调） |
 
-规则：lock 经 `read-version-lock.ps1`（或 paths/setup-rocm）；ROCm 路径发现只经 `get-rocm-sdk-paths.ps1`；编译/打 wheel 只经 `build_fa.py`。
+规则：lock 经 `read-version-lock.ps1`（唯一；或 get-build-paths/init-fa-build-env 间接）；ROCm 路径发现只经 `get-rocm-sdk-paths.ps1`；编译/打 wheel 只经 `build-fa-steps.py`。
+
+**依赖方向（强制）**：action/workflow 只能引用 `build/`；`build/` 只能引用 `base/`；`base/` 只能引用 `base/`（同层）。新增引用违反此方向即拒绝。base 共享工具（read-version-lock / get-rocm-sdk-paths）需经 build 适配层（`1.config` / `4.sdk`）暴露给 action。
 
 **Composite**（封装重复 step 序列；单行转发脚本仍禁止）
 
@@ -38,12 +45,12 @@
 | `fa-job-bootstrap` | lock + toolchain + download src |
 | `fa-build-with-cache` | cache restore → `inputs.run` → save |
 | `fa-smoke-test-upload-wheel` | smoke test + upload wheel |
-| `fa-prep-artifact` / `fa-plan-opt-dim-matrix` | prep / parallel matrix |
+| `fa-prep-src` / `fa-plan-opt-dim-matrix` | prep / parallel matrix |
 | `fa-read-version-lock` 等 | 被 bootstrap 调用 |
 
 缓存 key 含仓库 commit-id（覆盖 build 脚本/lock/action 全部仓内输入）+ 工具链指纹（MSVC+clang，镜像更新）+ pip 工具链指纹（pip/setuptools/wheel/ninja/packaging/psutil，运行时 `pip freeze` 观测）。Workflow `env`：`MAX_JOBS`/`FA_SRC`/`FA_ARTIFACT`/`FA_STAGING`/`SKIP_CACHE_RESTORE`。
 
-**有意不合并：** compile 阶段 `get-fa-release-dir.ps1` dim 校验 vs link 阶段 `validate_staging`；四 shard 重复编 shared obj（link 只用 d32）；parallel link-wheel 无 ninja cache；obj artifact 名 `d{dim}` 即 staging 子目录名（勿 normalize）。
+**有意不合并：** compile 阶段 `validate-shard.ps1` dim 校验 vs link 阶段 `validate_staging`；四 shard 重复编 shared obj（link 只用 d32）；parallel link-wheel 无 ninja cache；obj artifact 名 `d{dim}` 即 staging 子目录名（勿 normalize）。
 
 ## VERSION.lock.json
 
@@ -83,4 +90,4 @@ prep clone `flash_attention_build_commit`；不参与逻辑的字段不得进脚
 
 - 升级 FA：改 `flash_attention_build_commit`
 - bump PyTorch/ROCm：同步 `expected_wheel_pattern`、`wheel_local_version` 等
-- 部署前：`gpu-smoke-test.ps1`（gfx1201 真机）
+- 部署前：`9.test - gpu-smoke-test.ps1`（gfx1201 真机）

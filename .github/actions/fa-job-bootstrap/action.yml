@@ -6,7 +6,7 @@ inputs:
     description: Absolute path to flash-attention source root
     required: true
   artifact-name:
-    description: Prep artifact name from fa-prep-artifact
+    description: Prep artifact name from fa-prep-src
     required: true
 
 runs:

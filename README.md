@@ -75,7 +75,7 @@ Cache keys include the repository commit SHA and a toolchain fingerprint (MSVC t
 
 ### Build stages
 
-Single entry point for compile and wheel packaging: `build_fa.py` (in-process `exec_module(setup.py)`), one of three `--step` modes:
+Single entry point for compile and wheel packaging: `build-fa-steps.py` (in-process `exec_module(setup.py)`), one of three `--step` modes:
 
 | step | Role |
 |------|------|
@@ -91,7 +91,7 @@ Serial and parallel compose the same entry; both produce identical wheels:
 | Parallel compile | `--step compile` (once per shard) | single shard |
 | Parallel link | `--step merge-and-wheel` + staging | full (env) |
 
-Env is set uniformly via `env/init-fa-build-env.ps1`.
+Env is set uniformly via `base/init-fa-build-env.ps1`.
 
 ## Output
 
@@ -103,8 +103,8 @@ Expected pattern: `flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd6
 
 | Check | Script |
 |-------|--------|
-| CI CPU smoke test | `build/test/smoke-test-wheel.ps1` |
-| Pre-deploy GPU smoke test (gfx1201 hardware) | `build/test/gpu-smoke-test.ps1` |
+| CI CPU smoke test | `build/8.verify - wheel-smoke-test.ps1` |
+| Pre-deploy GPU smoke test (gfx1201 hardware) | `build/9.test - gpu-smoke-test.ps1` |
 
 Run `gpu-smoke-test.ps1` on gfx1201 before deploy.
 

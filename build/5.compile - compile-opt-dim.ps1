@@ -17,16 +17,14 @@ if (-not (Test-Path $FaSrc)) {
     throw "flash-attention source not found: $FaSrc"
 }
 
-$BuildRoot = Join-Path $WorkspaceRoot "build"
-
-. (Join-Path $BuildRoot "env\init-fa-build-env.ps1") `
+. (Join-Path $WorkspaceRoot "base\init-fa-build-env.ps1") `
     -WorkspaceRoot $WorkspaceRoot `
     -PythonExe $PythonExe `
     -OptDim $OptDim
 
 Write-Host "Compiling OPT_DIM=$OptDim via in-process build_ext"
 
-$buildScript = Join-Path $BuildRoot "compile\build_fa.py"
+$buildScript = Join-Path $WorkspaceRoot "base\build-fa-steps.py"
 & $PythonExe $buildScript --step compile --fa-src $FaSrc -v
 if ($LASTEXITCODE -ne 0) {
     throw "build_ext failed for OPT_DIM=$OptDim (exit $LASTEXITCODE)"

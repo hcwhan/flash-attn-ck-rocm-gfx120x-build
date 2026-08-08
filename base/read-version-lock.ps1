@@ -1,8 +1,9 @@
+# Read VERSION.lock.json into $script: variables. THE only script that reads
+# the lock file directly. Dot-source only; all lock consumers (get-build-paths.ps1,
+# init-fa-build-env.ps1, build scripts, actions) go through this entry.
 param(
     [Parameter(Mandatory = $true)]
-    [string]$WorkspaceRoot,
-
-    [switch]$ExportToGitHubEnv
+    [string]$WorkspaceRoot
 )
 
 $ErrorActionPreference = "Stop"
@@ -76,11 +77,7 @@ foreach ($name in $vars.Keys) {
     Set-Variable -Name $name -Value $vars[$name] -Scope Script
 }
 Set-Variable -Name OptDimList -Value $optDimList -Scope Script
-
-if ($ExportToGitHubEnv -and $env:GITHUB_ENV) {
-    foreach ($name in $vars.Keys) {
-        "${name}=$($vars[$name])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-    }
-}
+# Exposed for adapters that export the values (e.g. 1.config -ExportToGitHubEnv).
+Set-Variable -Name VersionLockVars -Value $vars -Scope Script
 
 Write-Host "VERSION.lock: python=$($vars.PYTHON_VERSION) pytorch=$($vars.PYTORCH_VERSION) gpu=$($vars.GPU_ARCHS) opt_dim=$optDimString"

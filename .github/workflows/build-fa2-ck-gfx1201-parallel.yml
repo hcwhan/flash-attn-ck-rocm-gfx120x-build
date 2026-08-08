@@ -48,7 +48,7 @@ jobs:
         uses: ./.github/actions/fa-plan-opt-dim-matrix
 
       - name: Prepare patched flash-attention source
-        uses: ./.github/actions/fa-prep-artifact
+        uses: ./.github/actions/fa-prep-src
         with:
           fa-src: ${{ env.FA_SRC }}
           artifact-name: ${{ env.FA_ARTIFACT }}
@@ -88,7 +88,7 @@ jobs:
           cache-key: fa2-ck-gfx1201-parallel-v4-d${{ matrix.opt_dim }}-${{ github.sha }}-msvc${{ steps.msvc-fp.outputs.msvc-hash }}-pip${{ steps.msvc-fp.outputs.pip-hash }}
           skip-restore: ${{ env.SKIP_CACHE_RESTORE }}
           run: |
-            . $env:GITHUB_WORKSPACE\build\compile\compile-fa.ps1 `
+            . "$env:GITHUB_WORKSPACE\build\5.compile - compile-opt-dim.ps1" `
               -OptDim "${{ matrix.opt_dim }}" `
               -WorkspaceRoot $env:GITHUB_WORKSPACE `
               -FaSrc $env:FA_SRC
@@ -96,7 +96,7 @@ jobs:
       - name: Validate shard and emit RELEASE_DIR
         shell: pwsh
         run: |
-          $releaseDir = . $env:GITHUB_WORKSPACE\build\common\get-fa-release-dir.ps1 `
+          $releaseDir = . "$env:GITHUB_WORKSPACE\build\6.shard - validate-shard.ps1" `
             -FaSrc $env:FA_SRC `
             -OptDim "${{ matrix.opt_dim }}"
           "RELEASE_DIR=$releaseDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -137,7 +137,7 @@ jobs:
       - name: Link and package wheel from merged objects
         shell: pwsh
         run: |
-          . $env:GITHUB_WORKSPACE\build\wheel\build-bdist-wheel.ps1 `
+          . "$env:GITHUB_WORKSPACE\build\7.wheel - build-bdist-wheel.ps1" `
             -FaSrc $env:FA_SRC `
             -DistDir $env:GITHUB_WORKSPACE\dist `
             -WorkspaceRoot $env:GITHUB_WORKSPACE `

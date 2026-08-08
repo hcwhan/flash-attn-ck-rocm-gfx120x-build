@@ -7,8 +7,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-. (Join-Path (Split-Path $PSScriptRoot -Parent) "common\paths.ps1") -WorkspaceRoot $WorkspaceRoot -LoadVersionLock
-$BuildRoot = $script:BuildRoot
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "base\get-build-paths.ps1") -WorkspaceRoot $WorkspaceRoot -LoadVersionLock
 
 $optDimsArg = ($OptDimList | ForEach-Object { [int]$_ }) -join ","
 

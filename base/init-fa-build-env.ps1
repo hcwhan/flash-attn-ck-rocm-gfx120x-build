@@ -1,20 +1,26 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$PythonExe,
+    [string]$WorkspaceRoot,
 
-    [Parameter(Mandatory = $true)]
-    [string]$WorkspaceRoot
+    [string]$PythonExe = "python",
+
+    [string]$OptDim = ""
 )
 
 $ErrorActionPreference = "Stop"
 
-if (-not $env:OPT_DIM) {
-    throw "OPT_DIM env must be set before setup-rocm-env.ps1"
+& $PythonExe -m pip install numpy -q
+
+if ($OptDim) {
+    $env:OPT_DIM = $OptDim
 }
 
-$BuildRoot = Join-Path $WorkspaceRoot "build"
-. (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
-. (Join-Path $BuildRoot "common\get-rocm-sdk-paths.ps1") -PythonExe $PythonExe
+if (-not $env:OPT_DIM) {
+    throw "OPT_DIM env must be set before init-fa-build-env.ps1"
+}
+
+. (Join-Path $PSScriptRoot "read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
+. (Join-Path $PSScriptRoot "get-rocm-sdk-paths.ps1") -PythonExe $PythonExe
 
 $coreRoot = $script:CoreRoot
 $rocmRoot = $script:DevelRoot
@@ -52,3 +58,5 @@ Write-Host "OPT_DIM=$env:OPT_DIM"
 Write-Host "ROCM_HOME=$env:ROCM_HOME"
 
 & $PythonExe -c "import torch; print('torch', torch.__version__); print('hip', torch.version.hip); print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)"
+
+Write-Host "Build env ready (GPU_ARCHS=$env:GPU_ARCHS, OPT_DIM=$env:OPT_DIM)"

@@ -6,9 +6,9 @@ param(
     [switch]$LoadVersionLock
 )
 
-$script:BuildRoot = Split-Path $PSScriptRoot -Parent
+$script:BuildRoot = Join-Path (Split-Path $PSScriptRoot -Parent) "build"
 $script:WorkspaceRoot = $WorkspaceRoot
 
 if ($LoadVersionLock) {
-    . (Join-Path $script:BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
+    . (Join-Path $PSScriptRoot "read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 }

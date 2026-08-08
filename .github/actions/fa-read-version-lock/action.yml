@@ -7,6 +7,6 @@ runs:
     - name: Load VERSION.lock.json
       shell: pwsh
       run: |
-        . $env:GITHUB_WORKSPACE\build\config\read-version-lock.ps1 `
+        . "$env:GITHUB_WORKSPACE\build\1.config - read-version-lock.ps1" `
           -WorkspaceRoot $env:GITHUB_WORKSPACE `
           -ExportToGitHubEnv

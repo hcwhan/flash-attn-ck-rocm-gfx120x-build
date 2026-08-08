@@ -75,7 +75,7 @@ ComfyUI **推理专用** wheel：
 | Job | 作用 | 超时 |
 |-----|------|------|
 | `prep-fa-src` | clone + patch，上传源码 artifact | 45 min |
-| `build-win-gfx1201` | toolchain、cache、`build-bdist-wheel.ps1`（全量） | 6 h |
+| `build-win-gfx1201` | toolchain、cache、`build/7.wheel - build-bdist-wheel.ps1`（全量） | 6 h |
 
 ### 并行（`build-fa2-ck-gfx1201-parallel.yml`）
 
@@ -90,7 +90,7 @@ ComfyUI **推理专用** wheel：
 
 ### 构建阶段
 
-编译/打 wheel 唯一入口：`build_fa.py`（同进程 `exec_module(setup.py)`），按 `--step` 三选一：
+编译/打 wheel 唯一入口：`build-fa-steps.py`（同进程 `exec_module(setup.py)`），按 `--step` 三选一：
 
 | step | 作用 |
 |------|------|
@@ -106,7 +106,7 @@ ComfyUI **推理专用** wheel：
 | 并行 compile | `--step compile`（每 shard 一次） | 单 shard |
 | 并行 link | `--step merge-and-wheel` + staging | 全量（env） |
 
-env 统一经 `env/init-fa-build-env.ps1`。
+env 统一经 `base/init-fa-build-env.ps1`。
 
 ## 产物
 
@@ -126,8 +126,8 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 | 检查 | 脚本 |
 |------|------|
-| CI CPU smoke test | `build/test/smoke-test-wheel.ps1` |
-| 部署前 GPU smoke test（gfx1201 真机） | `build/test/gpu-smoke-test.ps1` |
+| CI CPU smoke test | `build/8.verify - wheel-smoke-test.ps1` |
+| 部署前 GPU smoke test（gfx1201 真机） | `build/9.test - gpu-smoke-test.ps1` |
 
 CPU smoke test：wheel 文件名/结构（.pyd 体积、OPT_DIM 符号、METADATA）→ pip 安装 → import flash_attn_2_cuda。**不等于** gfx1201 kernel 正确 — 部署前须在 GPU 上跑 `gpu-smoke-test.ps1`（覆盖 fwd + kvcache/appendkv/splitkv）。
 

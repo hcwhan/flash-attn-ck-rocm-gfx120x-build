@@ -16,9 +16,11 @@ runs:
       id: prep
       shell: pwsh
       run: |
-        . $env:GITHUB_WORKSPACE\build\prep\prep-flash-attention.ps1 `
+        . "$env:GITHUB_WORKSPACE\build\2.prep - prep-flash-attention.ps1" `
           -FlashAttentionRoot "${{ inputs.fa-src }}" `
           -WorkspaceRoot $env:GITHUB_WORKSPACE
+        . "$env:GITHUB_WORKSPACE\build\3.patch - patch-fa-inference.ps1" `
+          -FlashAttentionRoot "${{ inputs.fa-src }}"
 
     - name: Upload patched source artifact
       uses: actions/upload-artifact@v7

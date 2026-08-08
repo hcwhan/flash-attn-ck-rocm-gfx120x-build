@@ -31,7 +31,7 @@ runs:
         # ROCm clang (installed by fa-rocm-toolchain before this step); guards the
         # cache against toolchain drift inside the pinned rocm[devel] version.
         $clangVersion = 'unknown'
-        . $env:GITHUB_WORKSPACE\build\common\get-rocm-sdk-paths.ps1 -PythonExe python
+        . "$env:GITHUB_WORKSPACE\build\4.sdk - get-rocm-sdk-paths.ps1" -PythonExe python
         $clangExe = Join-Path $script:CoreRoot 'lib\llvm\bin\clang.exe'
         if (Test-Path $clangExe) {
           $clangVersion = (& $clangExe --version 2>$null | Select-Object -First 1)
