@@ -28,7 +28,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `.github
 | `expected_wheel_pattern` | Glob for smoke-test wheel name |
 | `wheel_artifact_name` | GitHub Actions artifact name |
 
-Prep clones **`flash_attention_build_commit`** and verifies `HEAD` matches that SHA.
+Prep clones **`flash_attention_build_commit`** (`fetch` + `checkout FETCH_HEAD`).
 
 ## Build profile
 

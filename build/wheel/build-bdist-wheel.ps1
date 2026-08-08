@@ -33,6 +33,8 @@ if ($StagingRoot) {
     $env:FLASH_ATTENTION_FORCE_BUILD = "TRUE"
 }
 
+$env:OPT_DIM = [string]$LockOptDim
+
 . (Join-Path $BuildRoot "env\init-fa-build-env.ps1") `
     -WorkspaceRoot $WorkspaceRoot `
     -PythonExe $PythonExe

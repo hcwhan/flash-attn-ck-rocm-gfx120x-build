@@ -11,6 +11,10 @@ $ErrorActionPreference = "Stop"
 $BuildRoot = Join-Path $WorkspaceRoot "build"
 . (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
+if (-not $env:OPT_DIM) {
+    throw "OPT_DIM env must be set before setup-rocm-env.ps1"
+}
+
 $pyCode = @"
 import importlib.util, os, subprocess, sys
 
@@ -26,11 +30,6 @@ proc = subprocess.run(
     check=True,
 )
 devel_root = proc.stdout.strip()
-rocm_root = devel_root
-
-thrust_hdr = os.path.join(rocm_root, 'include', 'thrust', 'complex.h')
-if not os.path.isfile(thrust_hdr):
-    raise SystemExit(f'ERROR: thrust header missing: {thrust_hdr}')
 
 print(core_root)
 print(devel_root)
@@ -63,9 +62,6 @@ $env:CC = "clang-cl"
 $env:CXX = "clang-cl"
 $env:DISTUTILS_USE_SDK = "1"
 $env:GPU_ARCHS = [string]$GPU_ARCHS
-if (-not $env:OPT_DIM) {
-    $env:OPT_DIM = [string]$LockOptDim
-}
 $env:FLASHATTENTION_DISABLE_BACKWARD = "TRUE"
 $env:BUILD_TARGET = "rocm"
 

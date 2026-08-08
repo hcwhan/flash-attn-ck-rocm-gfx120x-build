@@ -18,10 +18,11 @@ def load_opt_dims() -> tuple[str, ...]:
     opt_dim = os.environ.get("OPT_DIM", "").strip()
     if not opt_dim:
         raise SystemExit("OPT_DIM env is required")
-    if "," in opt_dim:
-        dims = tuple(part.strip() for part in opt_dim.split(",") if part.strip())
-    else:
-        dims = (opt_dim,)
+    if "," not in opt_dim:
+        raise SystemExit(
+            f"OPT_DIM must be comma-separated tiers for link, got {opt_dim!r}"
+        )
+    dims = tuple(part.strip() for part in opt_dim.split(",") if part.strip())
     if not dims:
         raise SystemExit("OPT_DIM is empty")
     return dims

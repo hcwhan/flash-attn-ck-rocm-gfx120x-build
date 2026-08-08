@@ -40,7 +40,7 @@
 | `fa-prep-artifact` / `fa-plan-opt-dim-matrix` | prep / parallel matrix |
 | `fa-read-version-lock` 等 | 被 bootstrap 调用 |
 
-Workflow `env` 统一：`FA_CACHE_HASH`（单一 `hashFiles` 列表）、`SKIP_CACHE_RESTORE`。仅 job 独有逻辑可内联（如 parallel link staging 重命名 `fa-objs-dNN` → `dNN`）。
+Workflow `env` 统一：`FA_CACHE_HASH`（单一 `hashFiles` 列表）、`SKIP_CACHE_RESTORE`。
 
 **有意不合并：** compile 阶段 `get-fa-release-dir.ps1` dim 校验 vs link 阶段 `validate_staging`；四 shard 重复编 shared obj（link 只用 d32）。
 
@@ -50,12 +50,13 @@ Workflow `env` 统一：`FA_CACHE_HASH`（单一 `hashFiles` 列表）、`SKIP_C
 |----------|------------|
 | `flash_attention_build_commit`、`flash_attention_repo`、`opt_dim`、`expected_wheel_pattern`、`wheel_artifact_name`、`python`、`pytorch`、`hip`、`gpu_archs`… | `flash_attention_min_commit`、`flash_attention_build_commit_date` |
 
-prep 校验 clone 后 HEAD = `flash_attention_build_commit`；不参与逻辑的字段不得进脚本分支。
+prep clone `flash_attention_build_commit` 并输出 `fa-commit-sha`（lock 值，供 cache key）；不参与逻辑的字段不得进脚本分支。
 
 ## 设计决策
 
 分析 / refactor 时**勿当缺陷**；与本节冲突时以本节为准。
 
+- **不为不可能场景加诊断**
 - **干净 runner**：compile 后仅一棵 `temp.win-*`；不为脏 workspace / 人工改目录加兜底。
 - **连续 CI 链**：prep → compile/link → smoke 自动跑完；staging/shard 齐全等流水线检查保留。
 - **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=FALSE` + prebuilt `.obj` 时间戳 merge。

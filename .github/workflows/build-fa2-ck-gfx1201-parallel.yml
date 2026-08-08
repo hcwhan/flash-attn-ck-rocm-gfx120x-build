@@ -86,7 +86,7 @@ jobs:
       - name: Upload object files
         uses: actions/upload-artifact@v7
         with:
-          name: fa-objs-d${{ matrix.opt_dim }}
+          name: d${{ matrix.opt_dim }}
           path: ${{ env.RELEASE_DIR }}
           retention-days: 7
           if-no-files-found: error
@@ -110,23 +110,9 @@ jobs:
       - name: Download OPT_DIM object artifacts
         uses: actions/download-artifact@v8
         with:
-          pattern: fa-objs-d*
+          pattern: d*
           path: ${{ env.FA_STAGING }}
           merge-multiple: false
-
-      - name: Normalize staging layout
-        shell: pwsh
-        run: |
-          Write-Host "flash-attention commit: ${{ needs.prep.outputs.fa-commit-sha }}"
-          # download-artifact creates fa-objs-d32/ etc.; link script expects d32/
-          Get-ChildItem $env:FA_STAGING -Directory | ForEach-Object {
-            if ($_.Name -match '^fa-objs-d(\d+)$') {
-              $dest = Join-Path $env:FA_STAGING ("d{0}" -f $Matches[1])
-              if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
-              Move-Item $_.FullName $dest
-            }
-          }
-          Get-ChildItem $env:FA_STAGING -Directory | ForEach-Object { Write-Host "Staging:" $_.Name }
 
       - name: Link wheel from merged objects
         shell: pwsh
