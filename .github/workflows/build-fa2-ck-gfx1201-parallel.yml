@@ -36,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout build repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Prepare patched flash-attention source
         uses: ./.github/actions/fa-prep-artifact
@@ -57,7 +57,7 @@ jobs:
 
     steps:
       - name: Checkout build repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup ROCm toolchain
         uses: ./.github/actions/fa-rocm-toolchain
@@ -86,7 +86,7 @@ jobs:
           "RELEASE_DIR=$(Join-Path $release.FullName 'Release')" >> $env:GITHUB_ENV
 
       - name: Upload object files
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fa-objs-d${{ matrix.opt_dim }}
           path: ${{ env.RELEASE_DIR }}
@@ -101,7 +101,7 @@ jobs:
 
     steps:
       - name: Checkout build repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup ROCm toolchain
         uses: ./.github/actions/fa-rocm-toolchain
@@ -118,7 +118,7 @@ jobs:
           fa-src: ${{ env.FA_SRC }}
 
       - name: Download OPT_DIM object artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: fa-objs-d*
           path: ${{ env.FA_STAGING }}
@@ -155,7 +155,7 @@ jobs:
           . $env:GITHUB_WORKSPACE\build\smoke-test-wheel.ps1 -DistDir $env:GITHUB_WORKSPACE\dist
 
       - name: Upload wheel artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: flash-attn-ck-gfx1201-cp312-rocm714
           path: dist/*.whl
@@ -179,7 +179,7 @@ jobs:
 
       - name: Upload build logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-logs-parallel
           path: build-logs

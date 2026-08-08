@@ -23,7 +23,7 @@ runs:
           -FlashAttentionRef "${{ inputs.flash-attn-ref }}"
 
     - name: Upload patched source artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact-name }}
         path: ${{ inputs.fa-src }}
