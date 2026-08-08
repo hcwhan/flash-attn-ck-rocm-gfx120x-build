@@ -7,6 +7,11 @@ on:
         description: "Ninja parallel compile workers per build job (use 2 if OOM on hosted runner)"
         required: false
         default: "4"
+      skip_cache_restore:
+        description: "Skip restoring ninja cache (build still saves cache after compile)"
+        type: boolean
+        required: false
+        default: true
 
 concurrency:
   group: build-fa2-ck-gfx1201-serial
@@ -70,12 +75,16 @@ jobs:
         with:
           fa-src: ${{ env.FA_SRC }}
           cache-key: fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/patch-ck-windows.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/read-version-lock.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}
+          skip-restore: ${{ github.event.inputs.skip_cache_restore != false && 'true' || 'false' }}
 
       - name: Report cache status
         shell: pwsh
         run: |
           Write-Host "flash-attention commit: ${{ needs.prep.outputs.fa-commit-sha }}"
-          if ('${{ steps.fa-build-cache.outputs.cache-hit }}' -eq 'true') {
+          Write-Host "skip_cache_restore: ${{ github.event.inputs.skip_cache_restore != false }}"
+          if ('${{ github.event.inputs.skip_cache_restore != false }}' -eq 'true') {
+            Write-Host "Cache restore skipped by workflow input; compiling fresh (cache save still enabled)"
+          } elseif ('${{ steps.fa-build-cache.outputs.cache-hit }}' -eq 'true') {
             Write-Host "Cache hit: resuming incremental ninja build"
           } else {
             Write-Host "Cache miss: starting fresh compile (re-run workflow to resume if timed out)"
