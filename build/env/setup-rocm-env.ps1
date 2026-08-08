@@ -45,7 +45,6 @@ $env:CC = "clang-cl"
 $env:CXX = "clang-cl"
 $env:DISTUTILS_USE_SDK = "1"
 $env:GPU_ARCHS = [string]$GPU_ARCHS
-$env:FLASHATTENTION_DISABLE_BACKWARD = "TRUE"
 $env:BUILD_TARGET = "rocm"
 
 Write-Host "GPU_ARCHS=$env:GPU_ARCHS"

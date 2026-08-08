@@ -9,8 +9,6 @@ inputs:
     description: Artifact name for upload-artifact
     required: true
 
-outputs: {}
-
 runs:
   using: composite
   steps:

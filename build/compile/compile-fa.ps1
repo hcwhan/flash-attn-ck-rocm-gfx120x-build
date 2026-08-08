@@ -32,13 +32,4 @@ if ($LASTEXITCODE -ne 0) {
     throw "build_ext failed for OPT_DIM=$OptDim (exit $LASTEXITCODE)"
 }
 
-$releaseDir = . (Join-Path $BuildRoot "common\get-fa-release-dir.ps1") `
-    -FaSrc $FaSrc `
-    -OptDim $OptDim
-
-Write-Host "OPT_DIM=$OptDim release dir: $releaseDir"
-
-$env:RELEASE_DIR = $releaseDir
-if ($env:GITHUB_ENV) {
-    "RELEASE_DIR=$releaseDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-}
+Write-Host "Compile done for OPT_DIM=$OptDim"
