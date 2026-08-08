@@ -22,7 +22,7 @@ if (-not $PrimaryDim) {
     $PrimaryDim = $PrimaryOptDim
 }
 
-$env:OPT_DIM = $OPT_DIM
+$env:OPT_DIM = $LockOptDim
 
 python (Join-Path $PSScriptRoot "link_parallel_wheel.py") `
     --validate-only `

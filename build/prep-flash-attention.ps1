@@ -97,7 +97,17 @@ function Assert-BuildCommitMeetsMin {
 
     git -C $Root merge-base --is-ancestor $MinCommit HEAD
     if ($LASTEXITCODE -ne 0) {
-        throw "flash_attention_build_commit ($head) is older than flash_attention_min_commit ($MinCommit)"
+        # depth-1 clone/fetch leaves min and build commits disconnected; deepen before re-check
+        Write-Host "Shallow clone lacks ancestry link; deepening fetch for min-commit check..."
+        git -c core.longpaths=true -C $Root fetch --deepen=2000 origin
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to deepen flash-attention clone for min-commit ancestry check"
+        }
+
+        git -C $Root merge-base --is-ancestor $MinCommit HEAD
+        if ($LASTEXITCODE -ne 0) {
+            throw "flash_attention_build_commit ($head) is older than flash_attention_min_commit ($MinCommit)"
+        }
     }
 
     Write-Host "Verified build commit $head is not earlier than flash_attention_min_commit $MinCommit"
@@ -105,6 +115,8 @@ function Assert-BuildCommitMeetsMin {
 
 Initialize-FlashAttentionRepo -Root $FlashAttentionRoot -Repo $repoUrl -Ref $buildCommit
 git -C $FlashAttentionRoot submodule update --init --depth 1 csrc/composable_kernel csrc/cutlass
+
+. (Join-Path $PSScriptRoot "patch-ck-windows.ps1") -FlashAttentionRoot $FlashAttentionRoot
 
 Assert-BuildCommitMeetsMin -Root $FlashAttentionRoot -BuildCommit $buildCommit -MinCommit $minCommit
 

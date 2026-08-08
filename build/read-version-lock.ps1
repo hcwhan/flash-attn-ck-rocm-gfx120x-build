@@ -39,7 +39,7 @@ $vars = @{
     ROCM_INDEX          = [string]$lock.rocm_index
     GPU_ARCHS           = [string]$lock.gpu_archs
     HIP_VERSION         = [string]$lock.hip
-    OPT_DIM             = $optDimString
+    LockOptDim          = $optDimString
     PRIMARY_OPT_DIM     = [string]$optDimList[0]
     WHEEL_ARTIFACT_NAME = $wheelArtifactName
 }
@@ -53,7 +53,7 @@ if ($ExportToGitHubEnv -and $env:GITHUB_ENV) {
     foreach ($name in $vars.Keys) {
         "${name}=$($vars[$name])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
     }
-    Write-Host "Exported VERSION.lock.json to GITHUB_ENV"
+    Write-Host "Exported VERSION.lock.json to GITHUB_ENV (LockOptDim not exported; compile shards set OPT_DIM explicitly)"
 }
 
 Write-Host "VERSION.lock: python=$($vars.PYTHON_VERSION) pytorch=$($vars.PYTORCH_VERSION) gpu=$($vars.GPU_ARCHS) opt_dim=$optDimString wheel_artifact=$wheelArtifactName"
