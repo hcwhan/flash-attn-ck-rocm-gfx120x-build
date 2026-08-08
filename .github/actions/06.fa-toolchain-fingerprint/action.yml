@@ -45,7 +45,7 @@ runs:
         # inputs that change compiled output -- observe at runtime like the
         # MSVC/clang toolchain instead of trusting an unpinned install.
         $pipPkgs = @('pip', 'setuptools', 'wheel', 'ninja', 'packaging', 'psutil')
-        $pipFreeze = python -m pip freeze 2>$null
+        $pipFreeze = python -m pip list --format=freeze 2>$null
         $pipVersions = foreach ($pkg in $pipPkgs) {
             $line = $pipFreeze | Where-Object { $_ -like "$pkg==*" } | Select-Object -First 1
             if (-not $line) {
