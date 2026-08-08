@@ -33,8 +33,12 @@
 
 ## 编译配置
 
-- CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（不含 **bwd** 训练内核）
+本 workflow 为 ComfyUI **推理专用** wheel：
+
+- CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（`generate.py` 不跑 **bwd** 方向 → wheel 内**不含** `fmha_bwd_*` backward kernel；前向推理正常，**不支持**需对 attention 求梯度的场景，如扩散模型训练、LoRA/微调中对 `flash_attn` 的反传）
+- 编译宏 **`-DFLASHATTENTION_DISABLE_BACKWARD`**（`patch-fa-inference.ps1` 启用；`setup-rocm-env.ps1` 设 `FLASHATTENTION_DISABLE_BACKWARD=TRUE`）— 编译期去掉 extension 内 backward 相关 C++ 分支；与上条互补，**不支持训练/反传**
 - `OPT_DIM=32,64,128,256`（与 upstream 默认 head dim 档一致）
+- 适配 GitHub 托管 runner **6 小时**上限；完整 upstream 编译需 20 小时+
 
 ## 触发方式
 

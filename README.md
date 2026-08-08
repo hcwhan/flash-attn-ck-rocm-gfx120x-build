@@ -35,7 +35,8 @@ Per [AMD ROCm GPU specifications](https://rocm.docs.amd.com/en/latest/reference/
 
 This workflow builds an **inference-only** wheel for ComfyUI:
 
-- CK kernels: **fwd + fwd_appendkv + fwd_splitkv** (no **bwd** training kernels)
+- CK kernels: **fwd + fwd_appendkv + fwd_splitkv** (`generate.py` skips **bwd** → no `fmha_bwd_*` backward kernels in the wheel; forward inference works; **not for** workloads that need attention gradients, e.g. diffusion training or LoRA/fine-tuning with `flash_attn` backward)
+- Compile flag **`-DFLASHATTENTION_DISABLE_BACKWARD`** (enabled by `patch-fa-inference.ps1`; `setup-rocm-env.ps1` sets `FLASHATTENTION_DISABLE_BACKWARD=TRUE`) — strips backward C++ dispatch in the extension; complements the line above; **no training / backward pass**
 - `OPT_DIM=32,64,128,256` (same head-dim tiers as upstream default)
 - Fits GitHub hosted runner **6h** timeout; full upstream build needs ~20h+
 
