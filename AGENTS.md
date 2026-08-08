@@ -75,7 +75,7 @@ prep clone `flash_attention_build_commit`；不参与逻辑的字段不得进脚
 - **连续 CI 链**：prep → compile/link → smoke 自动跑完；staging/shard 齐全等流水线检查保留。
 - **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=TRUE`（避免 FA `CachedWheelsCommand` 下载上游 wheel 短路）+ prebuilt `.obj` 时间戳 merge。
 - **`PRIMARY_OPT_DIM`** = lock `opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
-- **`ninja_workers` 默认 4**（OOM 改 2）；**`skip_cache_restore` 默认 true**（测试阶段；命中时构建成功后先删旧缓存再重存刷新，构建失败保留旧缓存；skip-restore 时 lookup-only 探测）。
+- **`ninja_workers` 默认 4**（OOM 改 2）；**`skip_cache_restore` 默认 false**（命中时构建成功后先删旧缓存再重存刷新，构建失败保留旧缓存；设为 true 时 lookup-only 探测）。
 - **全模式 prebuilt obj stamp**：compile/serial 恢复缓存后、link 合并后，均对既有 `.obj` 打未来时间戳（setup.py 每次 `build_ext` 重拷 `fmha_*.cu` 刷新 mtime，不 stamp 则 ninja 必然全量重编，缓存形同虚设）。
 - **link 排除 `*_api.obj`**：`fmha_*_api.cu.obj` 是 per-shard 部分分发表（只含本 shard hdim），合并 primary 副本会静默丢失其它 dim 分发；link job 必须从全量再生成的源码重编这 3 个 obj。
 

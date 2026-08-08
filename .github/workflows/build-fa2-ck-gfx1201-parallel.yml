@@ -11,7 +11,7 @@ on:
         description: "Skip restoring ninja cache (build still saves cache after compile)"
         type: boolean
         required: false
-        default: true
+        default: false
 
 concurrency:
   group: build-fa2-ck-gfx1201-parallel

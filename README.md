@@ -54,7 +54,7 @@ Push to `main` does **not** auto-trigger builds.
 | Input | Default | Description |
 |-------|---------|-------------|
 | `ninja_workers` | `4` | Ninja parallel workers (use `2` if OOM) |
-| `skip_cache_restore` | `true` | Skip cache restore during testing; set `false` when stable |
+| `skip_cache_restore` | `false` | Set `true` to skip cache restore (lookup-only probe; cache still saved after compile) |
 
 ### Serial (`build-fa2-ck-gfx1201-serial.yml`)
 

@@ -68,7 +68,7 @@ ComfyUI **推理专用** wheel：
 | 输入 | 默认 | 说明 |
 |------|------|------|
 | `ninja_workers` | `4` | Ninja 并行 worker 数（OOM 时可改为 `2`） |
-| `skip_cache_restore` | `true` | 测试阶段跳过 cache restore；稳定后改为 `false` |
+| `skip_cache_restore` | `false` | 设为 `true` 时跳过 cache restore（仅 lookup 探测，仍会在编译后保存） |
 
 ### 串行（`build-fa2-ck-gfx1201-serial.yml`）
 
