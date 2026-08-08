@@ -1,0 +1,59 @@
+name: FA ROCm toolchain
+description: Python, MSVC, PyTorch ROCm, and rocm[devel] for flash-attn Windows builds
+
+inputs:
+  python-version:
+    description: Python version
+    required: true
+  pytorch-version:
+    description: PyTorch version string
+    required: true
+  torch-device:
+    description: torch[device-*] extra name
+    required: true
+  rocm-index:
+    description: pip index URL for ROCm wheels
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Upgrade pip tooling
+      shell: pwsh
+      run: |
+        python -m pip install --upgrade pip wheel setuptools psutil packaging ninja
+
+    - name: Install pinned PyTorch ROCm
+      shell: pwsh
+      run: |
+        python -m pip install --no-cache-dir `
+          --index-url ${{ inputs.rocm-index }} `
+          "torch[device-${{ inputs.torch-device }}]==${{ inputs.pytorch-version }}"
+
+    - name: Install ROCm devel headers
+      shell: pwsh
+      run: |
+        python -m pip install --no-cache-dir `
+          --index-url ${{ inputs.rocm-index }} `
+          "rocm[devel]==7.14.0"
+
+    - name: Initialize ROCm devel tree
+      shell: pwsh
+      run: |
+        python -m rocm_sdk init --quiet
+        python -m rocm_sdk path --root
+        python -c "from pathlib import Path; import subprocess; r=Path(subprocess.check_output(['python','-m','rocm_sdk','path','--root'], text=True).strip()); p=r/'include'/'thrust'/'complex.h'; print('thrust header:', p, p.is_file()); assert p.is_file()"
+
+    - name: Verify torch and rocm toolchain
+      shell: pwsh
+      run: |
+        python -c "import torch; print('torch', torch.__version__); print('hip', torch.version.hip); print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)"
+        python -c "import importlib.util, os; s=importlib.util.find_spec('_rocm_sdk_core'); print('rocm_sdk_core', os.path.dirname(s.origin))"

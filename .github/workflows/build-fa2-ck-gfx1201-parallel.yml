@@ -1,4 +1,4 @@
-name: Build FlashAttention CK (Windows gfx1201)
+name: Build FlashAttention CK parallel (Windows gfx1201)
 
 on:
   workflow_dispatch:
@@ -8,15 +8,12 @@ on:
         required: false
         default: "main"
       max_jobs:
-        description: "Parallel compile jobs (use 2 if OOM on hosted runner)"
+        description: "Parallel compile jobs per OPT_DIM shard (use 2 if OOM)"
         required: false
         default: "4"
-  push:
-    tags:
-      - "fa-ck-v*"
 
 concurrency:
-  group: build-fa2-ck-gfx1201
+  group: build-fa2-ck-gfx1201-parallel
   cancel-in-progress: true
 
 env:
@@ -29,6 +26,7 @@ env:
   MAX_JOBS: ${{ github.event.inputs.max_jobs || '4' }}
   FA_SRC: C:\fa\flash-attention
   FA_ARTIFACT: fa-src-patched-gfx1201
+  FA_STAGING: C:\fa-staging
 
 jobs:
   prep:
@@ -47,9 +45,57 @@ jobs:
           fa-src: ${{ env.FA_SRC }}
           artifact-name: ${{ env.FA_ARTIFACT }}
 
-  build:
-    name: build-win-gfx1201
+  compile:
+    name: compile-d${{ matrix.opt_dim }}
     needs: prep
+    runs-on: windows-2022
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        opt_dim: ["32", "64", "128", "256"]
+
+    steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v4
+
+      - name: Setup ROCm toolchain
+        uses: ./.github/actions/fa-rocm-toolchain
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          pytorch-version: ${{ env.PYTORCH_VERSION }}
+          torch-device: ${{ env.TORCH_DEVICE }}
+          rocm-index: ${{ env.ROCM_INDEX }}
+
+      - name: Download patched flash-attention source
+        uses: ./.github/actions/fa-download-src
+        with:
+          artifact-name: ${{ env.FA_ARTIFACT }}
+          fa-src: ${{ env.FA_SRC }}
+
+      - name: Compile OPT_DIM shard
+        shell: pwsh
+        run: |
+          . $env:GITHUB_WORKSPACE\build\compile-opt-dim.ps1 `
+            -OptDim "${{ matrix.opt_dim }}" `
+            -WorkspaceRoot $env:GITHUB_WORKSPACE `
+            -FaSrc $env:FA_SRC
+          $release = Get-ChildItem -Path (Join-Path $env:FA_SRC "build") -Directory -Filter "temp.win-*" |
+            Select-Object -First 1
+          if (-not $release) { throw "temp.win-* missing after compile" }
+          "RELEASE_DIR=$(Join-Path $release.FullName 'Release')" >> $env:GITHUB_ENV
+
+      - name: Upload object files
+        uses: actions/upload-artifact@v4
+        with:
+          name: fa-objs-d${{ matrix.opt_dim }}
+          path: ${{ env.RELEASE_DIR }}
+          retention-days: 3
+          if-no-files-found: error
+
+  link:
+    name: link-wheel
+    needs: compile
     runs-on: windows-2022
     timeout-minutes: 360
 
@@ -71,38 +117,36 @@ jobs:
           artifact-name: ${{ env.FA_ARTIFACT }}
           fa-src: ${{ env.FA_SRC }}
 
-      - name: Restore ninja incremental build cache
-        uses: actions/cache@v4
-        id: fa-build-cache
+      - name: Download OPT_DIM object artifacts
+        uses: actions/download-artifact@v4
         with:
-          path: ${{ env.FA_SRC }}\build
-          key: fa2-ck-gfx1201-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-opt3264256-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1') }}-${{ env.FLASH_ATTN_REF }}
-          restore-keys: |
-            fa2-ck-gfx1201-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-opt3264256-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1') }}-
-            fa2-ck-gfx1201-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-
-          save-always: true
+          pattern: fa-objs-d*
+          path: ${{ env.FA_STAGING }}
+          merge-multiple: false
 
-      - name: Report cache status
+      - name: Normalize staging layout
         shell: pwsh
         run: |
-          if ('${{ steps.fa-build-cache.outputs.cache-hit }}' -eq 'true') {
-            Write-Host "Cache hit: resuming incremental ninja build"
-          } else {
-            Write-Host "Cache miss: starting fresh compile (re-run workflow to resume if timed out)"
+          # download-artifact creates fa-objs-d32/ etc.; link script expects d32/
+          Get-ChildItem $env:FA_STAGING -Directory | ForEach-Object {
+            if ($_.Name -match '^fa-objs-d(\d+)$') {
+              $dest = Join-Path $env:FA_STAGING ("d{0}" -f $Matches[1])
+              if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+              Move-Item $_.FullName $dest
+            }
           }
-          if (Test-Path "$env:FA_SRC\build") {
-            Get-ChildItem "$env:FA_SRC\build" -Recurse -Filter "*.obj" -ErrorAction SilentlyContinue |
-              Measure-Object | ForEach-Object { Write-Host "Cached object files: $($_.Count)" }
-          }
+          Get-ChildItem $env:FA_STAGING -Directory | ForEach-Object { Write-Host "Staging:" $_.Name }
 
-      - name: Build wheel
+      - name: Link wheel from merged objects
         shell: pwsh
-        working-directory: ${{ env.FA_SRC }}
         run: |
           New-Item -ItemType Directory -Force -Path $env:GITHUB_WORKSPACE\dist | Out-Null
-          python -m pip install numpy
           . $env:GITHUB_WORKSPACE\build\setup-rocm-env.ps1 -PythonExe python
-          python -m pip wheel . --no-build-isolation --no-deps -w $env:GITHUB_WORKSPACE\dist -v
+          python $env:GITHUB_WORKSPACE\build\link_parallel_wheel.py `
+            --fa-src $env:FA_SRC `
+            --staging-root $env:FA_STAGING `
+            --dist-dir $env:GITHUB_WORKSPACE\dist `
+            --primary-dim 32
           Get-ChildItem $env:GITHUB_WORKSPACE\dist
 
       - name: CPU smoke test
@@ -129,12 +173,15 @@ jobs:
           if (Test-Path $env:FA_SRC\build) {
             Copy-Item -Recurse $env:FA_SRC\build (Join-Path $dest "fa-build")
           }
+          if (Test-Path $env:FA_STAGING) {
+            Copy-Item -Recurse $env:FA_STAGING (Join-Path $dest "fa-staging")
+          }
 
       - name: Upload build logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs
+          name: build-logs-parallel
           path: build-logs
           retention-days: 7
           if-no-files-found: ignore

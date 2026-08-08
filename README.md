@@ -31,13 +31,6 @@ Per [AMD ROCm GPU specifications](https://rocm.docs.amd.com/en/latest/reference/
 
 > RDNA4 **`gfx1200`** models (e.g. RX 9060 / RX 9060 XT) use a different LLVM target and are **not** included in this wheel.
 
-## Trigger
-
-- Manual: Actions -> **Build FlashAttention CK (Windows gfx1201)** -> Run workflow
-- Tag push: `fa-ck-v*`
-
-> Push to `main` does **not** auto-trigger builds (avoids duplicate runs when pushing workflow fixes).
-
 ## Build profile
 
 This workflow builds an **inference-only** wheel for ComfyUI:
@@ -46,18 +39,48 @@ This workflow builds an **inference-only** wheel for ComfyUI:
 - `OPT_DIM=32,64,128,256` (same head-dim tiers as upstream default)
 - Fits GitHub hosted runner **6h** timeout; full upstream build needs ~20h+
 
-## CI strategy (two jobs + resume cache)
+## Trigger
+
+| Workflow | Purpose | Trigger |
+|----------|---------|---------|
+| **Build FlashAttention CK (Windows gfx1201)** | Single-job build + cache resume | Manual / tag `fa-ck-v*` |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | 4-way `OPT_DIM` compile + link | **Manual only** |
+
+> Push to `main` does **not** auto-trigger builds.
+
+### Shared components
+
+Both workflows share:
+
+- `.github/actions/fa-prep-artifact` — clone + patch + upload source
+- `.github/actions/fa-rocm-toolchain` — Python / MSVC / torch / rocm devel
+- `.github/actions/fa-download-src` — download prep artifact
+- `build/prep-flash-attention.ps1`, `build/setup-rocm-env.ps1`, `build/smoke-test-wheel.ps1`
+
+Parallel workflow additionally uses `build/compile-opt-dim.ps1`, `build/link_parallel_wheel.py`.
+
+## CI strategy
+
+### Serial (default)
 
 | Job | Role | Timeout |
 |-----|------|---------|
-| `prep-fa-src` | clone + patch flash-attention, upload source artifact | 45 min |
-| `build-win-gfx1201` | install torch/rocm, restore cache, compile wheel | 6 h |
+| `prep-fa-src` | clone + patch, upload source artifact | 45 min |
+| `build-win-gfx1201` | toolchain, cache restore, `pip wheel` | 6 h |
 
-- **Prep / Build split**: the compile job keeps its full 6h budget for ninja (saves ~20–40 min vs a single job).
-- **actions/cache**: caches `C:\fa\flash-attention\build` (ninja `.obj` + generated kernels); `save-always: true`.
-- **Resume after timeout**: re-run the workflow with the same `flash_attn_ref` and unchanged patch scripts. Cache keys include PyTorch version, `GPU_ARCHS`, `OPT_DIM`, patch script hashes, and `flash_attn_ref`; changing ref or patches starts a cold build.
+- **Prep / Build split** + **actions/cache** with `save-always: true` for timeout resume (**Re-run all jobs**).
 
-> Actions → timed-out or failed run → **Re-run all jobs** (not “Re-run failed jobs” only, or the prep artifact may be missing).
+### Parallel (OPT_DIM ×4)
+
+| Job | Role | Timeout |
+|-----|------|---------|
+| `prep-fa-src` | same prep action | 45 min |
+| `compile-d32` … `compile-d256` | one `OPT_DIM` shard each, upload `.obj` | 6 h each |
+| `link-wheel` | merge objs + link + wheel | 6 h |
+
+Shorter wall clock (~1–2h) but more total runner minutes. Same wheel artifact as serial.
+
+> Parallel: all four compile jobs must succeed before link runs.
 
 ## Output
 

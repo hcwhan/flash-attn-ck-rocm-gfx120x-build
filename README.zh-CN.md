@@ -31,33 +31,54 @@
 
 > RDNA4 **`gfx1200`** 型号（如 RX 9060 / RX 9060 XT）为不同 LLVM target，**不包含**在本 wheel 中。
 
-## 触发方式
-
-- 手动：Actions -> **Build FlashAttention CK (Windows gfx1201)** -> Run workflow
-- 打 tag：`fa-ck-v*`
-
-> 推送到 `main` **不会**自动触发编译（避免推送 workflow 修复时与手动触发重复跑两次）。
-
 ## 编译配置
-
-本 workflow 为 ComfyUI **推理专用** wheel：
 
 - CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（不含 **bwd** 训练内核）
 - `OPT_DIM=32,64,128,256`（与 upstream 默认 head dim 档一致）
-- 适配 GitHub 托管 runner **6 小时**上限；完整 upstream 编译需 20 小时+
 
-## CI 策略（两 job + 断点续编）
+## 触发方式
+
+| Workflow | 用途 | 触发 |
+|----------|------|------|
+| **Build FlashAttention CK (Windows gfx1201)** | 单 job 编译 + cache 断点续编 | 手动 / tag `fa-ck-v*` |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | 4 路 `OPT_DIM` 并发编译 + link 汇总 | **仅手动** |
+
+> 推送到 `main` **不会**自动触发编译。
+
+### 共用组件
+
+两个 workflow 共用：
+
+- `.github/actions/fa-prep-artifact` — clone + patch + 上传源码
+- `.github/actions/fa-rocm-toolchain` — Python / MSVC / torch / rocm devel
+- `.github/actions/fa-download-src` — 下载 prep artifact
+- `build/prep-flash-attention.ps1`、`build/setup-rocm-env.ps1`、`build/smoke-test-wheel.ps1`
+
+并行 workflow 额外使用：`build/compile-opt-dim.ps1`、`build/link_parallel_wheel.py`。
+
+## CI 策略
+
+### 串行（默认）
 
 | Job | 作用 | 超时 |
 |-----|------|------|
-| `prep-fa-src` | clone + patch flash-attention，上传源码 artifact | 45 min |
-| `build-win-gfx1201` | 安装 torch/rocm、恢复 cache、编译 wheel | 6 h |
+| `prep-fa-src` | clone + patch，上传源码 artifact | 45 min |
+| `build-win-gfx1201` | 装 toolchain、恢复 cache、`pip wheel` | 6 h |
 
-- **Prep / Build 拆分**：编译 job 保留完整 6h 给 ninja（比单 job 多约 20–40 min 缓冲）。
-- **actions/cache**：缓存 `C:\fa\flash-attention\build`（ninja `.obj` + generate 输出）；`save-always: true`。
-- **超时后续编**：用相同 `flash_attn_ref` 且 patch 脚本未改时重新 Run workflow。cache key 绑定 PyTorch 版本、`GPU_ARCHS`、`OPT_DIM`、patch 脚本 hash、`flash_attn_ref`；换 ref 或改 patch 会冷启动。
+- **Prep / Build 拆分**：编译 job 保留完整 6h 给 ninja。
+- **actions/cache**：缓存 `build/`；超时后 **Re-run all jobs** 可增量续编。
 
-> Actions → 超时或失败的 run → **Re-run all jobs**（不要 Re-run failed jobs only，否则 prep artifact 可能缺失）。
+### 并行（OPT_DIM ×4）
+
+| Job | 作用 | 超时 |
+|-----|------|------|
+| `prep-fa-src` | 同上（共用 prep action） | 45 min |
+| `compile-d32` … `compile-d256` | 各编一个 `OPT_DIM` shard，上传 `.obj` | 各 6 h |
+| `link-wheel` | 合并 4 份 obj + link + 打 wheel | 6 h |
+
+墙钟更短（约 1–2h），但总 runner 分钟数更高。产物与串行 workflow 相同。
+
+> 超时续编：串行走 cache；并行需 4 个 compile job 均成功后再 link。
 
 ## 产物
 

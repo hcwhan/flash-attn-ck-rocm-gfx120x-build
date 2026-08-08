@@ -1,0 +1,31 @@
+name: Prepare and upload patched flash-attention source
+description: Clone, patch, and upload flash-attention source artifact
+
+inputs:
+  flash-attn-ref:
+    description: flash-attention git ref
+    required: true
+  fa-src:
+    description: Absolute path for flash-attention checkout
+    required: true
+  artifact-name:
+    description: Artifact name for upload-artifact
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare patched flash-attention source
+      shell: pwsh
+      run: |
+        . $env:GITHUB_WORKSPACE\build\prep-flash-attention.ps1 `
+          -FlashAttentionRoot "${{ inputs.fa-src }}" `
+          -FlashAttentionRef "${{ inputs.flash-attn-ref }}"
+
+    - name: Upload patched source artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.fa-src }}
+        retention-days: 3
+        if-no-files-found: error
