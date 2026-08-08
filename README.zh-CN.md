@@ -113,7 +113,7 @@
 - **actions/cache**：各 shard 缓存 `build/`，key 前缀 `parallel-v2-d{dim}`；restore-keys 仅匹配同 hash 前缀（不再宽泛匹配 `-gfx1201-`）；超时后 **Re-run failed jobs** 可增量续编。
 - **link-wheel** 仍须 4 个 compile job 均成功并上传 obj artifact。
 
-> cache key 互相隔离：串行 `serial-v2`，并行 `parallel-v2-d32` / `d64` / `d128` / `d256`，两个 workflow 不共用 cache 条目。
+> cache key 互相隔离：串行 `serial-v2`，并行 `parallel-v2-` (`d32` / `d64` / `d128` / `d256`)，两个 workflow 不共用 cache 条目。
 
 ## 产物
 

@@ -112,7 +112,7 @@ Shorter wall clock (~1–2h) but more total runner minutes. Same wheel artifact 
 - **actions/cache** per shard on `build/`, key prefix `parallel-v2-d{dim}`; restore-keys match hash prefix only (no broad `-gfx1201-` fallback); timeout resume via **Re-run failed jobs**.
 - **link-wheel** still requires all four compile jobs to succeed and upload obj artifacts.
 
-> Cache keys are isolated: serial uses `serial-v2`, parallel uses `parallel-v2-d32` / `d64` / `d128` / `d256` — the two workflows do not share cache entries.
+> Cache keys are isolated: serial uses `serial-v2`, parallel uses `parallel-v2-` (`d32` / `d64` / `d128` / `d256`) — the two workflows do not share cache entries.
 
 ## Output
 
