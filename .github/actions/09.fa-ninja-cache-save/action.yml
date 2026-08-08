@@ -6,7 +6,7 @@ inputs:
     description: flash-attention source root
     required: true
   cache-primary-key:
-    description: cache-primary-key from fa-ninja-cache-restore
+    description: cache-primary-key from 07.fa-ninja-cache-restore
     required: true
 
 runs:

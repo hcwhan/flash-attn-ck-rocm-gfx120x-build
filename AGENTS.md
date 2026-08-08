@@ -20,12 +20,12 @@
 | 入口 | 职责 |
 |------|------|
 | `read-version-lock.ps1`（base 目录） | **唯一直接读 lock 的 PS1**；`$script:` 变量 + `VersionLockVars` 暴露 |
-| `1.config - read-version-lock.ps1` | 调 base 版 + `-ExportToGitHubEnv` 写 CI env（fa-read-version-lock action 专用） |
+| `1.config - read-version-lock.ps1` | 调 base 版 + `-ExportToGitHubEnv` 写 CI env（`01.fa-read-version-lock` 专用） |
 | `2.prep - prep-flash-attention.ps1` | clone FA 源码（读 lock 取 repo/commit） |
-| `3.patch - patch-fa-inference.ps1` | 改 setup.py：跳过 bwd + 启用 CK 禁用 backward 标志（fa-prep-src 第二步调） |
+| `3.patch - patch-fa-inference.ps1` | 改 setup.py：跳过 bwd + 启用 CK 禁用 backward 标志（`02.fa-prep-src` 第二步调） |
 | `get-build-paths.ps1`（base 目录） | `BuildRoot`；`-LoadVersionLock` 供测试脚本 |
 | `get-rocm-sdk-paths.ps1`（base 目录） | 输出 `CoreRoot`/`DevelRoot`（init-fa-build-env 与 msvc 指纹共用；唯一 ROCm 路径发现） |
-| `4.sdk - get-rocm-sdk-paths.ps1` | 调 base 版（fa-toolchain-fingerprint action 专用适配） |
+| `4.sdk - get-rocm-sdk-paths.ps1` | 调 base 版（`06.fa-toolchain-fingerprint` 专用适配） |
 | `init-fa-build-env.ps1`（base 目录） | numpy + `OPT_DIM` + ROCm 编译 env（内部 dot-source lock） |
 | `build-fa-steps.py`（base 目录） | `--step compile` / `--step wheel` / `--step merge-and-wheel`（parallel link+staging 校验） |
 | `5.compile - compile-opt-dim.ps1` | 任意 `-OptDim` 编译入口（serial 全量 / parallel 单 dim） |
@@ -42,11 +42,17 @@
 
 | Action | 用途 |
 |--------|------|
-| `fa-job-bootstrap` | lock + toolchain + download src |
-| `fa-build-with-cache` | cache restore → `inputs.run` → save |
-| `fa-smoke-test-upload-wheel` | smoke test + upload wheel |
-| `fa-prep-src` / `fa-plan-opt-dim-matrix` | prep / parallel matrix |
-| `fa-read-version-lock` 等 | 被 bootstrap 调用 |
+| `00.fa-plan-opt-dim-matrix` | 规划 parallel OPT_DIM 矩阵 |
+| `01.fa-read-version-lock` | 读 lock 注入 CI 环境 |
+| `02.fa-prep-src` | 克隆、打补丁、上传源码 |
+| `03.fa-rocm-toolchain` | 安装 Python / MSVC / PyTorch / ROCm |
+| `04.fa-download-src` | 下载 prep 源码包 |
+| `05.fa-job-bootstrap` | 01+03+04 复合引导 |
+| `06.fa-toolchain-fingerprint` | 生成工具链指纹（缓存 key） |
+| `07.fa-ninja-cache-restore` | 恢复 ninja 增量缓存 |
+| `08.fa-build-with-cache` | 07+编译+09 带缓存构建 |
+| `09.fa-ninja-cache-save` | 保存 ninja 增量缓存 |
+| `10.fa-smoke-test-upload-wheel` | 冒烟测试并上传 wheel |
 
 缓存 key 含仓库 commit-id（覆盖 build 脚本/lock/action 全部仓内输入）+ 工具链指纹（MSVC+clang，镜像更新）+ pip 工具链指纹（pip/setuptools/wheel/ninja/packaging/psutil，运行时 `pip freeze` 观测）。Workflow `env`：`MAX_JOBS`/`FA_SRC`/`FA_ARTIFACT`/`FA_STAGING`/`SKIP_CACHE_RESTORE`。
 

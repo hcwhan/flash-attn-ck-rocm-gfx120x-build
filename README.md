@@ -4,7 +4,7 @@
 
 GitHub Actions workflow to build **FlashAttention 2 CK backend** for **Windows / gfx1201 / PyTorch 2.12.0+rocm7.14.0**.
 
-Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `.github/actions/fa-read-version-lock`.
+Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `.github/actions/01.fa-read-version-lock`.
 
 ## Target
 

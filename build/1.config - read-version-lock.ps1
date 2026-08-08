@@ -1,6 +1,6 @@
 # Adapter for CI env export: core lock read lives in base/read-version-lock.ps1
 # (the only script that reads VERSION.lock.json directly); this wrapper adds the
-# -ExportToGitHubEnv GITHUB_ENV emission used by fa-read-version-lock.
+# -ExportToGitHubEnv GITHUB_ENV emission used by 01.fa-read-version-lock.
 param(
     [Parameter(Mandatory = $true)]
     [string]$WorkspaceRoot,

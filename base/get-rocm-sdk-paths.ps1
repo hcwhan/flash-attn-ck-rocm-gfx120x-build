@@ -1,5 +1,5 @@
 # Resolve ROCm SDK core/devel roots from the installed torch + rocm_sdk packages.
-# Single implementation shared by init-fa-build-env.ps1 and fa-toolchain-fingerprint.
+# Single implementation shared by init-fa-build-env.ps1 and 06.fa-toolchain-fingerprint.
 # Dot-source only; emits $script:CoreRoot (llvm/compiler tree) and $script:DevelRoot.
 param(
     [Parameter(Mandatory = $true)]

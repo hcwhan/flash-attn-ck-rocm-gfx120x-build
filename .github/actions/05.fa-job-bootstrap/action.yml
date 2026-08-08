@@ -6,17 +6,17 @@ inputs:
     description: Absolute path to flash-attention source root
     required: true
   artifact-name:
-    description: Prep artifact name from fa-prep-src
+    description: Prep artifact name from 02.fa-prep-src
     required: true
 
 runs:
   using: composite
   steps:
     - name: Load VERSION.lock.json
-      uses: ./.github/actions/fa-read-version-lock
+      uses: "./.github/actions/01.fa-read-version-lock"
 
     - name: Setup ROCm toolchain
-      uses: ./.github/actions/fa-rocm-toolchain
+      uses: "./.github/actions/03.fa-rocm-toolchain"
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         pytorch-version: ${{ env.PYTORCH_VERSION }}
@@ -25,7 +25,7 @@ runs:
         rocm-version: ${{ env.HIP_VERSION }}
 
     - name: Download patched flash-attention source
-      uses: ./.github/actions/fa-download-src
+      uses: "./.github/actions/04.fa-download-src"
       with:
         artifact-name: ${{ inputs.artifact-name }}
         fa-src: ${{ inputs.fa-src }}

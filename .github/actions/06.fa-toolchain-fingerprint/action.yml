@@ -28,7 +28,7 @@ runs:
               Select-Object -First 1).Name
           }
         }
-        # ROCm clang (installed by fa-rocm-toolchain before this step); guards the
+        # ROCm clang (installed by 03.fa-rocm-toolchain before this step); guards the
         # cache against toolchain drift inside the pinned rocm[devel] version.
         $clangVersion = 'unknown'
         . "$env:GITHUB_WORKSPACE\build\4.sdk - get-rocm-sdk-paths.ps1" -PythonExe python
@@ -41,7 +41,7 @@ runs:
         "msvc-hash=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
         # pip toolchain fingerprint: pip/setuptools/wheel/ninja/packaging/psutil are
-        # installed unpinned by fa-rocm-toolchain, so their versions are external
+        # installed unpinned by 03.fa-rocm-toolchain, so their versions are external
         # inputs that change compiled output -- observe at runtime like the
         # MSVC/clang toolchain instead of trusting an unpinned install.
         $pipPkgs = @('pip', 'setuptools', 'wheel', 'ninja', 'packaging', 'psutil')

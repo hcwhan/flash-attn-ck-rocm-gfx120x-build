@@ -4,7 +4,7 @@
 
 使用 GitHub Actions 为 **Windows / gfx1201 / PyTorch 2.12.0+rocm7.14.0** 编译 **FlashAttention 2 CK 后端** wheel。
 
-工具链版本以 **`VERSION.lock.json`** 为唯一来源，经 `.github/actions/fa-read-version-lock` 注入 CI。
+工具链版本以 **`VERSION.lock.json`** 为唯一来源，经 `.github/actions/01.fa-read-version-lock` 注入 CI。
 
 ## 目标环境
 
