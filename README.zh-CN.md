@@ -4,6 +4,8 @@
 
 使用 GitHub Actions 为 **Windows / gfx1201 / PyTorch 2.12.0+rocm7.14.0** 编译 **FlashAttention 2 CK 后端** wheel。
 
+工具链版本以 **`VERSION.lock.json`** 为唯一来源，经 `.github/actions/fa-read-version-lock` 注入 CI（workflow 不再重复硬编码版本号）。
+
 ## 目标环境
 
 | 项 | 值 |
@@ -36,7 +38,7 @@
 本 workflow 为 ComfyUI **推理专用** wheel：
 
 - CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（`generate.py` 不跑 **bwd** 方向 → wheel 内**不含** `fmha_bwd_*` backward kernel；前向推理正常，**不支持**需对 attention 求梯度的场景，如扩散模型训练、LoRA/微调中对 `flash_attn` 的反传）
-- 编译宏 **`-DFLASHATTENTION_DISABLE_BACKWARD`**（`patch-fa-inference.ps1` 启用；`setup-rocm-env.ps1` 设 `FLASHATTENTION_DISABLE_BACKWARD=TRUE`）— 编译期去掉 extension 内 backward 相关 C++ 分支；与上条互补，**不支持训练/反传**
+- 编译宏 **`-DFLASHATTENTION_DISABLE_BACKWARD`**（`patch-fa-inference.ps1` 直接修改并经修改前/后校验；`setup-rocm-env.ps1` 设 `FLASHATTENTION_DISABLE_BACKWARD=TRUE`）— 编译期去掉 extension 内 backward 相关 C++ 分支；与上条互补，**不支持训练/反传**
 - `OPT_DIM=32,64,128,256`（与 upstream 默认 head dim 档一致）
 - 适配 GitHub 托管 runner **6 小时**上限；完整 upstream 编译需 20 小时+
 
@@ -64,15 +66,17 @@
 |------|------|------|
 | `flash_attn_ref` | `main` | branch / tag / **commit SHA** |
 | `max_jobs` | `4` | ninja 并行度（OOM 时可改为 `2`） |
-| `use_locked_commit` | `false` | 为 `true` 时使用 `VERSION.lock.json` 的 **`flash_attention_min_commit`** 锁定 FA 源码 |
+| `use_locked_commit` | `false` | 为 `true` 时使用 `VERSION.lock.json` 的 **`flash_attention_min_commit`** 锁定 FA 源码（**发布构建建议开启**） |
 
 ### 共用组件
 
 两个 workflow 共用：
 
-- `.github/actions/fa-prep-artifact` — clone + patch + 上传源码
+- `.github/actions/fa-read-version-lock` — 从 `VERSION.lock.json` 加载版本到 `GITHUB_ENV`
+- `.github/actions/fa-prep-artifact` — clone + patch + 上传源码（输出解析后的 **FA commit SHA**）
 - `.github/actions/fa-rocm-toolchain` — Python / MSVC / torch / rocm devel
 - `.github/actions/fa-download-src` — 下载 prep artifact
+- `build/patch-fa-inference.ps1` — 直接修改 `setup.py`，含修改前/后校验
 - `build/prep-flash-attention.ps1`、`build/init-fa-build-env.ps1`、`build/setup-rocm-env.ps1`、`build/build-bdist-wheel.ps1`、`build/smoke-test-wheel.ps1`
 
 串行 / 并行 link / 并行 compile 共用 `init-fa-build-env.ps1` + 同进程 `link_parallel_wheel.py`；并行 compile 额外使用 `build/compile-opt-dim.ps1`、`build/validate-link-staging.ps1`。
@@ -97,7 +101,8 @@
 | `build-win-gfx1201` | 装 toolchain、恢复 cache、`build-bdist-wheel.ps1` | 6 h |
 
 - **Prep / Build 拆分**：编译 job 保留完整 6h 给 ninja。
-- **actions/cache**：缓存 `build/`，key 前缀 `serial-v2`；超时后 **Re-run all jobs** 可增量续编。
+- **`actions/cache/restore` + `actions/cache/save`**：缓存 `build/`，key 前缀 `serial-v2`，save 步骤 `if: always()`；超时后 **Re-run all jobs** 可增量续编。
+- **Cache key** 包含 prep 解析出的 **flash-attention commit SHA**（不仅是输入 ref 如 `main`），避免 upstream 前进后复用过期 `.obj`。
 
 ### 并行（`build-fa2-ck-gfx1201-parallel.yml`，OPT_DIM ×4）
 
@@ -110,8 +115,9 @@
 墙钟更短（约 1–2h），但总 runner 分钟数更高。产物与串行 workflow 相同。
 
 - **link 前置校验**：`validate-link-staging.ps1` 检查 `d32`/`d64`/`d128`/`d256` 目录齐全、各 shard 含对应 dim kernel obj、无跨 shard 污染。
-- **actions/cache**：各 shard 缓存 `build/`，key 前缀 `parallel-v2-d{dim}`；restore-keys 仅匹配同 hash 前缀（不再宽泛匹配 `-gfx1201-`）；超时后 **Re-run failed jobs** 可增量续编。
+- **actions/cache**：各 shard 缓存 `build/`，key 前缀 `parallel-v2-d{dim}`（含解析后的 FA commit SHA）；restore-keys 仅匹配同 hash 前缀；超时后 **Re-run failed jobs** 可增量续编（obj/源码 artifact 保留 **7 天**）。
 - **link-wheel** 仍须 4 个 compile job 均成功并上传 obj artifact。
+- 各 compile shard 也会编译共享 `csrc/flash_attn_ck` obj；link 阶段仅使用 **d32** shard 的共享 obj（重复编译属预期行为）。
 
 > cache key 互相隔离：串行 `serial-v2`，并行 `parallel-v2-` (`d32` / `d64` / `d128` / `d256`)，两个 workflow 不共用 cache 条目。
 
@@ -124,6 +130,26 @@ Artifact 名称：`flash-attn-ck-gfx1201-cp312-rocm714`
 ```text
 flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 ```
+
+## 验证
+
+| 检查 | 脚本 | 验证内容 |
+|------|------|----------|
+| CI CPU smoke test | `build/smoke-test-wheel.ps1` | wheel 文件名匹配 `VERSION.lock.json`、pip 安装、extension import |
+| 本地 GPU smoke test | `build/gpu-smoke-test.ps1` | gfx1201 上实际运行 `flash_attn_func` 前向（需 ROCm PyTorch + GPU） |
+
+> CI 运行在 GitHub **托管** runner 上，无 AMD GPU — **CI 通过不等于 GPU 内核正确**。部署到 ComfyUI 前请在 RX 9070 机器上运行 `gpu-smoke-test.ps1`。
+
+## 本地构建（CI 外）
+
+在已安装 MSVC、Python 3.12、PyTorch ROCm 的 Windows 机器上：
+
+```powershell
+cd flash-attn-rocm-gfx1201-build
+. .\build\build-local.ps1 -UseLockedCommit -GpuSmokeTest
+```
+
+可选参数：`-SkipPrep`（复用已有 `$FaSrc`）、`-MaxJobs 2`（OOM 时）、`-FlashAttentionRef main`。
 
 ## 安装到 ComfyUI 便携 Python
 

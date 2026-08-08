@@ -10,7 +10,9 @@ param(
 
     [string]$StagingRoot = "",
 
-    [string]$PrimaryDim = "32"
+    [string]$PrimaryDim = "32",
+
+    [string]$PythonExe = "python"
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,7 +23,7 @@ if (-not (Test-Path $FaSrc)) {
 
 . (Join-Path $WorkspaceRoot "build\init-fa-build-env.ps1") `
     -WorkspaceRoot $WorkspaceRoot `
-    -PythonExe python
+    -PythonExe $PythonExe
 
 $wheelScript = Join-Path $WorkspaceRoot "build\link_parallel_wheel.py"
 $wheelArgs = @(
@@ -39,7 +41,7 @@ if ($StagingRoot) {
     $wheelArgs += "--serial"
 }
 
-& python $wheelScript @wheelArgs
+& $PythonExe $wheelScript @wheelArgs
 if ($LASTEXITCODE -ne 0) {
     throw "bdist_wheel failed (exit $LASTEXITCODE)"
 }

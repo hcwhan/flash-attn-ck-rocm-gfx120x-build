@@ -16,10 +16,16 @@ inputs:
     required: false
     default: "false"
 
+outputs:
+  fa-commit-sha:
+    description: Resolved flash-attention commit SHA after clone and patch
+    value: ${{ steps.prep.outputs.fa-commit-sha }}
+
 runs:
   using: composite
   steps:
     - name: Prepare patched flash-attention source
+      id: prep
       shell: pwsh
       run: |
         $params = @{
@@ -37,5 +43,5 @@ runs:
       with:
         name: ${{ inputs.artifact-name }}
         path: ${{ inputs.fa-src }}
-        retention-days: 3
+        retention-days: 7
         if-no-files-found: error

@@ -22,6 +22,7 @@ if (-not (Test-Path $FaSrc)) {
     -OptDim $OptDim
 
 Write-Host "Compiling OPT_DIM=$OptDim via in-process build_ext (same setuptools path as serial/link)"
+Write-Host "Note: each shard also builds shared csrc/flash_attn_ck objs; link uses d32 shard for shared objects only"
 
 $wheelScript = Join-Path $WorkspaceRoot "build\link_parallel_wheel.py"
 & $PythonExe $wheelScript --compile-only --fa-src $FaSrc -v
