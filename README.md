@@ -92,10 +92,12 @@ Both workflows share:
 - `.github/actions/fa-prep-artifact` — clone + patch + upload source (outputs resolved **FA commit SHA**)
 - `.github/actions/fa-rocm-toolchain` — Python / MSVC / torch / rocm devel
 - `.github/actions/fa-download-src` — download prep artifact
-- `build/patch-fa-inference.ps1` — direct `setup.py` edits with pre/post verification
-- `build/prep-flash-attention.ps1`, `build/init-fa-build-env.ps1`, `build/setup-rocm-env.ps1`, `build/build-bdist-wheel.ps1`, `build/smoke-test-wheel.ps1`
+- `build/patch/patch-fa-inference.ps1`, `build/patch/patch-ck-windows.ps1` — direct upstream edits with pre/post verification
+- `build/prep/prep-flash-attention.ps1`, `build/env/init-fa-build-env.ps1`, `build/env/setup-rocm-env.ps1`, `build/wheel/build-bdist-wheel.ps1`, `build/test/smoke-test-wheel.ps1`
 
-Serial / parallel link / parallel compile share `init-fa-build-env.ps1` + in-process `link_parallel_wheel.py`; parallel compile additionally uses `build/compile-opt-dim.ps1`. `build/validate-link-staging.ps1` is a manual CLI wrapper only (CI validates inside `link_parallel_wheel.py` during link).
+`build/` scripts are grouped by stage: `config/`, `patch/`, `prep/`, `env/`, `compile/`, `wheel/`, `test/`, `local/`, `common/` (path resolution).
+
+Serial / parallel link / parallel compile share `env/init-fa-build-env.ps1` + in-process `compile/link_parallel_wheel.py`; parallel compile additionally uses `compile/compile-opt-dim.ps1`. `wheel/validate-link-staging.ps1` is a manual CLI wrapper only (CI validates inside `link_parallel_wheel.py` during link).
 
 ### Aligned build paths
 
@@ -156,8 +158,8 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 | Check | Where | What it proves |
 |-------|-------|----------------|
-| CI CPU smoke test | `build/smoke-test-wheel.ps1` | Layered checks (see table below) |
-| Local GPU smoke test | `build/gpu-smoke-test.ps1` | actual `flash_attn_func` forward on gfx1201 (requires ROCm PyTorch + GPU) |
+| CI CPU smoke test | `build/test/smoke-test-wheel.ps1` | Layered checks (see table below) |
+| Local GPU smoke test | `build/test/gpu-smoke-test.ps1` | actual `flash_attn_func` forward on gfx1201 (requires ROCm PyTorch + GPU) |
 
 ### CI CPU smoke test layers
 
@@ -181,7 +183,7 @@ On a Windows machine with MSVC, Python 3.12, and PyTorch ROCm already installed:
 
 ```powershell
 cd flash-attn-rocm-gfx1201-build
-. .\build\build-local.ps1 -GpuSmokeTest
+. .\build\local\build-local.ps1 -GpuSmokeTest
 ```
 
 Options: `-SkipPrep` (reuse existing `$FaSrc`), `-NinjaWorkers 2` (if OOM).

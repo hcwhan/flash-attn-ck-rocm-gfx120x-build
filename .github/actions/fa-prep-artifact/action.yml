@@ -21,7 +21,7 @@ runs:
       id: prep
       shell: pwsh
       run: |
-        . $env:GITHUB_WORKSPACE\build\prep-flash-attention.ps1 `
+        . $env:GITHUB_WORKSPACE\build\prep\prep-flash-attention.ps1 `
           -FlashAttentionRoot "${{ inputs.fa-src }}" `
           -WorkspaceRoot $env:GITHUB_WORKSPACE
 

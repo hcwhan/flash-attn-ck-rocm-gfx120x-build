@@ -8,15 +8,15 @@ param(
 )
 
 # Manual/local CLI wrapper for link_parallel_wheel.py --validate-only.
-# CI link jobs validate inside build-bdist-wheel.ps1 -> link_parallel_wheel.py.
+# CI link jobs validate inside build/wheel/build-bdist-wheel.ps1 -> compile/link_parallel_wheel.py.
 
 $ErrorActionPreference = "Stop"
 
-if (-not $WorkspaceRoot) {
-    $WorkspaceRoot = Split-Path $PSScriptRoot -Parent
-}
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "common\paths.ps1") -WorkspaceRoot $WorkspaceRoot
+$WorkspaceRoot = $script:WorkspaceRoot
+$BuildRoot = $script:BuildRoot
 
-. (Join-Path $WorkspaceRoot "build\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
+. (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
 if (-not $PrimaryDim) {
     $PrimaryDim = $PrimaryOptDim
@@ -24,7 +24,7 @@ if (-not $PrimaryDim) {
 
 $env:OPT_DIM = $LockOptDim
 
-python (Join-Path $PSScriptRoot "link_parallel_wheel.py") `
+python (Join-Path $BuildRoot "compile\link_parallel_wheel.py") `
     --validate-only `
     --staging-root $StagingRoot `
     --workspace-root $WorkspaceRoot `

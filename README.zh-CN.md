@@ -92,10 +92,12 @@
 - `.github/actions/fa-prep-artifact` — clone + patch + 上传源码（输出解析后的 **FA commit SHA**）
 - `.github/actions/fa-rocm-toolchain` — Python / MSVC / torch / rocm devel
 - `.github/actions/fa-download-src` — 下载 prep artifact
-- `build/patch-fa-inference.ps1` — 直接修改 `setup.py`，含修改前/后校验
-- `build/prep-flash-attention.ps1`、`build/init-fa-build-env.ps1`、`build/setup-rocm-env.ps1`、`build/build-bdist-wheel.ps1`、`build/smoke-test-wheel.ps1`
+- `build/patch/patch-fa-inference.ps1`、`build/patch/patch-ck-windows.ps1` — 修改 upstream 源码（含修改前/后校验）
+- `build/prep/prep-flash-attention.ps1`、`build/env/init-fa-build-env.ps1`、`build/env/setup-rocm-env.ps1`、`build/wheel/build-bdist-wheel.ps1`、`build/test/smoke-test-wheel.ps1`
 
-串行 / 并行 link / 并行 compile 共用 `init-fa-build-env.ps1` + 同进程 `link_parallel_wheel.py`；并行 compile 额外使用 `build/compile-opt-dim.ps1`。`build/validate-link-staging.ps1` 仅作本地/手动 CLI 包装（CI link 阶段由 `link_parallel_wheel.py` 内建校验）。
+`build/` 按阶段分子目录：`config/`、`patch/`、`prep/`、`env/`、`compile/`、`wheel/`、`test/`、`local/`、`common/`（路径解析）。
+
+串行 / 并行 link / 并行 compile 共用 `env/init-fa-build-env.ps1` + 同进程 `compile/link_parallel_wheel.py`；并行 compile 额外使用 `compile/compile-opt-dim.ps1`。`wheel/validate-link-staging.ps1` 仅作本地/手动 CLI 包装（CI link 阶段由 `link_parallel_wheel.py` 内建校验）。
 
 ### 构建路径对齐
 
@@ -157,8 +159,8 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 | 检查 | 脚本 | 验证内容 |
 |------|------|----------|
-| CI CPU smoke test | `build/smoke-test-wheel.ps1` | 分层校验（见下表） |
-| 本地 GPU smoke test | `build/gpu-smoke-test.ps1` | gfx1201 上实际运行 `flash_attn_func` 前向（需 ROCm PyTorch + GPU） |
+| CI CPU smoke test | `build/test/smoke-test-wheel.ps1` | 分层校验（见下表） |
+| 本地 GPU smoke test | `build/test/gpu-smoke-test.ps1` | gfx1201 上实际运行 `flash_attn_func` 前向（需 ROCm PyTorch + GPU） |
 
 ### CI CPU smoke test 分层
 
@@ -182,7 +184,7 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 ```powershell
 cd flash-attn-rocm-gfx1201-build
-. .\build\build-local.ps1 -GpuSmokeTest
+. .\build\local\build-local.ps1 -GpuSmokeTest
 ```
 
 可选参数：`-SkipPrep`（复用已有 `$FaSrc`）、`-NinjaWorkers 2`（OOM 时）。

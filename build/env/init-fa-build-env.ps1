@@ -15,7 +15,9 @@ if ($OptDim) {
     $env:OPT_DIM = $OptDim
 }
 
-. (Join-Path $WorkspaceRoot "build\setup-rocm-env.ps1") `
+$BuildRoot = Join-Path $WorkspaceRoot "build"
+
+. (Join-Path $BuildRoot "env\setup-rocm-env.ps1") `
     -PythonExe $PythonExe `
     -WorkspaceRoot $WorkspaceRoot
 

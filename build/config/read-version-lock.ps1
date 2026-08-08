@@ -6,9 +6,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if (-not $WorkspaceRoot) {
-    $WorkspaceRoot = Split-Path $PSScriptRoot -Parent
-}
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "common\paths.ps1") -WorkspaceRoot $WorkspaceRoot
+$WorkspaceRoot = $script:WorkspaceRoot
 
 $lockPath = Join-Path $WorkspaceRoot "VERSION.lock.json"
 if (-not (Test-Path $lockPath)) {

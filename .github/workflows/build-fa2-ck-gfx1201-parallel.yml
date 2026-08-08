@@ -41,7 +41,7 @@ jobs:
         id: opt-dim-plan
         shell: pwsh
         run: |
-          . $env:GITHUB_WORKSPACE\build\read-version-lock.ps1 -WorkspaceRoot $env:GITHUB_WORKSPACE
+          . $env:GITHUB_WORKSPACE\build\config\read-version-lock.ps1 -WorkspaceRoot $env:GITHUB_WORKSPACE
           $json = ($OptDimList | ConvertTo-Json -Compress)
           Write-Host "OPT_DIM matrix from lock: $json"
           Write-Host "Primary OPT_DIM shard: $PrimaryOptDim"
@@ -92,7 +92,7 @@ jobs:
         uses: ./.github/actions/fa-ninja-cache-restore
         with:
           fa-src: ${{ env.FA_SRC }}
-          cache-key: fa2-ck-gfx1201-parallel-v2-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/patch-ck-windows.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/read-version-lock.ps1', 'build/compile-opt-dim.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}
+          cache-key: fa2-ck-gfx1201-parallel-v2-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/patch/patch-ck-windows.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/compile/compile-opt-dim.ps1', 'build/common/paths.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}
           skip-restore: ${{ github.event.inputs.skip_cache_restore != false && 'true' || 'false' }}
 
       - name: Report cache status
@@ -115,7 +115,7 @@ jobs:
       - name: Compile OPT_DIM shard
         shell: pwsh
         run: |
-          . $env:GITHUB_WORKSPACE\build\compile-opt-dim.ps1 `
+          . $env:GITHUB_WORKSPACE\build\compile\compile-opt-dim.ps1 `
             -OptDim "${{ matrix.opt_dim }}" `
             -WorkspaceRoot $env:GITHUB_WORKSPACE `
             -FaSrc $env:FA_SRC
@@ -192,7 +192,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path $env:GITHUB_WORKSPACE\dist | Out-Null
-          . $env:GITHUB_WORKSPACE\build\build-bdist-wheel.ps1 `
+          . $env:GITHUB_WORKSPACE\build\wheel\build-bdist-wheel.ps1 `
             -FaSrc $env:FA_SRC `
             -DistDir $env:GITHUB_WORKSPACE\dist `
             -WorkspaceRoot $env:GITHUB_WORKSPACE `
@@ -203,7 +203,7 @@ jobs:
       - name: CPU smoke test
         shell: pwsh
         run: |
-          . $env:GITHUB_WORKSPACE\build\smoke-test-wheel.ps1 `
+          . $env:GITHUB_WORKSPACE\build\test\smoke-test-wheel.ps1 `
             -DistDir $env:GITHUB_WORKSPACE\dist `
             -WorkspaceRoot $env:GITHUB_WORKSPACE `
             -FaSrc $env:FA_SRC `

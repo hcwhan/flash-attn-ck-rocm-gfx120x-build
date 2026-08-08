@@ -13,9 +13,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if (-not $WorkspaceRoot) {
-    $WorkspaceRoot = Split-Path $PSScriptRoot -Parent
-}
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "common\paths.ps1") -WorkspaceRoot $WorkspaceRoot
+$WorkspaceRoot = $script:WorkspaceRoot
 
 $skipExtensionImport = ($env:FA_SKIP_EXTENSION_IMPORT -eq "1")
 $smokeReport = [ordered]@{

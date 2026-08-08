@@ -116,7 +116,9 @@ function Assert-BuildCommitMeetsMin {
 Initialize-FlashAttentionRepo -Root $FlashAttentionRoot -Repo $repoUrl -Ref $buildCommit
 git -C $FlashAttentionRoot submodule update --init --depth 1 csrc/composable_kernel csrc/cutlass
 
-. (Join-Path $PSScriptRoot "patch-ck-windows.ps1") -FlashAttentionRoot $FlashAttentionRoot
+$BuildRoot = Join-Path $WorkspaceRoot "build"
+
+. (Join-Path $BuildRoot "patch\patch-ck-windows.ps1") -FlashAttentionRoot $FlashAttentionRoot
 
 Assert-BuildCommitMeetsMin -Root $FlashAttentionRoot -BuildCommit $buildCommit -MinCommit $minCommit
 
@@ -127,7 +129,7 @@ if ($env:GITHUB_OUTPUT) {
     "fa-commit-sha=$resolvedCommit" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 }
 
-. (Join-Path $PSScriptRoot "patch-fa-inference.ps1") -FlashAttentionRoot $FlashAttentionRoot
+. (Join-Path $BuildRoot "patch\patch-fa-inference.ps1") -FlashAttentionRoot $FlashAttentionRoot
 
 $metaPath = Join-Path $FlashAttentionRoot ".fa-build-meta.json"
 @{

@@ -17,13 +17,15 @@ if (-not (Test-Path $FaSrc)) {
 
 $shardOptDim = $OptDim
 
-. (Join-Path $WorkspaceRoot "build\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
+$BuildRoot = Join-Path $WorkspaceRoot "build"
+
+. (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
 if ($shardOptDim -notin $OptDimList) {
     throw "OptDim '$shardOptDim' is not listed in VERSION.lock.json opt_dim: $($OptDimList -join ', ')"
 }
 
-. (Join-Path $WorkspaceRoot "build\init-fa-build-env.ps1") `
+. (Join-Path $BuildRoot "env\init-fa-build-env.ps1") `
     -WorkspaceRoot $WorkspaceRoot `
     -PythonExe $PythonExe `
     -OptDim $shardOptDim
@@ -31,7 +33,7 @@ if ($shardOptDim -notin $OptDimList) {
 Write-Host "Compiling OPT_DIM=$shardOptDim via in-process build_ext (same setuptools path as serial/link)"
 Write-Host "Note: each shard also builds shared csrc/flash_attn_ck objs; link uses d$PrimaryOptDim shard for shared objects only"
 
-$wheelScript = Join-Path $WorkspaceRoot "build\link_parallel_wheel.py"
+$wheelScript = Join-Path $BuildRoot "compile\link_parallel_wheel.py"
 & $PythonExe $wheelScript --compile-only --fa-src $FaSrc -v
 if ($LASTEXITCODE -ne 0) {
     throw "build_ext failed for OPT_DIM=$shardOptDim (exit $LASTEXITCODE)"

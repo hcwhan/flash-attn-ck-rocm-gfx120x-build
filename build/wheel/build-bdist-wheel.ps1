@@ -21,17 +21,19 @@ if (-not (Test-Path $FaSrc)) {
     throw "flash-attention source not found: $FaSrc"
 }
 
-. (Join-Path $WorkspaceRoot "build\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
+$BuildRoot = Join-Path $WorkspaceRoot "build"
+
+. (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
 if ($StagingRoot -and -not $PrimaryDim) {
     $PrimaryDim = $PrimaryOptDim
 }
 
-. (Join-Path $WorkspaceRoot "build\init-fa-build-env.ps1") `
+. (Join-Path $BuildRoot "env\init-fa-build-env.ps1") `
     -WorkspaceRoot $WorkspaceRoot `
     -PythonExe $PythonExe
 
-$wheelScript = Join-Path $WorkspaceRoot "build\link_parallel_wheel.py"
+$wheelScript = Join-Path $BuildRoot "compile\link_parallel_wheel.py"
 $wheelArgs = @(
     "--fa-src", $FaSrc,
     "--dist-dir", $DistDir,
