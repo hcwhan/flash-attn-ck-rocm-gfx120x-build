@@ -1,4 +1,4 @@
-"""Build flash-attn wheel via in-process bdist_wheel (serial or parallel link)."""
+"""Build flash-attn via in-process setuptools (compile-only, serial, or parallel link)."""
 from __future__ import annotations
 
 import argparse
@@ -13,6 +13,30 @@ _ORIGINAL_RUN_NINJA = None
 
 EXPECTED_DIMS = ("32", "64", "128", "256")
 DIM_PATTERN = re.compile(r"_d(\d+)_")
+
+
+def _exec_setup_py(fa_src: Path, command_argv: list[str]) -> None:
+    """Run setup.py in-process (same invocation model as bdist_wheel / build_ext)."""
+    import importlib.util
+
+    os.chdir(fa_src)
+    setup_py = fa_src / "setup.py"
+    sys.argv = [str(setup_py), *command_argv]
+    print("Running:", " ".join(sys.argv), flush=True)
+
+    spec = importlib.util.spec_from_file_location("flash_attn_setup", setup_py)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"Failed to load {setup_py}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+
+def build_ext_only(fa_src: Path, *, verbose: bool = False) -> None:
+    """Compile extension objects only (parallel OPT_DIM shard; no --inplace)."""
+    argv = ["build_ext"]
+    if verbose:
+        argv.append("-v")
+    _exec_setup_py(fa_src, argv)
 
 
 def validate_staging(staging_root: Path, primary_dim: str = "32") -> None:
@@ -121,23 +145,11 @@ def install_patch(staging_root: Path, primary_dim: str = "32") -> None:
 
 
 def build_wheel(fa_src: Path, dist_dir: Path, *, verbose: bool = False) -> None:
-    import importlib.util
-
     dist_dir.mkdir(parents=True, exist_ok=True)
-    os.chdir(fa_src)
-
-    setup_py = fa_src / "setup.py"
-    argv = [str(setup_py), "bdist_wheel", "--dist-dir", str(dist_dir)]
+    argv = ["bdist_wheel", "--dist-dir", str(dist_dir)]
     if verbose:
-        argv.insert(1, "-v")
-    sys.argv = argv
-    print("Running:", " ".join(argv), flush=True)
-
-    spec = importlib.util.spec_from_file_location("flash_attn_setup", setup_py)
-    if spec is None or spec.loader is None:
-        raise SystemExit(f"Failed to load {setup_py}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+        argv.insert(0, "-v")
+    _exec_setup_py(fa_src, argv)
 
 
 def main() -> None:
@@ -146,6 +158,11 @@ def main() -> None:
     parser.add_argument("--staging-root", type=Path)
     parser.add_argument("--dist-dir", type=Path)
     parser.add_argument("--primary-dim", default="32")
+    parser.add_argument(
+        "--compile-only",
+        action="store_true",
+        help="In-process build_ext only (parallel OPT_DIM shard compile)",
+    )
     parser.add_argument(
         "--serial",
         action="store_true",
@@ -172,6 +189,14 @@ def main() -> None:
         validate_staging(args.staging_root, primary_dim=args.primary_dim)
         return
 
+    if args.compile_only:
+        if args.fa_src is None:
+            raise SystemExit("--fa-src is required with --compile-only")
+        if not args.fa_src.is_dir():
+            raise SystemExit(f"FA source missing: {args.fa_src}")
+        build_ext_only(args.fa_src, verbose=args.verbose)
+        return
+
     if args.serial:
         if args.fa_src is None or args.dist_dir is None:
             raise SystemExit("--fa-src and --dist-dir are required with --serial")
@@ -181,7 +206,9 @@ def main() -> None:
         return
 
     if args.staging_root is None:
-        raise SystemExit("--staging-root is required unless --serial or --validate-only")
+        raise SystemExit(
+            "--staging-root is required unless --serial, --compile-only, or --validate-only"
+        )
     if args.fa_src is None or args.dist_dir is None:
         raise SystemExit("--fa-src and --dist-dir are required for parallel link")
     if not args.staging_root.is_dir():

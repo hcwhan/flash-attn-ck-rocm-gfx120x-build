@@ -19,8 +19,9 @@ if (-not (Test-Path $FaSrc)) {
     throw "flash-attention source not found: $FaSrc"
 }
 
-& python -m pip install numpy -q
-. (Join-Path $WorkspaceRoot "build\setup-rocm-env.ps1") -PythonExe python
+. (Join-Path $WorkspaceRoot "build\init-fa-build-env.ps1") `
+    -WorkspaceRoot $WorkspaceRoot `
+    -PythonExe python
 
 $wheelScript = Join-Path $WorkspaceRoot "build\link_parallel_wheel.py"
 $wheelArgs = @(

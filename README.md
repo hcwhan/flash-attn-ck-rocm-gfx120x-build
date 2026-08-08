@@ -73,18 +73,19 @@ Both workflows share:
 - `.github/actions/fa-prep-artifact` — clone + patch + upload source
 - `.github/actions/fa-rocm-toolchain` — Python / MSVC / torch / rocm devel
 - `.github/actions/fa-download-src` — download prep artifact
-- `build/prep-flash-attention.ps1`, `build/setup-rocm-env.ps1`, `build/smoke-test-wheel.ps1`
+- `build/prep-flash-attention.ps1`, `build/init-fa-build-env.ps1`, `build/setup-rocm-env.ps1`, `build/build-bdist-wheel.ps1`, `build/smoke-test-wheel.ps1`
 
-Parallel workflow (`build-fa2-ck-gfx1201-parallel.yml`) additionally uses `build/compile-opt-dim.ps1`, `build/link_parallel_wheel.py`, `build/validate-link-staging.ps1`.
+Serial / parallel link / parallel compile share `init-fa-build-env.ps1` + in-process `link_parallel_wheel.py`; parallel compile additionally uses `build/compile-opt-dim.ps1`, `build/validate-link-staging.ps1`.
 
-### Parallel compile vs link
+### Aligned build paths
 
-| Stage | Command | Why |
-|-------|---------|-----|
-| **compile** (each shard) | `setup.py build_ext --inplace` | Builds one `OPT_DIM` ninja graph; uploads `.obj` artifacts |
-| **link** | `bdist_wheel` (in-process + ninja patch to merge objs) | Needs full `OPT_DIM=32,64,128,256` setup graph for final link; prebuilt objs skip recompile |
+| Stage | Env init | setuptools entry | OPT_DIM |
+|-------|----------|------------------|---------|
+| Serial build | `init-fa-build-env.ps1` | `link_parallel_wheel.py --serial` → `bdist_wheel -v` | full |
+| Parallel compile | `init-fa-build-env.ps1` | `link_parallel_wheel.py --compile-only` → `build_ext -v` | single shard |
+| Parallel link | `init-fa-build-env.ps1` | `link_parallel_wheel.py` + staging → `bdist_wheel -v` | full |
 
-Both use the same `NinjaBuildExtension`; Release layout is compatible.
+All three use **in-process `exec_module(setup.py)`** and the same `NinjaBuildExtension`. Parallel compile no longer uses a subprocess or `--inplace`. The only material differences vs serial/link are **OPT_DIM scope** and **build_ext vs bdist_wheel** (compile emits objs only).
 
 ## CI strategy
 

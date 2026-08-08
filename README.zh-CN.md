@@ -73,25 +73,19 @@
 - `.github/actions/fa-prep-artifact` — clone + patch + 上传源码
 - `.github/actions/fa-rocm-toolchain` — Python / MSVC / torch / rocm devel
 - `.github/actions/fa-download-src` — 下载 prep artifact
-- `build/prep-flash-attention.ps1`、`build/setup-rocm-env.ps1`、`build/build-bdist-wheel.ps1`、`build/smoke-test-wheel.ps1`
+- `build/prep-flash-attention.ps1`、`build/init-fa-build-env.ps1`、`build/setup-rocm-env.ps1`、`build/build-bdist-wheel.ps1`、`build/smoke-test-wheel.ps1`
 
-串行 / 并行 link 共用 `build-bdist-wheel.ps1` → 同进程 `bdist_wheel -v`（`link_parallel_wheel.py`）；并行 compile 额外使用 `build/compile-opt-dim.ps1`、`build/validate-link-staging.ps1`。
+串行 / 并行 link / 并行 compile 共用 `init-fa-build-env.ps1` + 同进程 `link_parallel_wheel.py`；并行 compile 额外使用 `build/compile-opt-dim.ps1`、`build/validate-link-staging.ps1`。
 
-### 串行 build / 并行 link 打 wheel（共用路径）
+### 构建路径对齐
 
-| 步骤 | 脚本 |
-|------|------|
-| 装 numpy + ROCm env | `build-bdist-wheel.ps1` |
-| 打 wheel | `link_parallel_wheel.py --serial -v`（串行）或带 `--staging-root`（并行 link） |
+| 阶段 | 环境初始化 | setuptools 入口 | OPT_DIM |
+|------|-----------|----------------|---------|
+| 串行 build | `init-fa-build-env.ps1` | `link_parallel_wheel.py --serial` → `bdist_wheel -v` | 全量 |
+| 并行 compile | `init-fa-build-env.ps1` | `link_parallel_wheel.py --compile-only` → `build_ext -v` | 单 shard |
+| 并行 link | `init-fa-build-env.ps1` | `link_parallel_wheel.py` + staging → `bdist_wheel -v` | 全量 |
 
-### 并行 compile / link 分工
-
-| 阶段 | 命令 | 原因 |
-|------|------|------|
-| **compile**（各 shard） | `setup.py build_ext --inplace -v` | 只编译单个 `OPT_DIM` 的 ninja 图，产出 `.obj` artifact |
-| **串行 build / parallel link** | `build-bdist-wheel.ps1` → `bdist_wheel -v` | 同进程 setuptools；并行 link 额外 ninja patch 合并 prebuilt obj |
-
-两者共用同一 `NinjaBuildExtension`，Release 目录布局一致。
+三者均为 **同进程 `exec_module(setup.py)`**，共用 `NinjaBuildExtension`；并行 compile 不再使用 `--inplace` 子进程。与串行/link 的唯一实质差异是 **OPT_DIM 范围** 与 **build_ext vs bdist_wheel**（compile 只产出 obj，不打包 wheel）。
 
 ## CI 策略
 
