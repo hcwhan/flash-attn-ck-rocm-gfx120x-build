@@ -55,8 +55,16 @@ $env:HIP_PATH = $rocmRoot
 $env:HIP_INCLUDE_PATH = $hipInclude
 $env:HIP_DEVICE_LIB_PATH = $deviceLibPath
 $env:DEVICE_LIB_PATH = $deviceLibPath
-$env:CPATH = $hipInclude
-$env:INCLUDE = $hipInclude
+if ($env:CPATH) {
+    $env:CPATH = "$hipInclude;$env:CPATH"
+} else {
+    $env:CPATH = $hipInclude
+}
+if ($env:INCLUDE) {
+    $env:INCLUDE = "$hipInclude;$env:INCLUDE"
+} else {
+    $env:INCLUDE = $hipInclude
+}
 $env:PATH = "$llvmBin;$rocmBin;$env:PATH"
 $env:CC = "clang-cl"
 $env:CXX = "clang-cl"

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       ninja_workers:
-        description: "Ninja parallel compile workers per build job (use 2 if OOM on hosted runner)"
+        description: "Ninja parallel compile workers per build job (use 2 if OOM)"
         required: false
         default: "4"
       skip_cache_restore:

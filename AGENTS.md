@@ -42,7 +42,7 @@
 
 Workflow `env` 统一：`FA_CACHE_HASH`（单一 `hashFiles` 列表）、`SKIP_CACHE_RESTORE`。
 
-**有意不合并：** compile 阶段 `get-fa-release-dir.ps1` dim 校验 vs link 阶段 `validate_staging`；四 shard 重复编 shared obj（link 只用 d32）。
+**有意不合并：** compile 阶段 `get-fa-release-dir.ps1` dim 校验 vs link 阶段 `validate_staging`；四 shard 重复编 shared obj（link 只用 d32）；parallel link-wheel 无 ninja cache；obj artifact 名 `d{dim}` 即 staging 子目录名（勿 normalize）。
 
 ## VERSION.lock.json
 
@@ -68,10 +68,11 @@ prep clone `flash_attention_build_commit` 并输出 `fa-commit-sha`（lock 值�
 1. **单一事实来源** — lock 为准，不交叉验算同一含义。
 2. **信任流水线** — 不为漏传参 / 改目录加 silent fallback。
 3. **最小路径** — 能力一个入口；fail fast（`throw` / `SystemExit`）。
+4. **AGENTS 增改须简洁** — 并入现有条目，一句说清；禁长小节、禁复述 README/代码。
 
 **不要添加：** 双源校验、manifest 读回自证、`FA_SKIP_*`、多候选目录排序、git 考古、薄 one-liner 包装、排障用 build-log artifact、lock 只读字段进逻辑。
 
-**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；patch before-state；smoke 主路径；cache 精确 key 含 FA commit。
+**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；patch before-state；smoke 产物校验（.pyd 体积 / CXX11_ABI / 扩展符号）；cache 精确 key 含 FA commit。
 
 **改代码前：** 连续 CI 是否必发生？信息是否已在 lock/env/上游 output？能否复用上表入口？能删则删。
 
