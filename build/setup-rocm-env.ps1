@@ -66,7 +66,9 @@ $env:CC = "clang-cl"
 $env:CXX = "clang-cl"
 $env:DISTUTILS_USE_SDK = "1"
 $env:GPU_ARCHS = "gfx1201"
-$env:OPT_DIM = "32,64,128,256"
+if (-not $env:OPT_DIM) {
+    $env:OPT_DIM = "32,64,128,256"
+}
 $env:FLASHATTENTION_DISABLE_BACKWARD = "TRUE"
 if (-not $env:MAX_JOBS) {
     $env:MAX_JOBS = "4"
@@ -74,6 +76,7 @@ if (-not $env:MAX_JOBS) {
 $env:FLASH_ATTENTION_FORCE_BUILD = "TRUE"
 $env:BUILD_TARGET = "rocm"
 
+Write-Host "OPT_DIM=$env:OPT_DIM"
 Write-Host "ROCM_HOME=$env:ROCM_HOME"
 Write-Host "HIP_INCLUDE_PATH=$env:HIP_INCLUDE_PATH"
 Write-Host "HIP_DEVICE_LIB_PATH=$env:HIP_DEVICE_LIB_PATH"
