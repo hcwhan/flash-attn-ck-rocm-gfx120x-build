@@ -44,8 +44,8 @@ This workflow builds an **inference-only** wheel for ComfyUI:
 
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
-| **Build FlashAttention CK serial (Windows gfx1201)** | Single-job build + cache resume | Manual / tag `fa-ck-v*` |
-| **Build FlashAttention CK parallel (Windows gfx1201)** | 4-way `OPT_DIM` compile + link | **Manual only** |
+| **Build FlashAttention CK serial (Windows gfx1201)** | Single-job build + cache resume (`serial`) | Manual / tag `fa-ck-v*` |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | 4-way `OPT_DIM` compile + artifact sharding + cache resume (`parallel-d{dim}`) + link | **Manual only** |
 
 > Push to `main` does **not** auto-trigger builds.
 
@@ -69,19 +69,22 @@ Parallel workflow (`build-fa2-ck-gfx1201-parallel.yml`) additionally uses `build
 | `prep-fa-src` | clone + patch, upload source artifact | 45 min |
 | `build-win-gfx1201` | toolchain, cache restore, `pip wheel` | 6 h |
 
-- **Prep / Build split** + **actions/cache** with `save-always: true` for timeout resume (**Re-run all jobs**).
+- **Prep / Build split** + **actions/cache** on `build/` (key prefix `serial`, `save-always: true`) for timeout resume (**Re-run all jobs**).
 
 ### Parallel (`build-fa2-ck-gfx1201-parallel.yml`, OPT_DIM ×4)
 
 | Job | Role | Timeout |
 |-----|------|---------|
 | `prep-fa-src` | same prep action | 45 min |
-| `compile-d32` … `compile-d256` | one `OPT_DIM` shard each, upload `.obj` | 6 h each |
+| `compile-d32` … `compile-d256` | one `OPT_DIM` shard each, cache restore, upload `.obj` | 6 h each |
 | `link-wheel` | merge objs + link + wheel | 6 h |
 
 Shorter wall clock (~1–2h) but more total runner minutes. Same wheel artifact as serial.
 
-> Parallel: all four compile jobs must succeed before link runs.
+- **actions/cache** per shard on `build/`, key prefix `parallel-d{dim}`; timeout resume via **Re-run failed jobs**.
+- **link-wheel** still requires all four compile jobs to succeed and upload obj artifacts.
+
+> Cache keys are isolated: serial uses `serial`, parallel uses `parallel-d32` / `d64` / `d128` / `d256` — the two workflows do not share cache entries.
 
 ## Output
 

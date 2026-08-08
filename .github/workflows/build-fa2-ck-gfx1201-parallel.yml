@@ -73,6 +73,30 @@ jobs:
           artifact-name: ${{ env.FA_ARTIFACT }}
           fa-src: ${{ env.FA_SRC }}
 
+      - name: Restore ninja incremental build cache
+        uses: actions/cache@v6
+        id: fa-build-cache
+        with:
+          path: ${{ env.FA_SRC }}\build
+          key: fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1') }}-${{ env.FLASH_ATTN_REF }}
+          restore-keys: |
+            fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1') }}-
+            fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-
+          save-always: true
+
+      - name: Report cache status
+        shell: pwsh
+        run: |
+          if ('${{ steps.fa-build-cache.outputs.cache-hit }}' -eq 'true') {
+            Write-Host "Cache hit: resuming incremental ninja build for OPT_DIM=${{ matrix.opt_dim }}"
+          } else {
+            Write-Host "Cache miss: starting fresh compile for OPT_DIM=${{ matrix.opt_dim }} (re-run failed jobs to resume if timed out)"
+          }
+          if (Test-Path "$env:FA_SRC\build") {
+            Get-ChildItem "$env:FA_SRC\build" -Recurse -Filter "*.obj" -ErrorAction SilentlyContinue |
+              Measure-Object | ForEach-Object { Write-Host "Cached object files: $($_.Count)" }
+          }
+
       - name: Compile OPT_DIM shard
         shell: pwsh
         run: |

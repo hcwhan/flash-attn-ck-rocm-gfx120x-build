@@ -76,10 +76,10 @@ jobs:
         id: fa-build-cache
         with:
           path: ${{ env.FA_SRC }}\build
-          key: fa2-ck-gfx1201-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-opt3264256-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1') }}-${{ env.FLASH_ATTN_REF }}
+          key: fa2-ck-gfx1201-serial-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1') }}-${{ env.FLASH_ATTN_REF }}
           restore-keys: |
-            fa2-ck-gfx1201-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-opt3264256-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1') }}-
-            fa2-ck-gfx1201-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-
+            fa2-ck-gfx1201-serial-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1') }}-
+            fa2-ck-gfx1201-serial-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-
           save-always: true
 
       - name: Report cache status
