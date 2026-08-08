@@ -3,7 +3,7 @@ description: Clone, patch, and upload flash-attention source artifact
 
 inputs:
   flash-attn-ref:
-    description: flash-attention git ref
+    description: flash-attention git ref (branch, tag, or commit SHA)
     required: true
   fa-src:
     description: Absolute path for flash-attention checkout
@@ -11,6 +11,10 @@ inputs:
   artifact-name:
     description: Artifact name for upload-artifact
     required: true
+  use-locked-commit:
+    description: Use flash_attention_min_commit from VERSION.lock.json
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -18,9 +22,15 @@ runs:
     - name: Prepare patched flash-attention source
       shell: pwsh
       run: |
-        . $env:GITHUB_WORKSPACE\build\prep-flash-attention.ps1 `
-          -FlashAttentionRoot "${{ inputs.fa-src }}" `
-          -FlashAttentionRef "${{ inputs.flash-attn-ref }}"
+        $params = @{
+          FlashAttentionRoot = "${{ inputs.fa-src }}"
+          FlashAttentionRef  = "${{ inputs.flash-attn-ref }}"
+          WorkspaceRoot      = $env:GITHUB_WORKSPACE
+        }
+        if ('${{ inputs.use-locked-commit }}' -eq 'true') {
+          $params.UseLockedCommit = $true
+        }
+        . $env:GITHUB_WORKSPACE\build\prep-flash-attention.ps1 @params
 
     - name: Upload patched source artifact
       uses: actions/upload-artifact@v7

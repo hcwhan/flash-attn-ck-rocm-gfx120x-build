@@ -40,14 +40,26 @@
 - `OPT_DIM=32,64,128,256`（与 upstream 默认 head dim 档一致）
 - 适配 GitHub 托管 runner **6 小时**上限；完整 upstream 编译需 20 小时+
 
+### Ninja 编译规模（推理专用配置）
+
+| 范围 | 约计 ninja targets | 说明 |
+|------|-------------------|------|
+| 全量（串行 / link 汇总） | **~924** | 3 方向（fwd + fwd_appendkv + fwd_splitkv）× 4 head dim，无 bwd |
+| 单 OPT_DIM shard（并行 compile） | **~230** | 共享 `csrc/flash_attn_ck` + 单档 dim 的 `build/fmha_*_dNN_*` kernel |
+
+> 全量 upstream（含 bwd）约 **1837** targets，6h 内无法完成。
+
 ## 触发方式
 
 | Workflow | 用途 | 触发 |
 |----------|------|------|
-| **Build FlashAttention CK serial (Windows gfx1201)** | 单 job 编译 + cache 断点续编（`serial`） | 手动 / tag `fa-ck-v*` |
-| **Build FlashAttention CK parallel (Windows gfx1201)** | 4 路 `OPT_DIM` 并发编译 + artifact 分片 + cache 断点续编（`parallel-d{dim}`）+ link 汇总 | **仅手动** |
+| **Build FlashAttention CK serial (Windows gfx1201)** | 单 job 编译 + cache 断点续编（`serial-v2`） | 手动 / tag `fa-ck-v*` |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | 4 路 `OPT_DIM` 并发编译 + artifact 分片 + cache 断点续编（`parallel-d{dim}-v2`）+ link 汇总 | **仅手动** |
 
 > 推送到 `main` **不会**自动触发编译。
+
+- **手动触发**：`flash_attn_ref` 支持 branch / tag / **commit SHA**；未指定时默认 `main`。
+- **tag `fa-ck-v*` 触发串行 workflow**：使用 `VERSION.lock.json` 中的 **`flash_attention_min_commit`** 锁定 FA 源码（可复现发布），而非浮动 `main`。
 
 ### 共用组件
 
@@ -58,7 +70,16 @@
 - `.github/actions/fa-download-src` — 下载 prep artifact
 - `build/prep-flash-attention.ps1`、`build/setup-rocm-env.ps1`、`build/smoke-test-wheel.ps1`
 
-并行 workflow（`build-fa2-ck-gfx1201-parallel.yml`）额外使用：`build/compile-opt-dim.ps1`、`build/link_parallel_wheel.py`。
+并行 workflow（`build-fa2-ck-gfx1201-parallel.yml`）额外使用：`build/compile-opt-dim.ps1`、`build/link_parallel_wheel.py`、`build/validate-link-staging.ps1`。
+
+### 并行 compile / link 分工
+
+| 阶段 | 命令 | 原因 |
+|------|------|------|
+| **compile**（各 shard） | `setup.py build_ext --inplace` | 只编译单个 `OPT_DIM` 的 ninja 图，产出 `.obj` artifact |
+| **link** | `bdist_wheel`（同进程 + ninja patch 合并 obj） | 需要完整 `OPT_DIM=32,64,128,256` 的 setup 图做最终链接；prebuilt obj 注入后 ninja 跳过已编译单元 |
+
+两者共用同一 `NinjaBuildExtension`，Release 目录布局一致。
 
 ## CI 策略
 
@@ -70,7 +91,7 @@
 | `build-win-gfx1201` | 装 toolchain、恢复 cache、`pip wheel` | 6 h |
 
 - **Prep / Build 拆分**：编译 job 保留完整 6h 给 ninja。
-- **actions/cache**：缓存 `build/`，key 前缀 `serial`；超时后 **Re-run all jobs** 可增量续编。
+- **actions/cache**：缓存 `build/`，key 前缀 `serial-v2`；超时后 **Re-run all jobs** 可增量续编。
 
 ### 并行（`build-fa2-ck-gfx1201-parallel.yml`，OPT_DIM ×4）
 
@@ -78,14 +99,15 @@
 |-----|------|------|
 | `prep-fa-src` | 同上（共用 prep action） | 45 min |
 | `compile-d32` … `compile-d256` | 各编一个 `OPT_DIM` shard，恢复 cache、上传 `.obj` | 各 6 h |
-| `link-wheel` | 合并 4 份 obj + link + 打 wheel | 6 h |
+| `link-wheel` | 校验 4 份 staging → 合并 obj + link + 打 wheel | 6 h |
 
 墙钟更短（约 1–2h），但总 runner 分钟数更高。产物与串行 workflow 相同。
 
-- **actions/cache**：各 shard 缓存 `build/`，key 前缀 `parallel-d{dim}`；超时后 **Re-run failed jobs** 可增量续编。
+- **link 前置校验**：`validate-link-staging.ps1` 检查 `d32`/`d64`/`d128`/`d256` 目录齐全、各 shard 含对应 dim kernel obj、无跨 shard 污染。
+- **actions/cache**：各 shard 缓存 `build/`，key 前缀 `parallel-d{dim}-v2`；restore-keys 仅匹配同 hash 前缀（不再宽泛匹配 `-gfx1201-`）；超时后 **Re-run failed jobs** 可增量续编。
 - **link-wheel** 仍须 4 个 compile job 均成功并上传 obj artifact。
 
-> cache key 互相隔离：串行 `serial`，并行 `parallel-d32` / `d64` / `d128` / `d256`，两个 workflow 不共用 cache 条目。
+> cache key 互相隔离：串行 `serial-v2`，并行 `parallel-d32-v2` / `d64` / `d128` / `d256`，两个 workflow 不共用 cache 条目。
 
 ## 产物
 

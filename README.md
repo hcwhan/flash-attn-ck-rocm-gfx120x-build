@@ -40,14 +40,26 @@ This workflow builds an **inference-only** wheel for ComfyUI:
 - `OPT_DIM=32,64,128,256` (same head-dim tiers as upstream default)
 - Fits GitHub hosted runner **6h** timeout; full upstream build needs ~20h+
 
+### Ninja build scale (inference profile)
+
+| Scope | Approx. ninja targets | Notes |
+|-------|----------------------|-------|
+| Full wheel (serial / link) | **~924** | 3 directions (fwd + fwd_appendkv + fwd_splitkv) × 4 head dims, no bwd |
+| Single OPT_DIM shard (parallel compile) | **~230** | Shared `csrc/flash_attn_ck` + one dim's `build/fmha_*_dNN_*` kernels |
+
+> Full upstream (with bwd) is **~1837** targets — not feasible within 6h.
+
 ## Trigger
 
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
-| **Build FlashAttention CK serial (Windows gfx1201)** | Single-job build + cache resume (`serial`) | Manual / tag `fa-ck-v*` |
-| **Build FlashAttention CK parallel (Windows gfx1201)** | 4-way `OPT_DIM` compile + artifact sharding + cache resume (`parallel-d{dim}`) + link | **Manual only** |
+| **Build FlashAttention CK serial (Windows gfx1201)** | Single-job build + cache resume (`serial-v2`) | Manual / tag `fa-ck-v*` |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | 4-way `OPT_DIM` compile + artifact sharding + cache resume (`parallel-d{dim}-v2`) + link | **Manual only** |
 
 > Push to `main` does **not** auto-trigger builds.
+
+- **Manual dispatch**: `flash_attn_ref` accepts branch / tag / **commit SHA**; defaults to `main`.
+- **Tag `fa-ck-v*` (serial)**: pins FA source to **`flash_attention_min_commit`** in `VERSION.lock.json` for reproducible releases (not floating `main`).
 
 ### Shared components
 
@@ -58,7 +70,16 @@ Both workflows share:
 - `.github/actions/fa-download-src` — download prep artifact
 - `build/prep-flash-attention.ps1`, `build/setup-rocm-env.ps1`, `build/smoke-test-wheel.ps1`
 
-Parallel workflow (`build-fa2-ck-gfx1201-parallel.yml`) additionally uses `build/compile-opt-dim.ps1`, `build/link_parallel_wheel.py`.
+Parallel workflow (`build-fa2-ck-gfx1201-parallel.yml`) additionally uses `build/compile-opt-dim.ps1`, `build/link_parallel_wheel.py`, `build/validate-link-staging.ps1`.
+
+### Parallel compile vs link
+
+| Stage | Command | Why |
+|-------|---------|-----|
+| **compile** (each shard) | `setup.py build_ext --inplace` | Builds one `OPT_DIM` ninja graph; uploads `.obj` artifacts |
+| **link** | `bdist_wheel` (in-process + ninja patch to merge objs) | Needs full `OPT_DIM=32,64,128,256` setup graph for final link; prebuilt objs skip recompile |
+
+Both use the same `NinjaBuildExtension`; Release layout is compatible.
 
 ## CI strategy
 
@@ -69,7 +90,7 @@ Parallel workflow (`build-fa2-ck-gfx1201-parallel.yml`) additionally uses `build
 | `prep-fa-src` | clone + patch, upload source artifact | 45 min |
 | `build-win-gfx1201` | toolchain, cache restore, `pip wheel` | 6 h |
 
-- **Prep / Build split** + **actions/cache** on `build/` (key prefix `serial`, `save-always: true`) for timeout resume (**Re-run all jobs**).
+- **Prep / Build split** + **actions/cache** on `build/` (key prefix `serial-v2`, `save-always: true`) for timeout resume (**Re-run all jobs**).
 
 ### Parallel (`build-fa2-ck-gfx1201-parallel.yml`, OPT_DIM ×4)
 
@@ -77,14 +98,15 @@ Parallel workflow (`build-fa2-ck-gfx1201-parallel.yml`) additionally uses `build
 |-----|------|---------|
 | `prep-fa-src` | same prep action | 45 min |
 | `compile-d32` … `compile-d256` | one `OPT_DIM` shard each, cache restore, upload `.obj` | 6 h each |
-| `link-wheel` | merge objs + link + wheel | 6 h |
+| `link-wheel` | validate staging → merge objs + link + wheel | 6 h |
 
 Shorter wall clock (~1–2h) but more total runner minutes. Same wheel artifact as serial.
 
-- **actions/cache** per shard on `build/`, key prefix `parallel-d{dim}`; timeout resume via **Re-run failed jobs**.
+- **Link pre-check**: `validate-link-staging.ps1` ensures all four staging dirs exist, each shard has dim-specific kernel objs, no cross-shard contamination.
+- **actions/cache** per shard on `build/`, key prefix `parallel-d{dim}-v2`; restore-keys match hash prefix only (no broad `-gfx1201-` fallback); timeout resume via **Re-run failed jobs**.
 - **link-wheel** still requires all four compile jobs to succeed and upload obj artifacts.
 
-> Cache keys are isolated: serial uses `serial`, parallel uses `parallel-d32` / `d64` / `d128` / `d256` — the two workflows do not share cache entries.
+> Cache keys are isolated: serial uses `serial-v2`, parallel uses `parallel-d32-v2` / `d64` / `d128` / `d256` — the two workflows do not share cache entries.
 
 ## Output
 

@@ -46,6 +46,7 @@ jobs:
           flash-attn-ref: ${{ env.FLASH_ATTN_REF }}
           fa-src: ${{ env.FA_SRC }}
           artifact-name: ${{ env.FA_ARTIFACT }}
+          use-locked-commit: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/fa-ck-v') && 'true' || 'false' }}
 
   build:
     name: build-win-gfx1201
@@ -76,10 +77,9 @@ jobs:
         id: fa-build-cache
         with:
           path: ${{ env.FA_SRC }}\build
-          key: fa2-ck-gfx1201-serial-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1') }}-${{ env.FLASH_ATTN_REF }}
+          key: fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1') }}-${{ env.FLASH_ATTN_REF }}
           restore-keys: |
-            fa2-ck-gfx1201-serial-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1') }}-
-            fa2-ck-gfx1201-serial-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-
+            fa2-ck-gfx1201-serial-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/prep-flash-attention.ps1') }}-
           save-always: true
 
       - name: Report cache status

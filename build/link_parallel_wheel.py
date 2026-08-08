@@ -11,6 +11,54 @@ from pathlib import Path
 _PATCHED = False
 _ORIGINAL_RUN_NINJA = None
 
+EXPECTED_DIMS = ("32", "64", "128", "256")
+DIM_PATTERN = re.compile(r"_d(\d+)_")
+
+
+def validate_staging(staging_root: Path, primary_dim: str = "32") -> None:
+    """Fail fast before link if compile artifacts are missing or cross-contaminated."""
+    staging_root = staging_root.resolve()
+    if not staging_root.is_dir():
+        raise SystemExit(f"Staging root missing: {staging_root}")
+
+    summary: dict[str, int] = {}
+    for dim in EXPECTED_DIMS:
+        shard = staging_root / f"d{dim}"
+        if not shard.is_dir():
+            raise SystemExit(f"Missing OPT_DIM staging dir: {shard}")
+
+        objs = list(shard.rglob("*.obj"))
+        summary[dim] = len(objs)
+        if not objs:
+            raise SystemExit(f"No .obj files under {shard}")
+
+        dim_kernel_objs = [obj for obj in objs if DIM_PATTERN.search(obj.name)]
+        foreign = [obj for obj in dim_kernel_objs if f"_d{dim}_" not in obj.name]
+        if foreign:
+            sample = ", ".join(obj.name for obj in foreign[:3])
+            raise SystemExit(f"Shard d{dim} contains foreign-dim kernel objs: {sample}")
+
+        dim_specific = [obj for obj in dim_kernel_objs if f"_d{dim}_" in obj.name]
+        if not dim_specific:
+            raise SystemExit(f"Shard d{dim} has no *_d{dim}_* kernel objects")
+
+    primary = staging_root / f"d{primary_dim}"
+    shared = [
+        obj
+        for obj in primary.rglob("*.obj")
+        if "csrc/flash_attn_ck/" in obj.relative_to(primary).as_posix()
+    ]
+    if not shared:
+        raise SystemExit(
+            f"Primary shard d{primary_dim} missing csrc/flash_attn_ck shared objects"
+        )
+
+    print(
+        "Link staging validation OK: "
+        + ", ".join(f"d{dim}={summary[dim]}" for dim in EXPECTED_DIMS),
+        flush=True,
+    )
+
 
 def install_patch(staging_root: Path, primary_dim: str = "32") -> None:
     """Patch torch cpp_extension to seed prebuilt .obj files before ninja runs."""
@@ -21,7 +69,6 @@ def install_patch(staging_root: Path, primary_dim: str = "32") -> None:
     import torch.utils.cpp_extension as cpp_ext
 
     _ORIGINAL_RUN_NINJA = cpp_ext._run_ninja_build
-    dim_pattern = re.compile(r"_d(\d+)_")
 
     staging_dirs = sorted(p for p in staging_root.iterdir() if p.is_dir())
     if not staging_dirs:
@@ -55,7 +102,7 @@ def install_patch(staging_root: Path, primary_dim: str = "32") -> None:
                     continue
                 if not rel_posix.startswith("build/"):
                     continue
-                if not dim_pattern.search(obj.name):
+                if not DIM_PATTERN.search(obj.name):
                     continue
                 dest = temp_release / rel
                 if not dest.exists():
@@ -93,16 +140,28 @@ def build_wheel(fa_src: Path, dist_dir: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--fa-src", type=Path, required=True)
+    parser.add_argument("--fa-src", type=Path)
     parser.add_argument("--staging-root", type=Path, required=True)
-    parser.add_argument("--dist-dir", type=Path, required=True)
+    parser.add_argument("--dist-dir", type=Path)
     parser.add_argument("--primary-dim", default="32")
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate staging layout and exit without building",
+    )
     args = parser.parse_args()
 
-    if not args.fa_src.is_dir():
-        raise SystemExit(f"FA source missing: {args.fa_src}")
     if not args.staging_root.is_dir():
         raise SystemExit(f"Staging root missing: {args.staging_root}")
+
+    validate_staging(args.staging_root, primary_dim=args.primary_dim)
+    if args.validate_only:
+        return
+
+    if args.fa_src is None or args.dist_dir is None:
+        raise SystemExit("--fa-src and --dist-dir are required unless --validate-only is set")
+    if not args.fa_src.is_dir():
+        raise SystemExit(f"FA source missing: {args.fa_src}")
 
     install_patch(args.staging_root, primary_dim=args.primary_dim)
     build_wheel(args.fa_src, args.dist_dir)

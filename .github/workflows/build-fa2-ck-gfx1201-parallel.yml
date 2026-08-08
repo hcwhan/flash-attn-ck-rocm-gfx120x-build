@@ -44,6 +44,7 @@ jobs:
           flash-attn-ref: ${{ env.FLASH_ATTN_REF }}
           fa-src: ${{ env.FA_SRC }}
           artifact-name: ${{ env.FA_ARTIFACT }}
+          use-locked-commit: "false"
 
   compile:
     name: compile-d${{ matrix.opt_dim }}
@@ -78,10 +79,9 @@ jobs:
         id: fa-build-cache
         with:
           path: ${{ env.FA_SRC }}\build
-          key: fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1') }}-${{ env.FLASH_ATTN_REF }}
+          key: fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1') }}-${{ env.FLASH_ATTN_REF }}
           restore-keys: |
-            fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1') }}-
-            fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-
+            fa2-ck-gfx1201-parallel-d${{ matrix.opt_dim }}-v2-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1') }}-
           save-always: true
 
       - name: Report cache status
@@ -160,6 +160,13 @@ jobs:
             }
           }
           Get-ChildItem $env:FA_STAGING -Directory | ForEach-Object { Write-Host "Staging:" $_.Name }
+
+      - name: Validate link staging
+        shell: pwsh
+        run: |
+          . $env:GITHUB_WORKSPACE\build\validate-link-staging.ps1 `
+            -StagingRoot $env:FA_STAGING `
+            -PrimaryDim 32
 
       - name: Link wheel from merged objects
         shell: pwsh

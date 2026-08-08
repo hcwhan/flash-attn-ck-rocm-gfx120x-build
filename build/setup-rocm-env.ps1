@@ -42,7 +42,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $coreRoot = $paths[0]
 $develRoot = $paths[1]
-$rocmRoot = $develRoot
+$rocmRoot = if ($develRoot) { $develRoot } else { $coreRoot }
 
 $llvmBin = Join-Path $coreRoot "lib\llvm\bin"
 $rocmBin = Join-Path $rocmRoot "bin"
