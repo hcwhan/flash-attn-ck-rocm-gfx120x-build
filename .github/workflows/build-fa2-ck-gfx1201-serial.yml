@@ -1,4 +1,4 @@
-name: Build FlashAttention CK (Windows gfx1201)
+name: Build FlashAttention CK serial (Windows gfx1201)
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ on:
       - "fa-ck-v*"
 
 concurrency:
-  group: build-fa2-ck-gfx1201
+  group: build-fa2-ck-gfx1201-serial
   cancel-in-progress: true
 
 env:

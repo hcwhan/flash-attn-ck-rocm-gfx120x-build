@@ -44,7 +44,7 @@
 
 | Workflow | 用途 | 触发 |
 |----------|------|------|
-| **Build FlashAttention CK (Windows gfx1201)** | 单 job 编译 + cache 断点续编 | 手动 / tag `fa-ck-v*` |
+| **Build FlashAttention CK serial (Windows gfx1201)** | 单 job 编译 + cache 断点续编 | 手动 / tag `fa-ck-v*` |
 | **Build FlashAttention CK parallel (Windows gfx1201)** | 4 路 `OPT_DIM` 并发编译 + link 汇总 | **仅手动** |
 
 > 推送到 `main` **不会**自动触发编译。
@@ -58,11 +58,11 @@
 - `.github/actions/fa-download-src` — 下载 prep artifact
 - `build/prep-flash-attention.ps1`、`build/setup-rocm-env.ps1`、`build/smoke-test-wheel.ps1`
 
-并行 workflow 额外使用：`build/compile-opt-dim.ps1`、`build/link_parallel_wheel.py`。
+并行 workflow（`build-fa2-ck-gfx1201-parallel.yml`）额外使用：`build/compile-opt-dim.ps1`、`build/link_parallel_wheel.py`。
 
 ## CI 策略
 
-### 串行（默认）
+### 串行（`build-fa2-ck-gfx1201-serial.yml`，默认）
 
 | Job | 作用 | 超时 |
 |-----|------|------|
@@ -72,7 +72,7 @@
 - **Prep / Build 拆分**：编译 job 保留完整 6h 给 ninja。
 - **actions/cache**：缓存 `build/`；超时后 **Re-run all jobs** 可增量续编。
 
-### 并行（OPT_DIM ×4）
+### 并行（`build-fa2-ck-gfx1201-parallel.yml`，OPT_DIM ×4）
 
 | Job | 作用 | 超时 |
 |-----|------|------|

@@ -44,7 +44,7 @@ This workflow builds an **inference-only** wheel for ComfyUI:
 
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
-| **Build FlashAttention CK (Windows gfx1201)** | Single-job build + cache resume | Manual / tag `fa-ck-v*` |
+| **Build FlashAttention CK serial (Windows gfx1201)** | Single-job build + cache resume | Manual / tag `fa-ck-v*` |
 | **Build FlashAttention CK parallel (Windows gfx1201)** | 4-way `OPT_DIM` compile + link | **Manual only** |
 
 > Push to `main` does **not** auto-trigger builds.
@@ -58,11 +58,11 @@ Both workflows share:
 - `.github/actions/fa-download-src` — download prep artifact
 - `build/prep-flash-attention.ps1`, `build/setup-rocm-env.ps1`, `build/smoke-test-wheel.ps1`
 
-Parallel workflow additionally uses `build/compile-opt-dim.ps1`, `build/link_parallel_wheel.py`.
+Parallel workflow (`build-fa2-ck-gfx1201-parallel.yml`) additionally uses `build/compile-opt-dim.ps1`, `build/link_parallel_wheel.py`.
 
 ## CI strategy
 
-### Serial (default)
+### Serial (`build-fa2-ck-gfx1201-serial.yml`, default)
 
 | Job | Role | Timeout |
 |-----|------|---------|
@@ -71,7 +71,7 @@ Parallel workflow additionally uses `build/compile-opt-dim.ps1`, `build/link_par
 
 - **Prep / Build split** + **actions/cache** with `save-always: true` for timeout resume (**Re-run all jobs**).
 
-### Parallel (OPT_DIM ×4)
+### Parallel (`build-fa2-ck-gfx1201-parallel.yml`, OPT_DIM ×4)
 
 | Job | Role | Timeout |
 |-----|------|---------|
