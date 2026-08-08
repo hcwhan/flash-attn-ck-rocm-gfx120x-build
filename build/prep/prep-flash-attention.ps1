@@ -116,11 +116,9 @@ function Assert-BuildCommitMeetsMin {
 Initialize-FlashAttentionRepo -Root $FlashAttentionRoot -Repo $repoUrl -Ref $buildCommit
 git -C $FlashAttentionRoot submodule update --init --depth 1 csrc/composable_kernel csrc/cutlass
 
-$BuildRoot = Join-Path $WorkspaceRoot "build"
-
-. (Join-Path $BuildRoot "patch\patch-ck-windows.ps1") -FlashAttentionRoot $FlashAttentionRoot
-
 Assert-BuildCommitMeetsMin -Root $FlashAttentionRoot -BuildCommit $buildCommit -MinCommit $minCommit
+
+$BuildRoot = Join-Path $WorkspaceRoot "build"
 
 $resolvedCommit = (git -C $FlashAttentionRoot rev-parse HEAD).Trim()
 Write-Host "Resolved flash-attention commit: $resolvedCommit"
