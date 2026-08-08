@@ -5,7 +5,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$WorkspaceRoot,
 
-    [string]$FaSrc = "C:\fa\flash-attention",
+    [Parameter(Mandatory = $true)]
+    [string]$FaSrc,
+
     [string]$PythonExe = "python"
 )
 

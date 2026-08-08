@@ -16,8 +16,7 @@ inputs:
     required: true
   rocm-version:
     description: rocm[devel] package version (from VERSION.lock.json hip)
-    required: false
-    default: "7.14.0"
+    required: true
 
 runs:
   using: composite
@@ -56,4 +55,3 @@ runs:
       run: |
         python -m rocm_sdk init --quiet
         python -m rocm_sdk path --root
-        python -c "from pathlib import Path; import subprocess; r=Path(subprocess.check_output(['python','-m','rocm_sdk','path','--root'], text=True).strip()); p=r/'include'/'thrust'/'complex.h'; print('thrust header:', p, p.is_file()); assert p.is_file()"

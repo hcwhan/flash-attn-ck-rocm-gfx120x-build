@@ -15,10 +15,11 @@ $BuildRoot = $script:BuildRoot
 
 . (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
-$whl = Get-ChildItem (Join-Path $DistDir "*.whl") | Select-Object -First 1
-if (-not $whl) {
-    throw "No wheel produced in $DistDir"
+$whls = @(Get-ChildItem (Join-Path $DistDir "*.whl") -File)
+if ($whls.Count -ne 1) {
+    throw "Expected exactly one wheel in $DistDir, found $($whls.Count)"
 }
+$whl = $whls[0]
 if ($whl.Name -notlike $EXPECTED_WHEEL_PATTERN) {
     throw "Wheel name '$($whl.Name)' does not match expected pattern '$EXPECTED_WHEEL_PATTERN'"
 }

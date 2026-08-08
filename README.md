@@ -83,17 +83,9 @@ Expected pattern: `flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd6
 | Check | Script |
 |-------|--------|
 | CI CPU smoke test | `build/test/smoke-test-wheel.ps1` |
-| Local GPU smoke test | `build/test/gpu-smoke-test.ps1` |
+| Pre-deploy GPU smoke test (gfx1201 hardware) | `build/test/gpu-smoke-test.ps1` |
 
 Run `gpu-smoke-test.ps1` on gfx1201 before deploy.
-
-## Local full build
-
-```powershell
-. .\build\local\build-local.ps1 -GpuSmokeTest
-```
-
-Optional `-NinjaWorkers 2`. Local path uses single-pass `bdist_wheel`, not the four-shard CI layout.
 
 ## ComfyUI install
 

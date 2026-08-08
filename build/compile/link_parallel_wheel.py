@@ -120,12 +120,11 @@ def _stamp_prebuilt_obj(dest: Path, fa_src: Path) -> None:
 
 def require_parallel_link_force_build_false() -> None:
     value = os.environ.get("FLASH_ATTENTION_FORCE_BUILD", "").strip().upper()
-    if value == "TRUE":
+    if value != "FALSE":
         raise SystemExit(
             "Parallel link requires FLASH_ATTENTION_FORCE_BUILD=FALSE "
             f"(got {os.environ.get('FLASH_ATTENTION_FORCE_BUILD')!r})"
         )
-    os.environ["FLASH_ATTENTION_FORCE_BUILD"] = "FALSE"
 
 
 def install_patch(staging_root: Path, fa_src: Path, primary_dim: str) -> None:

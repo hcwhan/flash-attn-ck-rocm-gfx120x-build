@@ -15,7 +15,6 @@ flash-attn-rocm-gfx1201-build/
     compile/      compile-opt-dim.ps1, link_parallel_wheel.py
     wheel/        build-bdist-wheel.ps1
     test/         smoke-test-wheel.ps1, gpu-smoke-test.ps1
-    local/        build-local.ps1
     common/       paths.ps1, get-fa-release-dir.ps1
   .github/
     workflows/build-fa2-ck-gfx1201-serial.yml
@@ -33,7 +32,7 @@ flash-attn-rocm-gfx1201-build/
 两者均为 **workflow_dispatch** 手动触发；产物相同。
 
 - **setuptools 入口**：同进程 `compile/link_parallel_wheel.py`
-- **串行 / 本地**：无 staging，直接 `bdist_wheel`（全量 `OPT_DIM`）
+- **串行**：无 staging，直接 `bdist_wheel`（全量 `OPT_DIM`）
 - **并行 link**：`FLASH_ATTENTION_FORCE_BUILD=FALSE` + prebuilt `.obj` 时间戳 merge
 
 Cache key 互相隔离：串行 `serial-v3`，并行 `parallel-v3-d{dim}`。

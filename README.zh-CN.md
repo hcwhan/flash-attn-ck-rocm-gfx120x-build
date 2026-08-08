@@ -28,7 +28,7 @@
 | `expected_wheel_pattern` | smoke test 校验 wheel 文件名 glob |
 | `wheel_artifact_name` | GitHub Actions 发布的 artifact 名称 |
 
-规则：CI/本地始终 clone **`flash_attention_build_commit`**；prep 校验 checkout 后的 HEAD 与该 SHA 一致。
+规则：CI 始终 clone **`flash_attention_build_commit`**；prep 校验 checkout 后的 HEAD 与该 SHA 一致。
 
 ### 适用显卡（`gfx1201`）
 
@@ -116,18 +116,9 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 | 检查 | 脚本 |
 |------|------|
 | CI CPU smoke test | `build/test/smoke-test-wheel.ps1` |
-| 本地 GPU smoke test | `build/test/gpu-smoke-test.ps1` |
+| 部署前 GPU smoke test（gfx1201 真机） | `build/test/gpu-smoke-test.ps1` |
 
 CPU smoke test：wheel 结构 → pip 安装 → `import flash_attn_2_cuda`。**不等于** gfx1201 kernel 正确 — 部署前须在 GPU 上跑 `gpu-smoke-test.ps1`。
-
-## 本地全量构建
-
-```powershell
-cd flash-attn-rocm-gfx1201-build
-. .\build\local\build-local.ps1 -GpuSmokeTest
-```
-
-可选 `-NinjaWorkers 2`（OOM 时）。本地走单 job 全量 `bdist_wheel`（非 CI 四 shard 路径）。
 
 ## 安装到 ComfyUI
 
