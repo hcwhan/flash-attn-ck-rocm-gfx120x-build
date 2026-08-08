@@ -27,7 +27,6 @@ env:
   MAX_JOBS: ${{ github.event.inputs.ninja_workers }}
   FA_SRC: C:\fa\flash-attention
   FA_ARTIFACT: fa-src-patched-gfx1201
-  FA_CACHE_HASH: ${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/compile/compile-opt-dim.ps1', 'build/compile/link_parallel_wheel.py', 'build/wheel/build-bdist-wheel.ps1', 'build/common/paths.ps1', 'build/common/get-fa-release-dir.ps1', 'VERSION.lock.json') }}
   SKIP_CACHE_RESTORE: ${{ github.event.inputs.skip_cache_restore != 'false' && 'true' || 'false' }}
 
 jobs:
@@ -54,6 +53,8 @@ jobs:
     needs: prep
     runs-on: windows-2022
     timeout-minutes: 360
+    env:
+      FA_CACHE_HASH: ${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/compile/compile-opt-dim.ps1', 'build/compile/link_parallel_wheel.py', 'build/wheel/build-bdist-wheel.ps1', 'build/common/paths.ps1', 'build/common/get-fa-release-dir.ps1', 'build/common/get-rocm-sdk-paths.ps1', 'VERSION.lock.json') }}
 
     steps:
       - name: Checkout build repo
