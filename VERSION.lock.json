@@ -5,7 +5,7 @@
   "hip": "7.14.0",
   "rocm_index": "https://repo.amd.com/rocm/whl-multi-arch/",
   "gpu_archs": "gfx1201",
-  "opt_dim": "64,128,256",
+  "opt_dim": "32,64,128,256",
   "inference_only": true,
   "flash_attention_ref": "main",
   "flash_attention_min_commit": "5301a359f59ef8fa10f211618d9f7a69716a8898",

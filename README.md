@@ -27,7 +27,7 @@ GitHub Actions workflow to build **FlashAttention 2 CK backend** for **Windows /
 This workflow builds an **inference-only** wheel for ComfyUI:
 
 - CK kernels: **fwd only** (no bwd / kv-cache variants)
-- `OPT_DIM=64,128,256` (covers common diffusion head dims)
+- `OPT_DIM=32,64,128,256` (same head-dim tiers as upstream default)
 - Fits GitHub hosted runner **6h** timeout; full upstream build needs ~20h+
 
 ### CI strategy (two jobs + resume cache)

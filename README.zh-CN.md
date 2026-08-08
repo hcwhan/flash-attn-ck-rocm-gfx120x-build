@@ -27,7 +27,7 @@
 本 workflow 为 ComfyUI **推理专用** wheel：
 
 - CK 内核：仅 **fwd**（不含 bwd / kv-cache 变体）
-- `OPT_DIM=64,128,256`（覆盖常见扩散模型 head dim）
+- `OPT_DIM=32,64,128,256`（与 upstream 默认 head dim 档一致）
 - 适配 GitHub 托管 runner **6 小时**上限；完整 upstream 编译需 20 小时+
 
 ### CI 策略（两 job + 断点续编）
