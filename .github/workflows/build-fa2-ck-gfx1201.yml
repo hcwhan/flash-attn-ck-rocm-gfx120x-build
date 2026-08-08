@@ -27,10 +27,37 @@ env:
   GPU_ARCHS: "gfx1201"
   FLASH_ATTN_REF: ${{ github.event.inputs.flash_attn_ref || 'main' }}
   MAX_JOBS: ${{ github.event.inputs.max_jobs || '4' }}
+  FA_SRC: C:\fa\flash-attention
+  FA_ARTIFACT: fa-src-patched-gfx1201
 
 jobs:
+  prep:
+    name: prep-fa-src
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v4
+
+      - name: Prepare patched flash-attention source
+        shell: pwsh
+        run: |
+          . $env:GITHUB_WORKSPACE\build\prep-flash-attention.ps1 `
+            -FlashAttentionRoot $env:FA_SRC `
+            -FlashAttentionRef $env:FLASH_ATTN_REF
+
+      - name: Upload patched source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FA_ARTIFACT }}
+          path: ${{ env.FA_SRC }}
+          retention-days: 3
+          if-no-files-found: error
+
   build:
     name: build-win-gfx1201
+    needs: prep
     runs-on: windows-2022
     timeout-minutes: 360
 
@@ -78,31 +105,39 @@ jobs:
           python -c "import torch; print('torch', torch.__version__); print('hip', torch.version.hip); print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)"
           python -c "import importlib.util, os; s=importlib.util.find_spec('_rocm_sdk_core'); print('rocm_sdk_core', os.path.dirname(s.origin))"
 
-      - name: Checkout flash-attention
-        shell: pwsh
-        env:
-          FA_SRC: C:\fa\flash-attention
-        run: |
-          git config --global core.longpaths true
-          if (Test-Path $env:FA_SRC) { Remove-Item -Recurse -Force $env:FA_SRC }
-          New-Item -ItemType Directory -Force -Path C:\fa | Out-Null
-          git clone --depth 1 --branch $env:FLASH_ATTN_REF `
-            https://github.com/Dao-AILab/flash-attention.git `
-            $env:FA_SRC
-          git -C $env:FA_SRC submodule update --init --depth 1 csrc/composable_kernel csrc/cutlass
+      - name: Download patched flash-attention source
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.FA_ARTIFACT }}
+          path: C:\fa
 
-      - name: Patch flash-attention for inference-only build
+      - name: Restore ninja incremental build cache
+        uses: actions/cache@v4
+        id: fa-build-cache
+        with:
+          path: ${{ env.FA_SRC }}\build
+          key: fa2-ck-gfx1201-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-opt64256-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1') }}-${{ env.FLASH_ATTN_REF }}
+          restore-keys: |
+            fa2-ck-gfx1201-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-opt64256-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1') }}-
+            fa2-ck-gfx1201-v1-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-
+          save-always: true
+
+      - name: Report cache status
         shell: pwsh
-        env:
-          FA_SRC: C:\fa\flash-attention
         run: |
-          . $env:GITHUB_WORKSPACE\build\patch-fa-inference.ps1 -FlashAttentionRoot $env:FA_SRC
+          if ('${{ steps.fa-build-cache.outputs.cache-hit }}' -eq 'true') {
+            Write-Host "Cache hit: resuming incremental ninja build"
+          } else {
+            Write-Host "Cache miss: starting fresh compile (re-run workflow to resume if timed out)"
+          }
+          if (Test-Path "$env:FA_SRC\build") {
+            Get-ChildItem "$env:FA_SRC\build" -Recurse -Filter "*.obj" -ErrorAction SilentlyContinue |
+              Measure-Object | ForEach-Object { Write-Host "Cached object files: $($_.Count)" }
+          }
 
       - name: Build wheel
         shell: pwsh
-        env:
-          FA_SRC: C:\fa\flash-attention
-        working-directory: C:\fa\flash-attention
+        working-directory: ${{ env.FA_SRC }}
         run: |
           New-Item -ItemType Directory -Force -Path $env:GITHUB_WORKSPACE\dist | Out-Null
           python -m pip install numpy
@@ -134,8 +169,8 @@ jobs:
           if (Test-Path "$env:GITHUB_WORKSPACE\dist") {
             Copy-Item -Recurse "$env:GITHUB_WORKSPACE\dist" (Join-Path $dest "dist")
           }
-          if (Test-Path "C:\fa\flash-attention\build") {
-            Copy-Item -Recurse "C:\fa\flash-attention\build" (Join-Path $dest "fa-build")
+          if (Test-Path $env:FA_SRC\build) {
+            Copy-Item -Recurse $env:FA_SRC\build (Join-Path $dest "fa-build")
           }
 
       - name: Upload build logs on failure

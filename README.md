@@ -30,6 +30,35 @@ This workflow builds an **inference-only** wheel for ComfyUI:
 - `OPT_DIM=64,128,256` (covers common diffusion head dims)
 - Fits GitHub hosted runner **6h** timeout; full upstream build needs ~20h+
 
+### CI strategy (two jobs + resume cache)
+
+| Job | Role | Timeout |
+|-----|------|---------|
+| `prep-fa-src` | clone + patch, upload source artifact | 45 min |
+| `build-win-gfx1201` | toolchain, cache restore, `pip wheel` | 6 h |
+
+- **Prep / Build split**: compile job keeps its full 6h budget for ninja (saves ~20–40 min vs single job).
+- **actions/cache**: caches `build/` (ninja `.obj`); `save-always: true`. After a 6h timeout, **Re-run workflow** to continue incrementally (same `flash_attn_ref` + patch scripts).
+
+> To resume: Actions → timed-out run → **Re-run all jobs** (not “Re-run failed jobs” only).
+
+## Workflow layout
+
+Two jobs, separate timeouts:
+
+| Job | Work | Limit |
+|-----|------|-------|
+| `prep-fa-src` | clone + patch flash-attention, upload source artifact | 45 min |
+| `build-win-gfx1201` | install torch/rocm, restore cache, compile wheel | 6 h |
+
+The compile job no longer spends time on clone/patch.
+
+## Incremental resume (cache)
+
+The build job caches `C:\fa\flash-attention\build` (ninja objects + generated kernels).
+If the job times out or fails, **re-run the workflow** with the same `flash_attn_ref` to continue incrementally.
+Cache keys include PyTorch version, `GPU_ARCHS`, `OPT_DIM`, patch script hashes, and `flash_attn_ref`.
+
 ## Output
 
 Artifact: `flash-attn-ck-gfx1201-cp312-rocm714`
