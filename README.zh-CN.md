@@ -90,13 +90,23 @@ ComfyUI **推理专用** wheel：
 
 ### 构建阶段
 
-| 阶段 | 入口 | OPT_DIM |
-|------|------|---------|
-| 串行 build | `link_parallel_wheel.py`（无 staging）→ `bdist_wheel` | 全量 |
-| 并行 compile | `link_parallel_wheel.py --compile-only` | 单 shard |
-| 并行 link | `link_parallel_wheel.py` + staging | 全量（env） |
+编译/打 wheel 唯一入口：`build_fa.py`（同进程 `exec_module(setup.py)`），按 `--step` 三选一：
 
-共用 `env/init-fa-build-env.ps1` + 同进程 `exec_module(setup.py)`。
+| step | 作用 |
+|------|------|
+| `compile` | `build_ext` 编译；stamp 已有对象，让 ninja 缓存生效 |
+| `wheel` | stamp + `bdist_wheel`（对象来自原地编译） |
+| `merge-and-wheel` | staging 校验 + FORCE_BUILD 检查 + merge 对象 + stamp + `bdist_wheel` |
+
+串行 / 并行共用同一入口编排，产物相同：
+
+| 模式 | 调用序列 | OPT_DIM |
+|------|---------|---------|
+| 串行 build | `--step compile` → `--step wheel`（无 staging） | 全量 |
+| 并行 compile | `--step compile`（每 shard 一次） | 单 shard |
+| 并行 link | `--step merge-and-wheel` + staging | 全量（env） |
+
+env 统一经 `env/init-fa-build-env.ps1`。
 
 ## 产物
 

@@ -1,4 +1,4 @@
-"""Build flash-attn via in-process setuptools (compile-only or parallel link)."""
+"""Build flash-attn via in-process setuptools (compile / wheel / merge-and-wheel)."""
 from __future__ import annotations
 
 import argparse
@@ -241,15 +241,17 @@ def build_wheel(fa_src: Path, dist_dir: Path, *, verbose: bool = False) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--step",
+        choices=["compile", "merge-and-wheel", "wheel"],
+        required=True,
+        help="compile: build_ext only; wheel: stamp + bdist_wheel; "
+        "merge-and-wheel: staging validation + merge prebuilt objs + bdist_wheel",
+    )
     parser.add_argument("--fa-src", type=Path, required=True)
     parser.add_argument("--dist-dir", type=Path)
     parser.add_argument("--staging-root", type=Path)
     parser.add_argument("--primary-dim", default="")
-    parser.add_argument(
-        "--compile-only",
-        action="store_true",
-        help="In-process build_ext only (parallel OPT_DIM shard compile)",
-    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -258,20 +260,20 @@ def main() -> None:
 
     # Stamp restored prebuilt objects in every mode so the ninja cache actually
     # pays off (setup.py refreshes all fmha_*.cu mtimes on each build_ext).
-    if args.compile_only:
+    if args.step == "compile":
         install_patch(None, args.fa_src, primary_dim="")
         build_ext_only(args.fa_src, verbose=args.verbose)
         return
 
     if args.dist_dir is None:
-        raise SystemExit("--dist-dir is required unless --compile-only")
+        raise SystemExit("--dist-dir is required for step wheel/merge-and-wheel")
 
-    if args.staging_root is None:
+    if args.step == "wheel":
         install_patch(None, args.fa_src, primary_dim="")
         build_wheel(args.fa_src, args.dist_dir, verbose=args.verbose)
         return
 
-    if not args.staging_root.is_dir():
+    if args.staging_root is None or not args.staging_root.is_dir():
         raise SystemExit(f"Staging root missing: {args.staging_root}")
 
     expected_dims = load_opt_dims()

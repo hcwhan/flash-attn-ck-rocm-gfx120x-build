@@ -73,6 +73,26 @@ Push to `main` does **not** auto-trigger builds.
 
 Cache keys include the repository commit SHA and a toolchain fingerprint (MSVC toolset + ROCm clang + pip toolchain versions); **exact match only** (no `restore-keys`). Serial uses `serial-v4`, parallel uses `parallel-v4-d{dim}` — isolated from each other. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
 
+### Build stages
+
+Single entry point for compile and wheel packaging: `build_fa.py` (in-process `exec_module(setup.py)`), one of three `--step` modes:
+
+| step | Role |
+|------|------|
+| `compile` | `build_ext` compile; stamps existing objects so the ninja cache pays off |
+| `wheel` | stamp + `bdist_wheel` (objects from the in-place compile) |
+| `merge-and-wheel` | staging validation + FORCE_BUILD check + merge objects + stamp + `bdist_wheel` |
+
+Serial and parallel compose the same entry; both produce identical wheels:
+
+| Mode | Invocation sequence | OPT_DIM |
+|------|---------------------|---------|
+| Serial build | `--step compile` → `--step wheel` (no staging) | full |
+| Parallel compile | `--step compile` (once per shard) | single shard |
+| Parallel link | `--step merge-and-wheel` + staging | full (env) |
+
+Env is set uniformly via `env/init-fa-build-env.ps1`.
+
 ## Output
 
 Artifact: **`wheel_artifact_name`** — `.whl`, `.sha256`, `wheel.manifest.json`.

@@ -9,7 +9,7 @@
 | **serial** | prep → 全量 build_ext → 原地 `bdist_wheel`（同 job 同目录，stamp 跳过重编）→ smoke test |
 | **parallel** | prep → compile-d32\|d64\|d128\|d256 → link-wheel → smoke test |
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/compile/link_parallel_wheel.py`。Cache 前缀：`serial-v4` / `parallel-v4-d{dim}`（精确 key，无 `restore-keys`；key 含仓库 commit-id + 工具链指纹（MSVC+clang）+ pip 工具链指纹）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/compile/build_fa.py`。Cache 前缀：`serial-v4` / `parallel-v4-d{dim}`（精确 key，无 `restore-keys`；key 含仓库 commit-id + 工具链指纹（MSVC+clang）+ pip 工具链指纹）。
 
 ## 复用入口
 
@@ -24,12 +24,12 @@
 | `setup-rocm-env.ps1` | ROCm 编译 env（内部 dot-source lock） |
 | `get-rocm-sdk-paths.ps1` | 输出 `CoreRoot`/`DevelRoot`（setup-rocm-env 与 msvc 指纹共用；唯一 ROCm 路径发现） |
 | `init-fa-build-env.ps1` | numpy + `OPT_DIM` + setup-rocm |
-| `link_parallel_wheel.py` | `--compile-only` / serial wheel / parallel link+staging 校验 |
+| `build_fa.py` | `--step compile` / `--step wheel` / `--step merge-and-wheel`（parallel link+staging 校验） |
 | `build-bdist-wheel.ps1` | 设 `FLASH_ATTENTION_FORCE_BUILD`，调 link 脚本 |
 | `compile-fa.ps1` | 任意 `-OptDim` 编译入口（serial 全量 / parallel 单 dim）；parallel 的 `get-fa-release-dir.ps1` 校验与 `RELEASE_DIR` 输出在 workflow 内单独调 |
 | `smoke-test-wheel.ps1` | CI CPU smoke test |
 
-规则：lock 经 `read-version-lock.ps1`（或 paths/setup-rocm）；ROCm 路径发现只经 `get-rocm-sdk-paths.ps1`；编译/打 wheel 只经 `link_parallel_wheel.py`。
+规则：lock 经 `read-version-lock.ps1`（或 paths/setup-rocm）；ROCm 路径发现只经 `get-rocm-sdk-paths.ps1`；编译/打 wheel 只经 `build_fa.py`。
 
 **Composite**（封装重复 step 序列；单行转发脚本仍禁止）
 

@@ -26,8 +26,8 @@ $BuildRoot = Join-Path $WorkspaceRoot "build"
 
 Write-Host "Compiling OPT_DIM=$OptDim via in-process build_ext"
 
-$wheelScript = Join-Path $BuildRoot "compile\link_parallel_wheel.py"
-& $PythonExe $wheelScript --compile-only --fa-src $FaSrc -v
+$buildScript = Join-Path $BuildRoot "compile\build_fa.py"
+& $PythonExe $buildScript --step compile --fa-src $FaSrc -v
 if ($LASTEXITCODE -ne 0) {
     throw "build_ext failed for OPT_DIM=$OptDim (exit $LASTEXITCODE)"
 }

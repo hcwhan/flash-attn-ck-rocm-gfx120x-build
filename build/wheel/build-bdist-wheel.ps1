@@ -43,21 +43,25 @@ $env:FLASH_ATTN_LOCAL_VERSION = $FLASH_ATTN_LOCAL_VERSION
     -WorkspaceRoot $WorkspaceRoot `
     -PythonExe $PythonExe
 
-$wheelScript = Join-Path $BuildRoot "compile\link_parallel_wheel.py"
-$wheelArgs = @(
+$buildScript = Join-Path $BuildRoot "compile\build_fa.py"
+
+$step = if ($StagingRoot) { "merge-and-wheel" } else { "wheel" }
+
+$buildArgs = @(
+    "--step", $step,
     "--fa-src", $FaSrc,
     "--dist-dir", $DistDir,
     "-v"
 )
 
 if ($StagingRoot) {
-    $wheelArgs += @(
+    $buildArgs += @(
         "--staging-root", $StagingRoot,
         "--primary-dim", $PrimaryDim
     )
 }
 
-& $PythonExe $wheelScript @wheelArgs
+& $PythonExe $buildScript @buildArgs
 if ($LASTEXITCODE -ne 0) {
     throw "bdist_wheel failed (exit $LASTEXITCODE)"
 }
