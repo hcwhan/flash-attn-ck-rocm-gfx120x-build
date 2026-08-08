@@ -42,7 +42,7 @@
 
 本 workflow 为 ComfyUI **推理专用** wheel：
 
-- CK 内核：仅 **fwd**（不含 bwd / kv-cache 变体）
+- CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（不含 **bwd** 训练内核）
 - `OPT_DIM=32,64,128,256`（与 upstream 默认 head dim 档一致）
 - 适配 GitHub 托管 runner **6 小时**上限；完整 upstream 编译需 20 小时+
 

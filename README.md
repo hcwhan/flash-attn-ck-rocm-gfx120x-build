@@ -42,7 +42,7 @@ Per [AMD ROCm GPU specifications](https://rocm.docs.amd.com/en/latest/reference/
 
 This workflow builds an **inference-only** wheel for ComfyUI:
 
-- CK kernels: **fwd only** (no bwd / kv-cache variants)
+- CK kernels: **fwd + fwd_appendkv + fwd_splitkv** (no **bwd** training kernels)
 - `OPT_DIM=32,64,128,256` (same head-dim tiers as upstream default)
 - Fits GitHub hosted runner **6h** timeout; full upstream build needs ~20h+
 
