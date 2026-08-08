@@ -87,7 +87,7 @@ jobs:
         uses: ./.github/actions/fa-ninja-cache-restore
         with:
           fa-src: ${{ env.FA_SRC }}
-          cache-key: fa2-ck-gfx1201-parallel-v2-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1') }}-${{ needs.prep.outputs.fa-commit-sha }}
+          cache-key: fa2-ck-gfx1201-parallel-v2-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch-fa-inference.ps1', 'build/setup-rocm-env.ps1', 'build/compile-opt-dim.ps1', 'build/prep-flash-attention.ps1', 'build/init-fa-build-env.ps1', 'build/link_parallel_wheel.py', 'build/build-bdist-wheel.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}
 
       - name: Report cache status
         shell: pwsh
@@ -197,6 +197,7 @@ jobs:
           . $env:GITHUB_WORKSPACE\build\smoke-test-wheel.ps1 `
             -DistDir $env:GITHUB_WORKSPACE\dist `
             -WorkspaceRoot $env:GITHUB_WORKSPACE `
+            -FaSrc $env:FA_SRC `
             -FaCommitSha "${{ needs.prep.outputs.fa-commit-sha }}"
 
       - name: Upload wheel artifact

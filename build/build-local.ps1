@@ -40,6 +40,7 @@ New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 . (Join-Path $PSScriptRoot "smoke-test-wheel.ps1") `
     -DistDir $DistDir `
     -WorkspaceRoot $WorkspaceRoot `
+    -FaSrc $FaSrc `
     -PythonExe $PythonExe
 
 if ($GpuSmokeTest) {

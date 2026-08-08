@@ -156,10 +156,24 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 | 检查 | 脚本 | 验证内容 |
 |------|------|----------|
-| CI CPU smoke test | `build/smoke-test-wheel.ps1` | wheel 文件名匹配 `VERSION.lock.json`、SHA256 校验和 + manifest、pip 安装、extension import |
+| CI CPU smoke test | `build/smoke-test-wheel.ps1` | 分层校验（见下表） |
 | 本地 GPU smoke test | `build/gpu-smoke-test.ps1` | gfx1201 上实际运行 `flash_attn_func` 前向（需 ROCm PyTorch + GPU） |
 
-> CI 运行在 GitHub **托管** runner 上，无 AMD GPU — **CI 通过不等于 GPU 内核正确**。部署到 ComfyUI 前请在 **gfx1201** GPU 上运行 `gpu-smoke-test.ps1`。
+### CI CPU smoke test 分层
+
+| 层级 | 检查项 | 失败含义 |
+|------|--------|----------|
+| L1 | wheel 文件名、`VERSION.lock.json` pattern | 打包/ABI 标签错误 |
+| L1 | wheel 内 `flash_attn_2_cuda*.pyd` 存在且 >1KB | 扩展未打进 wheel |
+| L2 | `pip install --force-reinstall --no-deps` | wheel 不可安装 |
+| L3 | `find_spec` → `import flash_attn_2_cuda` → 公开符号 ≥1 | 扩展 DLL/HIP 加载失败 |
+| L3 | `torch.cuda.is_available()` 记录（hosted 上通常为 `False`） | 仅诊断，不 fail |
+| L3 | `dumpbin /DEPENDENTS`（MSVC 环境可用时） | 检查 HIP/torch DLL 依赖链 |
+| — | `wheel.manifest.json` 含 `smoke_test` 字段 + GitHub Step Summary | 可追溯 |
+
+> **L3 通过** = 在 GitHub hosted runner 上确认扩展 **可加载**（首次 CI 绿即证实该假设）。**不等于** gfx1201 kernel 正确 — 部署前须在 GPU 上运行 `gpu-smoke-test.ps1`。
+
+跳过 L3（仅 wheel 结构 + pip）：设置环境变量 `FA_SKIP_EXTENSION_IMPORT=1`。
 
 ## 本地构建
 

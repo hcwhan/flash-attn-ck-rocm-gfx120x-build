@@ -155,10 +155,24 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 | Check | Where | What it proves |
 |-------|-------|----------------|
-| CI CPU smoke test | `build/smoke-test-wheel.ps1` | wheel name matches `VERSION.lock.json`, SHA256 checksum + manifest, pip install, extension import |
+| CI CPU smoke test | `build/smoke-test-wheel.ps1` | Layered checks (see table below) |
 | Local GPU smoke test | `build/gpu-smoke-test.ps1` | actual `flash_attn_func` forward on gfx1201 (requires ROCm PyTorch + GPU) |
 
-> CI runs on GitHub **hosted** runners without AMD GPU — **CI pass does not prove GPU kernel correctness**. Run `gpu-smoke-test.ps1` on a **gfx1201** GPU before deploying to ComfyUI.
+### CI CPU smoke test layers
+
+| Layer | Check | Failure meaning |
+|-------|-------|-----------------|
+| L1 | Wheel name / `VERSION.lock.json` pattern | Wrong packaging or ABI tags |
+| L1 | `flash_attn_2_cuda*.pyd` inside wheel archive (>1KB) | Extension not packaged |
+| L2 | `pip install --force-reinstall --no-deps` | Wheel not installable |
+| L3 | `find_spec` → `import flash_attn_2_cuda` → public symbol count ≥1 | Extension DLL / HIP load failed |
+| L3 | Record `torch.cuda.is_available()` (usually `False` on hosted) | Diagnostic only, not a fail condition |
+| L3 | `dumpbin /DEPENDENTS` when MSVC tools are available | HIP/torch DLL dependency chain |
+| — | `wheel.manifest.json` `smoke_test` block + GitHub Step Summary | Audit trail |
+
+> **L3 pass** = extension **load** confirmed on GitHub hosted runners (first green CI run proves this assumption). Does **not** prove gfx1201 kernel correctness — run `gpu-smoke-test.ps1` on GPU before deploy.
+
+Skip L3 (wheel structure + pip only): set `FA_SKIP_EXTENSION_IMPORT=1`.
 
 ## Local build (outside CI)
 
