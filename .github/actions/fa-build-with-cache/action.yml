@@ -1,0 +1,39 @@
+name: FA build with ninja cache
+description: Restore ninja cache, run a PowerShell build step, then save cache
+
+inputs:
+  fa-src:
+    description: flash-attention source root
+    required: true
+  cache-key:
+    description: Primary cache key (must include FA commit SHA)
+    required: true
+  skip-restore:
+    description: When true, skip cache restore but still save after build
+    required: false
+    default: "false"
+  run:
+    description: PowerShell script executed between cache restore and save
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Restore ninja incremental build cache
+      id: fa-build-cache
+      uses: ./.github/actions/fa-ninja-cache-restore
+      with:
+        fa-src: ${{ inputs.fa-src }}
+        cache-key: ${{ inputs.cache-key }}
+        skip-restore: ${{ inputs.skip-restore }}
+
+    - name: Build
+      shell: pwsh
+      run: ${{ inputs.run }}
+
+    - name: Save ninja incremental build cache
+      if: always()
+      uses: ./.github/actions/fa-ninja-cache-save
+      with:
+        fa-src: ${{ inputs.fa-src }}
+        cache-primary-key: ${{ steps.fa-build-cache.outputs.cache-primary-key }}

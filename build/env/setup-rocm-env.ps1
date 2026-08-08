@@ -8,15 +8,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$lockPath = Join-Path $WorkspaceRoot "VERSION.lock.json"
-$lock = Get-Content $lockPath -Raw | ConvertFrom-Json
+$BuildRoot = Join-Path $WorkspaceRoot "build"
+. (Join-Path $BuildRoot "config\read-version-lock.ps1") -WorkspaceRoot $WorkspaceRoot
 
 $pyCode = @"
 import importlib.util, os, subprocess, sys
 
 spec = importlib.util.find_spec('_rocm_sdk_core')
 if spec is None:
-    raise SystemExit('ERROR: _rocm_sdk_core not found. Install torch[device-$($lock.gpu_archs)] first.')
+    raise SystemExit('ERROR: _rocm_sdk_core not found. Install torch[device-$($GPU_ARCHS)] first.')
 core_root = os.path.dirname(spec.origin)
 
 proc = subprocess.run(
@@ -62,9 +62,9 @@ $env:PATH = "$llvmBin;$rocmBin;$env:PATH"
 $env:CC = "clang-cl"
 $env:CXX = "clang-cl"
 $env:DISTUTILS_USE_SDK = "1"
-$env:GPU_ARCHS = [string]$lock.gpu_archs
+$env:GPU_ARCHS = [string]$GPU_ARCHS
 if (-not $env:OPT_DIM) {
-    $env:OPT_DIM = [string]$lock.opt_dim
+    $env:OPT_DIM = [string]$LockOptDim
 }
 $env:FLASHATTENTION_DISABLE_BACKWARD = "TRUE"
 $env:BUILD_TARGET = "rocm"

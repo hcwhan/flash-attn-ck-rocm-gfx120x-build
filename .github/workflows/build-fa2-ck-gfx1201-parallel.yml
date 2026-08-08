@@ -22,6 +22,8 @@ env:
   FA_SRC: C:\fa\flash-attention
   FA_ARTIFACT: fa-src-patched-gfx1201
   FA_STAGING: C:\fa-staging
+  FA_CACHE_HASH: ${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/compile/compile-opt-dim.ps1', 'build/compile/link_parallel_wheel.py', 'build/wheel/build-bdist-wheel.ps1', 'build/common/paths.ps1', 'build/common/get-fa-release-dir.ps1', 'VERSION.lock.json') }}
+  SKIP_CACHE_RESTORE: ${{ github.event.inputs.skip_cache_restore != false && 'true' || 'false' }}
 
 jobs:
   prep:
@@ -30,23 +32,16 @@ jobs:
     timeout-minutes: 45
     outputs:
       fa-commit-sha: ${{ steps.fa-prep.outputs.fa-commit-sha }}
-      opt-dims-json: ${{ steps.opt-dim-plan.outputs.opt_dims_json }}
-      primary-opt-dim: ${{ steps.opt-dim-plan.outputs.primary_opt_dim }}
+      opt-dims-json: ${{ steps.opt-dim-plan.outputs.opt-dims-json }}
+      primary-opt-dim: ${{ steps.opt-dim-plan.outputs.primary-opt-dim }}
 
     steps:
       - name: Checkout build repo
         uses: actions/checkout@v7
 
-      - name: Plan OPT_DIM matrix from VERSION.lock.json
+      - name: Plan OPT_DIM matrix
         id: opt-dim-plan
-        shell: pwsh
-        run: |
-          . $env:GITHUB_WORKSPACE\build\config\read-version-lock.ps1 -WorkspaceRoot $env:GITHUB_WORKSPACE
-          $json = ConvertTo-Json -InputObject @($OptDimList) -Compress
-          Write-Host "OPT_DIM matrix from lock: $json"
-          Write-Host "Primary OPT_DIM shard: $PRIMARY_OPT_DIM"
-          "opt_dims_json=$json" >> $env:GITHUB_OUTPUT
-          "primary_opt_dim=$PRIMARY_OPT_DIM" >> $env:GITHUB_OUTPUT
+        uses: ./.github/actions/fa-plan-opt-dim-matrix
 
       - name: Prepare patched flash-attention source
         id: fa-prep
@@ -69,47 +64,24 @@ jobs:
       - name: Checkout build repo
         uses: actions/checkout@v7
 
-      - name: Load VERSION.lock.json
-        uses: ./.github/actions/fa-read-version-lock
-
-      - name: Setup ROCm toolchain
-        uses: ./.github/actions/fa-rocm-toolchain
+      - name: Bootstrap toolchain and FA source
+        uses: ./.github/actions/fa-job-bootstrap
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          pytorch-version: ${{ env.PYTORCH_VERSION }}
-          torch-device: ${{ env.TORCH_DEVICE }}
-          rocm-index: ${{ env.ROCM_INDEX }}
-          rocm-version: ${{ env.HIP_VERSION }}
-
-      - name: Download patched flash-attention source
-        uses: ./.github/actions/fa-download-src
-        with:
+          fa-src: ${{ env.FA_SRC }}
           artifact-name: ${{ env.FA_ARTIFACT }}
-          fa-src: ${{ env.FA_SRC }}
 
-      - name: Restore ninja incremental build cache
-        id: fa-build-cache
-        uses: ./.github/actions/fa-ninja-cache-restore
+      - name: Compile OPT_DIM shard with ninja cache
+        uses: ./.github/actions/fa-build-with-cache
         with:
           fa-src: ${{ env.FA_SRC }}
-          cache-key: fa2-ck-gfx1201-parallel-v3-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ hashFiles('build/patch/patch-fa-inference.ps1', 'build/env/setup-rocm-env.ps1', 'build/prep/prep-flash-attention.ps1', 'build/env/init-fa-build-env.ps1', 'build/config/read-version-lock.ps1', 'build/compile/compile-opt-dim.ps1', 'build/compile/link_parallel_wheel.py', 'build/wheel/build-bdist-wheel.ps1', 'build/common/paths.ps1', 'build/common/get-fa-release-dir.ps1', 'VERSION.lock.json') }}-${{ needs.prep.outputs.fa-commit-sha }}
-          skip-restore: ${{ github.event.inputs.skip_cache_restore != false && 'true' || 'false' }}
-
-      - name: Compile OPT_DIM shard
-        shell: pwsh
-        run: |
-          . $env:GITHUB_WORKSPACE\build\compile\compile-opt-dim.ps1 `
-            -OptDim "${{ matrix.opt_dim }}" `
-            -WorkspaceRoot $env:GITHUB_WORKSPACE `
-            -FaSrc $env:FA_SRC
-          Write-Host "Uploading object files from $env:RELEASE_DIR"
-
-      - name: Save ninja incremental build cache
-        if: always()
-        uses: ./.github/actions/fa-ninja-cache-save
-        with:
-          fa-src: ${{ env.FA_SRC }}
-          cache-primary-key: ${{ steps.fa-build-cache.outputs.cache-primary-key }}
+          cache-key: fa2-ck-gfx1201-parallel-v3-d${{ matrix.opt_dim }}-py${{ env.PYTHON_VERSION }}-${{ env.PYTORCH_VERSION }}-${{ env.GPU_ARCHS }}-inference-fwd-${{ env.FA_CACHE_HASH }}-${{ needs.prep.outputs.fa-commit-sha }}
+          skip-restore: ${{ env.SKIP_CACHE_RESTORE }}
+          run: |
+            . $env:GITHUB_WORKSPACE\build\compile\compile-opt-dim.ps1 `
+              -OptDim "${{ matrix.opt_dim }}" `
+              -WorkspaceRoot $env:GITHUB_WORKSPACE `
+              -FaSrc $env:FA_SRC
+            Write-Host "Uploading object files from $env:RELEASE_DIR"
 
       - name: Upload object files
         uses: actions/upload-artifact@v7
@@ -129,23 +101,11 @@ jobs:
       - name: Checkout build repo
         uses: actions/checkout@v7
 
-      - name: Load VERSION.lock.json
-        uses: ./.github/actions/fa-read-version-lock
-
-      - name: Setup ROCm toolchain
-        uses: ./.github/actions/fa-rocm-toolchain
+      - name: Bootstrap toolchain and FA source
+        uses: ./.github/actions/fa-job-bootstrap
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          pytorch-version: ${{ env.PYTORCH_VERSION }}
-          torch-device: ${{ env.TORCH_DEVICE }}
-          rocm-index: ${{ env.ROCM_INDEX }}
-          rocm-version: ${{ env.HIP_VERSION }}
-
-      - name: Download patched flash-attention source
-        uses: ./.github/actions/fa-download-src
-        with:
-          artifact-name: ${{ env.FA_ARTIFACT }}
           fa-src: ${{ env.FA_SRC }}
+          artifact-name: ${{ env.FA_ARTIFACT }}
 
       - name: Download OPT_DIM object artifacts
         uses: actions/download-artifact@v8
@@ -171,7 +131,6 @@ jobs:
       - name: Link wheel from merged objects
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path $env:GITHUB_WORKSPACE\dist | Out-Null
           . $env:GITHUB_WORKSPACE\build\wheel\build-bdist-wheel.ps1 `
             -FaSrc $env:FA_SRC `
             -DistDir $env:GITHUB_WORKSPACE\dist `
@@ -180,19 +139,5 @@ jobs:
             -PrimaryDim "${{ needs.prep.outputs.primary-opt-dim }}"
           Get-ChildItem $env:GITHUB_WORKSPACE\dist
 
-      - name: CPU smoke test
-        shell: pwsh
-        run: |
-          . $env:GITHUB_WORKSPACE\build\test\smoke-test-wheel.ps1 `
-            -DistDir $env:GITHUB_WORKSPACE\dist `
-            -WorkspaceRoot $env:GITHUB_WORKSPACE
-
-      - name: Upload wheel artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.WHEEL_ARTIFACT_NAME }}
-          path: |
-            dist/*.whl
-            dist/*.sha256
-            dist/wheel.manifest.json
-          retention-days: 30
+      - name: Smoke test and upload wheel
+        uses: ./.github/actions/fa-smoke-test-upload-wheel
