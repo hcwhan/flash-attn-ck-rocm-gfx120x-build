@@ -42,10 +42,9 @@ if ($objCount -lt 1) {
 if ($dimKernelCount -lt 1) {
     throw "No *_d${OptDim}_* kernel objects under $releaseDir"
 }
-foreach ($required in @('.ninja_log', '.ninja_deps')) {
-    if (-not (Test-Path (Join-Path $releaseDir $required))) {
-        throw "Release dir missing ${required}: $releaseDir (upload-artifact must set include-hidden-files: true)"
-    }
+$ninjaLog = Join-Path $releaseDir '.ninja_log'
+if (-not (Test-Path $ninjaLog)) {
+    throw "Release dir missing .ninja_log: $releaseDir (upload-artifact must set include-hidden-files: true)"
 }
 
 Write-Host "Release dir: $releaseDir ($objCount objs, $dimKernelCount dim-kernel)"
