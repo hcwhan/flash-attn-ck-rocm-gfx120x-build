@@ -31,8 +31,8 @@
 | `5.compile - compile-opt-dim.ps1` | 任意 `-OptDim` 编译入口（serial 全量 / parallel 单 dim） |
 | `6.shard - validate-shard.ps1` | 校验 compile 产物 .obj（含 `_d{dim}_` kernel）并输出 `RELEASE_DIR`（parallel 专用；workflow 内单独调） |
 | `7.wheel - build-bdist-wheel.ps1` | 设 `FLASH_ATTENTION_FORCE_BUILD`，调 link 脚本 |
-| `8.verify - wheel-smoke-test.ps1` | CI CPU smoke test |
-| `9.test - gpu-smoke-test.ps1` | 部署前真机 GPU smoke（fwd + kvcache；CI 不调） |
+| `8.verify - wheel-smoke-test.ps1` | CI CPU smoke test；gfx1201 真机可用时同脚本续跑 GPU fwd+kvcache |
+| `9.test - gpu-smoke-test.ps1` | 部署前 / smoke 内 GPU 校验（fwd + kvcache） |
 
 规则：lock 经 `read-version-lock.ps1`（唯一；或 get-build-paths/init-fa-build-env 间接）；ROCm 路径发现只经 `get-rocm-sdk-paths.ps1`；编译/打 wheel 只经 `build-fa-steps.py`。
 
@@ -77,7 +77,7 @@ prep clone `flash_attention_build_commit`；不参与逻辑的字段不得进脚
 - **`PRIMARY_OPT_DIM`** = lock `opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
 - **`ninja_workers` 默认 4**（OOM 改 2）；**`skip_cache_restore` 默认 false**（命中时构建成功后先删旧缓存再重存刷新，构建失败保留旧缓存；设为 true 时 lookup-only 探测）。
 - **全模式 prebuilt obj 两向 stamp**：compile/serial 恢复缓存后、link 合并后，用单一未来时间戳（`max(now, 最新 fmha_*.cu, 最新 csrc 头文件)+1s`）同时写 `.obj` mtime 与 `.ninja_log` 条目 mtime（Windows HIP 无 `deps=` 规则、不生成 `.ninja_deps`；只 stamp obj 会触发 ninja `entry<input` 脏检查，缓存与 merge 均全量重编；`.ninja_log` 版本头必须保留，否则 ninja unlink 日志全量重编）。link 合并四 shard 的 `.ninja_log`（上传需 `include-hidden-files: true`），真实 ninja 运行前先 `ninja -n` dry-run 预检 merged obj 是否会被重编，违者立即退出；运行后再校验 merged obj mtime，违者报错退出。
-- **link 排除 `*_api.obj`**：`fmha_*_api.cu.obj` 是 per-shard 部分分发表（只含本 shard hdim），合并 primary 副本会静默丢失其它 dim 分发；link job 必须从全量再生成的源码重编这 3 个 obj。
+- **link 排除 `fmha_*_api.obj`**（Windows HIP 产物名，非 `.cu.obj`）：各 shard 分发表只含本 shard hdim；merge 必须 skip 这 3 个 obj 并在 link ninja 重编（`verify_api_objs_absent` → `precheck_link_ninja_will_build_api_objs` → `verify_api_objs_recompiled`）。`validate_staging` 断言 primary shard 含且仅含这 3 个 api obj。
 
 ## 编写规范
 
@@ -88,7 +88,7 @@ prep clone `flash_attention_build_commit`；不参与逻辑的字段不得进脚
 
 **不要添加：** 双源校验、manifest 读回自证、`FA_SKIP_*`、多候选目录排序、git 考古、薄 one-liner 包装、排障用 build-log artifact、lock 只读字段进逻辑。
 
-**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；patch before-state（含 mha_bwd guard 前置校验）；smoke 产物校验（.pyd 体积 / CXX11_ABI / dim 符号 / METADATA）；cache 精确 key 含仓库 commit-id。
+**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 3 个 `fmha_*_api.obj`；link merge skip + ninja API 重编三重校验；patch before-state（含 mha_bwd guard 前置校验）；smoke 产物校验（.pyd 体积 / CXX11_ABI / dim 符号 / METADATA）；gfx1201 真机可用时 smoke 跑 GPU fwd+kvcache；cache 精确 key 含仓库 commit-id。
 
 **改代码前：** 连续 CI 是否必发生？信息是否已在 lock/env/上游 output？能否复用上表入口？能删则删。
 

@@ -120,8 +120,37 @@ if ($LASTEXITCODE -ne 0) {
     throw "flash_attn extension import failed (exit $LASTEXITCODE)"
 }
 
+Write-Host "=== GPU smoke test (gfx1201 when available) ==="
+$gpuProbeCode = @"
+import sys
+import torch
+
+expected_arch = sys.argv[1].strip().lower()
+if not torch.cuda.is_available():
+    print('SKIP GPU smoke: torch.cuda.is_available() is False')
+    raise SystemExit(0)
+props = torch.cuda.get_device_properties(0)
+arch = (getattr(props, 'gcnArchName', None) or '').lower()
+print(f'GPU probe: {props.name} (gcnArchName={arch or "unknown"})')
+if expected_arch not in arch:
+    print(f'SKIP GPU smoke: expected {expected_arch!r} not in gcnArchName {arch!r}')
+    raise SystemExit(0)
+raise SystemExit(100)
+"@
+& $PythonExe -c $gpuProbeCode $GPU_ARCHS
+if ($LASTEXITCODE -eq 100) {
+    & (Join-Path $PSScriptRoot "9.test - gpu-smoke-test.ps1") `
+        -PythonExe $PythonExe `
+        -WorkspaceRoot $WorkspaceRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "GPU smoke test failed (exit $LASTEXITCODE)"
+    }
+} elseif ($LASTEXITCODE -ne 0) {
+    throw "GPU probe failed (exit $LASTEXITCODE)"
+}
+
 $manifestPath = Join-Path $DistDir "wheel.manifest.json"
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -Path $manifestPath -Encoding UTF8
 Write-Host "Manifest file: $manifestPath"
 
-Write-Host "CPU smoke test complete"
+Write-Host "Smoke test complete"

@@ -126,10 +126,11 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 | 检查 | 脚本 |
 |------|------|
-| CI CPU smoke test | `build/8.verify - wheel-smoke-test.ps1` |
-| 部署前 GPU smoke test（gfx1201 真机） | `build/9.test - gpu-smoke-test.ps1` |
+| CI smoke test（CPU + gfx1201 可用时 GPU） | `build/8.verify - wheel-smoke-test.ps1` |
+| parallel link API dispatch 重编校验 | `base/build-fa-steps.py`（merge skip + ninja 前后断言） |
+| 部署前 GPU smoke test（gfx1201 真机） | `build/9.test - gpu-smoke-test.ps1`（亦被 8.verify 在检测到 gfx1201 时调用） |
 
-CPU smoke test：wheel 文件名/结构（.pyd 体积、OPT_DIM 符号、METADATA）→ pip 安装 → import flash_attn_2_cuda。**不等于** gfx1201 kernel 正确 — 部署前须在 GPU 上跑 `gpu-smoke-test.ps1`（覆盖 fwd + kvcache/appendkv/splitkv）。
+Smoke test：wheel 文件名/结构（.pyd 体积、OPT_DIM kernel 符号、METADATA）→ pip 安装 → import flash_attn_2_cuda；parallel link 另在 merge 阶段断言 3 个 `fmha_*_api.obj` 被 skip 并由 ninja 重编。检测到 gfx1201 时同脚本续跑 GPU fwd + kvcache（appendkv/splitkv）。
 
 ## 安装到 ComfyUI
 

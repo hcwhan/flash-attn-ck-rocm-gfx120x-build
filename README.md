@@ -103,10 +103,11 @@ Expected pattern: `flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd6
 
 | Check | Script |
 |-------|--------|
-| CI CPU smoke test | `build/8.verify - wheel-smoke-test.ps1` |
-| Pre-deploy GPU smoke test (gfx1201 hardware) | `build/9.test - gpu-smoke-test.ps1` |
+| CI smoke test (CPU + GPU when gfx1201 available) | `build/8.verify - wheel-smoke-test.ps1` |
+| Parallel link API dispatch recompile checks | `base/build-fa-steps.py` (merge skip + pre/post ninja asserts) |
+| Pre-deploy GPU smoke test (gfx1201 hardware) | `build/9.test - gpu-smoke-test.ps1` (also invoked by 8.verify when gfx1201 is detected) |
 
-Run `gpu-smoke-test.ps1` on gfx1201 before deploy.
+Smoke test covers wheel structure, pip install, and extension import. Parallel link additionally asserts the three `fmha_*_api.obj` dispatch objects are skipped during merge and recompiled by ninja. When gfx1201 is available, the same script runs GPU fwd + kvcache smoke.
 
 ## ComfyUI install
 

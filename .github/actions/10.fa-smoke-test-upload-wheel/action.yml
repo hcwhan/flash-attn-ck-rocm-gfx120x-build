@@ -1,10 +1,10 @@
 name: FA smoke test and upload wheel
-description: Run CPU smoke test on dist/*.whl and upload wheel artifact
+description: Run CPU smoke test on dist/*.whl; run GPU smoke when gfx1201 is available; upload wheel artifact
 
 runs:
   using: composite
   steps:
-    - name: CPU smoke test
+    - name: Smoke test (CPU + GPU when gfx1201 available)
       shell: pwsh
       run: |
         . "$env:GITHUB_WORKSPACE\build\8.verify - wheel-smoke-test.ps1" `

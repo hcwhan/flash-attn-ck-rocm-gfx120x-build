@@ -13,13 +13,23 @@ from pathlib import Path
 _ORIGINAL_RUN_NINJA = None
 
 DIM_PATTERN = re.compile(r"_d(\d+)_")
-# Generated API dispatch objects (fmha_fwd_api.cu.obj, fmha_fwd_appendkv_api.cu.obj,
-# fmha_fwd_splitkv_api.cu.obj) are per-shard partial: each shard only renders the
-# hdim cases for its own OPT_DIM. Merging the primary shard's copy would silently
-# drop the other dims' dispatch, so these must always be recompiled in the link job
-# from the regenerated all-dim sources. (csrc/flash_attn_ck/flash_api.cu.obj is a
-# fixed dim-independent source and must still be merged.)
-API_OBJ_PATTERN = re.compile(r"^fmha_.*_api\.cu\.obj$")
+# Generated API dispatch objects (Windows HIP: fmha_fwd_api.obj, …) are per-shard
+# partial: each shard only renders the hdim cases for its own OPT_DIM. Merging the
+# primary shard's copy would silently drop the other dims' dispatch, so these must
+# always be recompiled in the link job from the regenerated all-dim sources.
+# (csrc/flash_attn_ck/flash_api.obj is dim-independent and must still be merged.)
+REQUIRED_API_OBJS = frozenset(
+    {
+        "fmha_fwd_api.obj",
+        "fmha_fwd_appendkv_api.obj",
+        "fmha_fwd_splitkv_api.obj",
+    }
+)
+API_OBJ_PATTERN = re.compile(r"^fmha_.*_api\.obj$")
+
+
+def is_api_dispatch_obj(name: str) -> bool:
+    return bool(API_OBJ_PATTERN.match(name))
 
 # Ninja's dirty check on Windows HIP (PyTorch cpp_extension) is NOT obj-mtime-only.
 # build.ninja rules use neither deps=gcc nor deps=msvc (no .ninja_deps); reuse
@@ -125,6 +135,22 @@ def validate_staging(
     if not shared:
         raise SystemExit(
             f"Primary shard d{primary_dim} missing csrc/flash_attn_ck shared objects"
+        )
+
+    api_in_primary = {
+        obj.name for obj in primary.rglob("*.obj") if is_api_dispatch_obj(obj.name)
+    }
+    missing_api = REQUIRED_API_OBJS - api_in_primary
+    if missing_api:
+        raise SystemExit(
+            f"Primary shard d{primary_dim} missing API dispatch objs: "
+            f"{sorted(missing_api)}"
+        )
+    extra_api = api_in_primary - REQUIRED_API_OBJS
+    if extra_api:
+        raise SystemExit(
+            f"Primary shard d{primary_dim} unexpected API dispatch objs: "
+            f"{sorted(extra_api)}"
         )
 
     print(
@@ -255,17 +281,17 @@ def merge_prebuilt_objects(
     temp_release: Path,
     fa_src: Path,
     primary_dim: str,
-) -> tuple[list[Path], list[Path]]:
+) -> tuple[list[Path], list[Path], list[Path]]:
     """Merge shard .obj files and .ninja_log into the ninja build dir before link.
 
     - Primary shard: every .obj except the generated API dispatch objects
-      (fmha_*_api.cu.obj) -- those are per-shard partial and must be recompiled
-      in the link job from the regenerated all-dim sources.
+      (fmha_*_api.obj) -- those are per-shard partial and must be recompiled in
+      the link job from the regenerated all-dim sources.
     - Other shards: dim-specific kernel objects only (build/*_d<N>_*).
     - Ninja logs: every shard's .ninja_log (the link build dir is fresh, so
       without it ninja would rebuild all kernels).
 
-    Returns (merged obj paths, ninja log sources).
+    Returns (merged obj paths, ninja log sources, skipped API dispatch sources).
     """
     primary_dir = staging_root / f"d{primary_dim}"
     if not primary_dir.is_dir():
@@ -274,6 +300,7 @@ def merge_prebuilt_objects(
     staging_dirs = sorted(p for p in staging_root.iterdir() if p.is_dir())
     temp_release.mkdir(parents=True, exist_ok=True)
     copied: list[Path] = []
+    skipped_api: list[Path] = []
     log_sources: list[Path] = []
 
     for staging in staging_dirs:
@@ -292,13 +319,21 @@ def merge_prebuilt_objects(
         copied.append(dest)
 
     for obj in primary_dir.rglob("*.obj"):
-        if API_OBJ_PATTERN.match(obj.name):
+        if is_api_dispatch_obj(obj.name):
+            skipped_api.append(obj)
             print(
                 f"  skip {obj.relative_to(primary_dir).as_posix()} (recompiled in link job)",
                 flush=True,
             )
             continue
         copy_obj(obj, obj.relative_to(primary_dir))
+
+    if {p.name for p in skipped_api} != REQUIRED_API_OBJS:
+        raise SystemExit(
+            "Primary shard API dispatch skip set mismatch: "
+            f"expected {sorted(REQUIRED_API_OBJS)}, "
+            f"skipped {sorted(p.name for p in skipped_api)}"
+        )
 
     for staging in staging_dirs:
         if staging.resolve() == primary_dir.resolve():
@@ -316,7 +351,62 @@ def merge_prebuilt_objects(
             if not dest.exists():
                 copy_obj(obj, rel)
 
-    return copied, log_sources
+    return copied, log_sources, skipped_api
+
+
+def verify_api_objs_absent(build_dir: Path) -> None:
+    present = [
+        p.relative_to(build_dir).as_posix()
+        for p in build_dir.rglob("*.obj")
+        if is_api_dispatch_obj(p.name)
+    ]
+    if present:
+        raise SystemExit(
+            "API dispatch objs must not be present after merge (link job must "
+            f"recompile them from full OPT_DIM sources): {present}"
+        )
+
+
+def precheck_link_ninja_will_build_api_objs(build_dir: Path) -> None:
+    result = subprocess.run(
+        ["ninja", "-n"], cwd=build_dir, capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"ninja -n API precheck failed in {build_dir}: {result.stderr.strip()}"
+        )
+    out = result.stdout
+    if "no work to do" in out.lower():
+        raise SystemExit(
+            "ninja -n reported 'no work to do' on parallel link, but the 3 API "
+            "dispatch objs must be compiled from full OPT_DIM sources"
+        )
+    missing = [name for name in REQUIRED_API_OBJS if name not in out]
+    if missing:
+        tail = out[-800:] if len(out) > 800 else out
+        raise SystemExit(
+            f"ninja -n did not plan to build API dispatch objs: {missing}. "
+            f"Output tail: {tail!r}"
+        )
+
+
+def verify_api_objs_recompiled(build_dir: Path, stamp: int) -> None:
+    for name in sorted(REQUIRED_API_OBJS):
+        matches = [p for p in build_dir.rglob(name) if p.name == name]
+        if len(matches) != 1:
+            raise SystemExit(
+                f"Expected exactly one {name} after link ninja, found {len(matches)}"
+            )
+        obj = matches[0]
+        if obj.stat().st_mtime_ns == stamp:
+            raise SystemExit(
+                f"API dispatch obj {obj.relative_to(build_dir).as_posix()} still "
+                "has the prebuilt stamp mtime; link job did not recompile it"
+            )
+        print(
+            f"OK recompiled {obj.relative_to(build_dir).as_posix()}",
+            flush=True,
+        )
 
 
 def precheck_merged_objects_clean(
@@ -409,19 +499,23 @@ def install_patch(staging_root: Path | None, fa_src: Path, primary_dim: str) -> 
         merged_objs: list[Path] = []
         log_sources: list[Path] | None = None
         if staging_root is not None:
-            merged_objs, log_sources = merge_prebuilt_objects(
+            merged_objs, log_sources, skipped_api = merge_prebuilt_objects(
                 staging_root, build_dir, fa_src, primary_dim=primary_dim
             )
             print(
-                f"Merged {len(merged_objs)} prebuilt .obj files into {build_dir}",
+                f"Merged {len(merged_objs)} prebuilt .obj files into {build_dir} "
+                f"(skipped {len(skipped_api)} API dispatch objs)",
                 flush=True,
             )
+            verify_api_objs_absent(build_dir)
         stamp = stamp_prebuilt_objects(build_dir, fa_src, log_sources)
         if staging_root is not None and merged_objs:
             precheck_merged_objects_clean(build_dir, merged_objs)
+            precheck_link_ninja_will_build_api_objs(build_dir)
         result = _ORIGINAL_RUN_NINJA(build_directory, *args, **kwargs)
         if staging_root is not None and merged_objs:
             verify_merged_objects_reused(build_dir, merged_objs, stamp)
+            verify_api_objs_recompiled(build_dir, stamp)
         return result
 
     cpp_ext._run_ninja_build = patched_run_ninja
