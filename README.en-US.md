@@ -24,7 +24,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx
 | `flash_attention_repo` | Upstream git URL |
 | `flash_attention_build_commit` | Exact commit cloned each build; **bump with `flash_attention_build_commit_date` when upgrading FA** |
 | `flash_attention_min_commit` | Minimum gfx1201 commit ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); **human-readable lock marker** |
-| `flash_attention_build_commit_date` | UTC date for that commit; parsed to `SOURCE_DATE_EPOCH` for PE TimeDateStamp and wheel zip timestamps; **must update when bumping commit** |
+| `flash_attention_build_commit_date` | UTC date for that commit; parsed to `SOURCE_DATE_EPOCH` for wheel zip timestamps; PE fixed via patch injecting link `/Brepro`; **must update when bumping commit** |
 | `expected_wheel_pattern` | Glob for smoke-test wheel name |
 | `wheel_local_version` | `+local` tag appended to the wheel version (fed to `FLASH_ATTN_LOCAL_VERSION`) |
 | `wheel_artifact_name` | GitHub Actions artifact name |
@@ -97,7 +97,7 @@ Env is set uniformly via `scripts/lib/init-build-env.ts` (includes `SOURCE_DATE_
 
 Artifact: **`wheel_artifact_name`** — `.whl`, `.sha256`, `wheel.manifest.json`.
 
-Under the same `VERSION.lock.json`, **serial and parallel should produce byte-identical wheels** (matching SHA256); reproducibility is anchored on `flash_attention_build_commit_date`.
+Under the same `VERSION.lock.json`, **serial and parallel should produce byte-identical wheels** (matching SHA256); `/Brepro` fixes PE TimeDateStamp, `SOURCE_DATE_EPOCH` fixes wheel zip metadata.
 
 Expected pattern: `flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl`
 

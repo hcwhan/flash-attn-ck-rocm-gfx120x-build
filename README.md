@@ -24,7 +24,7 @@
 | `flash_attention_repo` | upstream git 地址 |
 | `flash_attention_build_commit` | 每次构建精确 clone 的 commit；**升级 FA 时改此字段及 `flash_attention_build_commit_date`** |
 | `flash_attention_min_commit` | gfx1201 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**lock 内人类可读参考** |
-| `flash_attention_build_commit_date` | 上述 commit 的 UTC 时间；解析为 `SOURCE_DATE_EPOCH`，固定 PE TimeDateStamp 与 wheel zip 时间戳；**升级 commit 时须同步更新** |
+| `flash_attention_build_commit_date` | 上述 commit 的 UTC 时间；解析为 `SOURCE_DATE_EPOCH` 固定 wheel zip 时间戳；PE 由 patch 注入 link `/Brepro`；**升级 commit 时须同步更新** |
 | `expected_wheel_pattern` | smoke test 校验 wheel 文件名 glob |
 | `wheel_local_version` | wheel 版本号后的 `+local` 标签（注入 `FLASH_ATTN_LOCAL_VERSION`） |
 | `wheel_artifact_name` | GitHub Actions 发布的 artifact 名称 |
@@ -116,7 +116,7 @@ env 统一经 `scripts/lib/init-build-env.ts`（含 `SOURCE_DATE_EPOCH`，取自
 
 Artifact：**`wheel_artifact_name`**（Actions 短期下载）
 
-同一 `VERSION.lock.json` 下，**serial / parallel 应产出 byte-identical wheel**（SHA256 一致）；可重现性锚点为 `flash_attention_build_commit_date`。
+同一 `VERSION.lock.json` 下，**serial / parallel 应产出 byte-identical wheel**（SHA256 一致）；`/Brepro` 固定 PE TimeDateStamp，`SOURCE_DATE_EPOCH` 固定 wheel zip。
 
 GitHub Release（构建成功后自动上传；serial / parallel 使用不同 tag 与标题）：
 

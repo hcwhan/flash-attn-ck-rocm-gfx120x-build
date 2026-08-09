@@ -16,6 +16,16 @@ const patchPoints = [
     after: '$1"-DFLASHATTENTION_DISABLE_BACKWARD",',
     regex: true,
   },
+  {
+    name: "link-spawn-brepro",
+    before: `                cmd = [str(arg) for arg in cmd]
+                if len(subprocess.list2cmdline(cmd)) <= 32767:`,
+    after: `                cmd = [str(arg) for arg in cmd]
+                if "/Brepro" not in cmd and "-Brepro" not in cmd:
+                    cmd.append("/Brepro")
+                if len(subprocess.list2cmdline(cmd)) <= 32767:`,
+    regex: false,
+  },
 ] as const;
 
 export function runPatch(options: { flashAttentionRoot: string }): void {

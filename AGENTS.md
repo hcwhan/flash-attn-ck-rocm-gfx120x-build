@@ -27,7 +27,7 @@
 | `01.config` | 读 lock；`--export-github-env` 写 CI env |
 | `02.plan-opt-dim-matrix` | 导出 parallel OPT_DIM matrix（`GITHUB_OUTPUT`） |
 | `03.prep` | clone FA 源码；校验 commit author date 与 lock 一致 |
-| `04.patch` | 改 setup.py：跳过 bwd + 启用 CK 禁用 backward 标志 |
+| `04.patch` | 改 setup.py：跳过 bwd + 启用 CK 禁用 backward 标志 + link `spawn` 注入 `/Brepro` |
 | `05.toolchain-fingerprint` | MSVC/clang + pip 工具链指纹（缓存 key） |
 | `06.compile` | 任意 `--opt-dim` 编译入口（serial 全量 / parallel 单 dim） |
 | `07.shard` | 校验 compile 产物 .obj；写 `RELEASE_DIR` 到 `GITHUB_ENV` |
@@ -60,7 +60,7 @@
 |----------|------------|
 | `flash_attention_build_commit`、`flash_attention_build_commit_date`、`flash_attention_repo`、`opt_dim`、`expected_wheel_pattern`、`wheel_artifact_name`、`python`、`pytorch`、`hip`、`gpu_archs`… | `flash_attention_min_commit` |
 
-prep clone `flash_attention_build_commit` 并校验 author date 与 `flash_attention_build_commit_date` 一致；后者经 `init-build-env.ts` 注入 `SOURCE_DATE_EPOCH`（PE TimeDateStamp + wheel zip）。
+prep clone `flash_attention_build_commit` 并校验 author date 与 `flash_attention_build_commit_date` 一致；`SOURCE_DATE_EPOCH` 固定 wheel zip；PE TimeDateStamp 由 patch 注入 link `/Brepro`（内容哈希，serial/parallel 一致）。
 
 ## 设计决策
 
@@ -69,7 +69,7 @@ prep clone `flash_attention_build_commit` 并校验 author date 与 `flash_atten
 - **不为不可能场景加诊断**
 - **干净 runner**：compile 后仅一棵 `temp.win-*`；不为脏 workspace / 人工改目录加兜底。
 - **连续 CI 链**：prep → compile/link → smoke 自动跑完；staging/shard 齐全等流水线检查保留。
-- **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=TRUE` + prebuilt `.obj` 时间戳 merge；`SOURCE_DATE_EPOCH` 使 serial / parallel wheel **byte-identical**。
+- **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=TRUE` + prebuilt `.obj` 时间戳 merge；`/Brepro` + `SOURCE_DATE_EPOCH` 使 serial / parallel wheel **byte-identical**。
 - **`PRIMARY_OPT_DIM`** = lock `opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
 - **`ninja_workers` 默认 4**（OOM 改 2）；**`skip_cache_restore` 默认 false**（命中时构建成功后先删旧缓存再重存刷新，构建失败保留旧缓存；设为 true 时 lookup-only 探测）。
 - **全模式 prebuilt obj 两向 stamp** / **link 排除 `fmha_*_api.obj`**：见 `build/build-fa-steps.py` 注释。
