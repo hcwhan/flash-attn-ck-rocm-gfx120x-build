@@ -37,29 +37,27 @@ program
 program
   .command("03.prep")
   .description("Clone flash-attention at pinned commit")
-  .requiredOption("--flash-attention-root <path>")
+  .requiredOption("--fa-src <path>")
   .action((opts) => {
-    runPrep({
-      flashAttentionRoot: opts.flashAttentionRoot,
-    });
+    runPrep({ faSrc: opts.faSrc });
   });
 
 program
   .command("04.patch")
   .description("Patch flash-attention for inference-only CK build")
-  .requiredOption("--flash-attention-root <path>")
+  .requiredOption("--fa-src <path>")
   .action((opts) => {
-    runPatch({ flashAttentionRoot: opts.flashAttentionRoot });
+    runPatch({ faSrc: opts.faSrc });
   });
 
 program
   .command("05.toolchain-fingerprint")
   .description("Emit MSVC/clang and pip toolchain cache fingerprints")
-  .option("--cache-variant <mode>", "serial or parallel (emit cache-key output)")
-  .option("--opt-dim <value>", "OPT_DIM shard when --cache-variant parallel")
+  .option("--build-variant <mode>", "serial or parallel (emit cache-key output)")
+  .option("--opt-dim <value>", "OPT_DIM shard when --build-variant parallel")
   .action((opts) => {
     runToolchainFingerprint({
-      cacheVariant: opts.cacheVariant,
+      buildVariant: opts.buildVariant,
       optDim: opts.optDim,
     });
   });
@@ -78,7 +76,7 @@ program
 
 program
   .command("07.shard")
-  .description("Validate compile shard and emit RELEASE_DIR to GITHUB_ENV")
+  .description("Validate compile shard and emit SHARD_RELEASE_DIR to GITHUB_ENV")
   .requiredOption("--fa-src <path>")
   .requiredOption("--opt-dim <value>")
   .action((opts) => {
@@ -108,13 +106,13 @@ program
   .command("09.verify")
   .description("CPU wheel smoke test")
   .requiredOption("--dist-dir <path>")
-  .requiredOption("--release-variant <name>", "serial or parallel")
-  .option("--ninja-cache-key <key>", "compile ninja cache key (required for serial)")
+  .requiredOption("--build-variant <name>", "serial or parallel")
+  .option("--cache-key <key>", "compile cache key (required for serial)")
   .action((opts) => {
     runVerify({
       distDir: opts.distDir,
-      releaseVariant: opts.releaseVariant,
-      ninjaCacheKey: opts.ninjaCacheKey,
+      buildVariant: opts.buildVariant,
+      cacheKey: opts.cacheKey,
     });
   });
 
@@ -123,12 +121,12 @@ program
   .description("Prepare GitHub Release metadata")
   .requiredOption("--dist-dir <path>")
   .requiredOption("--workflow-name <name>")
-  .requiredOption("--release-variant <name>")
+  .requiredOption("--build-variant <name>")
   .action((opts) => {
     runPublish({
       distDir: opts.distDir,
       workflowName: opts.workflowName,
-      releaseVariant: opts.releaseVariant,
+      buildVariant: opts.buildVariant,
     });
   });
 

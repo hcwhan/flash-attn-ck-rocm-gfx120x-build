@@ -24,7 +24,7 @@ const versionLockSchema = z.object({
   python: z.string().min(1),
   pytorch: z.string().min(1),
   torch_device_extra: z.string().min(1),
-  hip: z.string().min(1),
+  rocm: z.string().min(1),
   rocm_index: z.string().min(1),
   gpu_archs: z.string().min(1),
   opt_dim: optDimSchema,
@@ -41,16 +41,16 @@ const versionLockSchema = z.object({
 export type VersionLockVars = {
   PYTHON_VERSION: string;
   PYTORCH_VERSION: string;
-  TORCH_DEVICE: string;
+  TORCH_DEVICE_EXTRA: string;
   ROCM_INDEX: string;
   GPU_ARCHS: string;
-  HIP_VERSION: string;
-  LockOptDim: string;
-  PRIMARY_OPT_DIM: string;
-  OptDimList: string[];
+  ROCM_VERSION: string;
+  LOCK_OPT_DIM: string;
+  PRIMARY_DIM: string;
+  optDimList: string[];
   WHEEL_ARTIFACT_NAME: string;
   EXPECTED_WHEEL_PATTERN: string;
-  FLASH_ATTN_LOCAL_VERSION: string;
+  WHEEL_LOCAL_VERSION: string;
   FLASH_ATTENTION_REPO: string;
   FLASH_ATTENTION_BUILD_COMMIT: string;
   FLASH_ATTENTION_BUILD_COMMIT_DATE: string;
@@ -111,16 +111,16 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
   const vars: VersionLockVars = {
     PYTHON_VERSION: lock.python,
     PYTORCH_VERSION: lock.pytorch,
-    TORCH_DEVICE: lock.torch_device_extra,
+    TORCH_DEVICE_EXTRA: lock.torch_device_extra,
     ROCM_INDEX: lock.rocm_index,
     GPU_ARCHS: lock.gpu_archs,
-    HIP_VERSION: lock.hip,
-    LockOptDim: lock.opt_dim,
-    PRIMARY_OPT_DIM: optDimList[0]!,
-    OptDimList: optDimList,
+    ROCM_VERSION: lock.rocm,
+    LOCK_OPT_DIM: lock.opt_dim,
+    PRIMARY_DIM: optDimList[0]!,
+    optDimList,
     WHEEL_ARTIFACT_NAME: lock.wheel_artifact_name,
     EXPECTED_WHEEL_PATTERN: lock.expected_wheel_pattern,
-    FLASH_ATTN_LOCAL_VERSION: lock.wheel_local_version,
+    WHEEL_LOCAL_VERSION: lock.wheel_local_version,
     FLASH_ATTENTION_REPO: lock.flash_attention_repo,
     FLASH_ATTENTION_BUILD_COMMIT: lock.flash_attention_build_commit,
     FLASH_ATTENTION_BUILD_COMMIT_DATE: isoUtc,
@@ -130,13 +130,13 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
   };
 
   console.log(
-    `VERSION.lock: python=${vars.PYTHON_VERSION} pytorch=${vars.PYTORCH_VERSION} gpu=${vars.GPU_ARCHS} opt_dim=${vars.LockOptDim}`,
+    `VERSION.lock: python=${vars.PYTHON_VERSION} pytorch=${vars.PYTORCH_VERSION} gpu=${vars.GPU_ARCHS} opt_dim=${vars.LOCK_OPT_DIM}`,
   );
 
   return vars;
 }
 
 export function versionLockEnvRecord(vars: VersionLockVars): Record<string, string> {
-  const { OptDimList: _optDimList, ...envVars } = vars;
+  const { optDimList: _optDimList, ...envVars } = vars;
   return envVars;
 }

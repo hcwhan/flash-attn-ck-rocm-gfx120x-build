@@ -60,11 +60,11 @@ jobs:
 
       - name: Clone flash-attention source
         shell: pwsh
-        run: npx tsx scripts/cli.ts 03.prep --flash-attention-root $env:FA_SRC
+        run: npx tsx scripts/cli.ts 03.prep --fa-src $env:FA_SRC
 
       - name: Patch flash-attention for inference-only build
         shell: pwsh
-        run: npx tsx scripts/cli.ts 04.patch --flash-attention-root $env:FA_SRC
+        run: npx tsx scripts/cli.ts 04.patch --fa-src $env:FA_SRC
 
       - name: Upload patched source artifact
         uses: actions/upload-artifact@v7
@@ -75,7 +75,7 @@ jobs:
           if-no-files-found: error
           compression-level: 9
 
-  build:
+  compile-full:
     name: compile-full
     needs: prep
     runs-on: windows-2022
@@ -104,9 +104,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           pytorch-version: ${{ env.PYTORCH_VERSION }}
-          torch-device: ${{ env.TORCH_DEVICE }}
+          torch-device-extra: ${{ env.TORCH_DEVICE_EXTRA }}
           rocm-index: ${{ env.ROCM_INDEX }}
-          rocm-version: ${{ env.HIP_VERSION }}
+          rocm-version: ${{ env.ROCM_VERSION }}
 
       - name: Download patched flash-attention source
         uses: actions/download-artifact@v8
@@ -117,15 +117,15 @@ jobs:
       - name: Fingerprint toolchain for cache key
         id: toolchain-fingerprint
         shell: pwsh
-        run: npx tsx scripts/cli.ts 05.toolchain-fingerprint --cache-variant serial
+        run: npx tsx scripts/cli.ts 05.toolchain-fingerprint --build-variant serial
 
       - name: Compile OPT_DIM full with ninja cache
         uses: "./.github/actions/03.fa-build-with-cache"
         with:
           fa-src: ${{ env.FA_SRC }}
           cache-key: ${{ steps.toolchain-fingerprint.outputs.cache-key }}
-          skip-restore: ${{ env.SKIP_CACHE_RESTORE }}
-          run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ env.LockOptDim }}" --fa-src $env:FA_SRC
+          skip-cache-restore: ${{ env.SKIP_CACHE_RESTORE }}
+          run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ env.LOCK_OPT_DIM }}" --fa-src $env:FA_SRC
 
       - name: Link and package wheel from in-place objects
         shell: pwsh
@@ -133,7 +133,7 @@ jobs:
 
       - name: Smoke test (CPU)
         shell: pwsh
-        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --release-variant serial --ninja-cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"
+        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --build-variant serial --cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v7
@@ -149,15 +149,15 @@ jobs:
         if: ${{ github.event.inputs.publish_release != 'false' }}
         id: publish
         shell: pwsh
-        run: npx tsx scripts/cli.ts 10.publish --dist-dir $env:GITHUB_WORKSPACE\dist --workflow-name "${{ github.workflow }}" --release-variant serial
+        run: npx tsx scripts/cli.ts 10.publish --dist-dir $env:GITHUB_WORKSPACE\dist --workflow-name "${{ github.workflow }}" --build-variant serial
 
       - name: Publish GitHub Release
         if: ${{ github.event.inputs.publish_release != 'false' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.publish.outputs.tag }}
-          name: ${{ steps.publish.outputs.release_title }}
-          body_path: ${{ steps.publish.outputs.body_path }}
+          tag_name: ${{ steps.publish.outputs.release-tag }}
+          name: ${{ steps.publish.outputs.release-title }}
+          body_path: ${{ steps.publish.outputs.body-path }}
           files: |
             dist/*.whl
             dist/*.sha256

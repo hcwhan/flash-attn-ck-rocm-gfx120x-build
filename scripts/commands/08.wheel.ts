@@ -30,10 +30,11 @@ export function runWheel(options: {
   }
 
   process.env.FLASH_ATTENTION_FORCE_BUILD = "TRUE";
-  process.env.FLASH_ATTN_LOCAL_VERSION = requireLockEnv("FLASH_ATTN_LOCAL_VERSION");
+  // Upstream flash-attention setup.py reads FLASH_ATTN_LOCAL_VERSION at wheel time.
+  process.env.FLASH_ATTN_LOCAL_VERSION = requireLockEnv("WHEEL_LOCAL_VERSION");
 
   initBuildEnv({
-    optDim: requireLockEnv("LockOptDim"),
+    optDim: requireLockEnv("LOCK_OPT_DIM"),
   });
 
   const buildScript = path.join(resolveBuildDir(), "build-fa-steps.py");

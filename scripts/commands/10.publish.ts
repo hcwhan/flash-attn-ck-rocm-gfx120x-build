@@ -9,7 +9,7 @@ import {
 export function runPublish(options: {
   distDir: string;
   workflowName: string;
-  releaseVariant: string;
+  buildVariant: string;
 }): void {
   const releaseTagPrefix = requireLockEnv("RELEASE_TAG_PREFIX");
   const releaseName = requireLockEnv("RELEASE_NAME");
@@ -17,13 +17,13 @@ export function runPublish(options: {
   const runnerTemp = requireGithubActionsEnv("RUNNER_TEMP");
   const githubSha = requireGithubActionsEnv("GITHUB_SHA");
 
-  const variantSlug = options.releaseVariant
+  const variantSlug = options.buildVariant
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   if (!variantSlug) {
     throw new Error(
-      `ReleaseVariant '${options.releaseVariant}' did not produce a valid slug`,
+      `buildVariant '${options.buildVariant}' did not produce a valid slug`,
     );
   }
 
@@ -39,8 +39,8 @@ export function runPublish(options: {
   }
 
   const whlName = path.basename(whls[0]!);
-  const tag = `${releaseTagPrefix}-${variantSlug}-build${runNumber}`;
-  const displayName = `${releaseName} (${options.releaseVariant})`;
+  const releaseTag = `${releaseTagPrefix}-${variantSlug}-build${runNumber}`;
+  const displayName = `${releaseName} (${options.buildVariant})`;
   const releaseTitle = `${displayName} (build ${runNumber})`;
   const bodyPath = path.join(runnerTemp, "release-body.md");
 
@@ -54,7 +54,7 @@ export function runPublish(options: {
     "| Field | Value |",
     "|-------|-------|",
     `| Workflow | ${options.workflowName} |`,
-    `| Build source | ${options.releaseVariant} |`,
+    `| Build variant | ${options.buildVariant} |`,
     `| Run | ${runNumber} |`,
     `| Repository commit | ${githubSha} |`,
     `| Wheel | ${whlName} |`,
@@ -64,11 +64,11 @@ export function runPublish(options: {
   writeFileSync(bodyPath, body, "utf8");
 
   appendGithubOutput({
-    tag,
-    body_path: bodyPath,
-    release_title: releaseTitle,
+    "release-tag": releaseTag,
+    "body-path": bodyPath,
+    "release-title": releaseTitle,
   });
 
-  console.log(`Release tag: ${tag}`);
+  console.log(`Release tag: ${releaseTag}`);
   console.log(`Release body: ${bodyPath}`);
 }

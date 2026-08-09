@@ -8,14 +8,14 @@ inputs:
   pytorch-version:
     description: PyTorch version string
     required: true
-  torch-device:
-    description: torch[device-*] extra name
+  torch-device-extra:
+    description: torch[device-*] extra name (VERSION.lock.json torch_device_extra)
     required: true
   rocm-index:
     description: pip index URL for ROCm wheels
     required: true
   rocm-version:
-    description: rocm[devel] package version (from VERSION.lock.json hip)
+    description: rocm[devel] package version (VERSION.lock.json rocm)
     required: true
 
 runs:
@@ -41,7 +41,7 @@ runs:
       run: |
         python -m pip install --no-cache-dir `
           --index-url ${{ inputs.rocm-index }} `
-          "torch[device-${{ inputs.torch-device }}]==${{ inputs.pytorch-version }}"
+          "torch[device-${{ inputs.torch-device-extra }}]==${{ inputs.pytorch-version }}"
 
     - name: Install ROCm devel headers
       shell: pwsh

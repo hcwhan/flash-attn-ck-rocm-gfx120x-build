@@ -72,7 +72,7 @@ export function runShard(options: {
     `Release dir: ${releaseDir} (${objFiles.length} objs, ${dimKernelCount} dim-kernel)`,
   );
 
-  appendGithubEnv({ RELEASE_DIR: releaseDir });
+  appendGithubEnv({ SHARD_RELEASE_DIR: releaseDir });
   console.log(`Uploading object files from ${releaseDir}`);
 
   return releaseDir;

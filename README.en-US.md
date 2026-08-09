@@ -26,7 +26,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx
 | `flash_attention_min_commit` | Minimum gfx1201 commit ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); **human-readable lock marker** |
 | `flash_attention_build_commit_date` | UTC date for that commit; parsed to `SOURCE_DATE_EPOCH` for wheel zip timestamps; PE fixed via patch injecting link `/Brepro`; **must update when bumping commit** |
 | `expected_wheel_pattern` | Glob for smoke-test wheel name |
-| `wheel_local_version` | `+local` tag appended to the wheel version (fed to `FLASH_ATTN_LOCAL_VERSION`) |
+| `wheel_local_version` | `+local` tag appended to the wheel version (lock env `WHEEL_LOCAL_VERSION`; mapped to upstream `FLASH_ATTN_LOCAL_VERSION` at wheel time) |
 | `wheel_artifact_name` | GitHub Actions artifact name |
 
 Prep clones **`flash_attention_build_commit`** (`fetch` + `checkout FETCH_HEAD`).
@@ -44,8 +44,8 @@ Prep clones **`flash_attention_build_commit`** (`fetch` + `checkout FETCH_HEAD`)
 
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
-| **Build FlashAttention CK serial (Windows gfx1201)** | Single-job full build + cache (`serial-v4`) | **Manual only** |
-| **Build FlashAttention CK parallel (Windows gfx1201)** | OPT_DIM shard compile + link (`parallel-v4-d{dim}`) | **Manual only** |
+| **Build FlashAttention CK serial (Windows gfx1201)** | Single-job full build + cache (`serial-v5`) | **Manual only** |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | OPT_DIM shard compile + link (`parallel-v5-d{dim}`) | **Manual only** |
 
 Push to `main` does **not** auto-trigger builds.
 
@@ -61,7 +61,7 @@ Push to `main` does **not** auto-trigger builds.
 | Job | Role | Timeout |
 |-----|------|---------|
 | `prep-fa-src` | clone + patch, upload source | 45 min |
-| `build` | toolchain, cache, full `npx tsx scripts/cli.ts 06.compile` + `08.wheel` | 6 h |
+| `compile-full` | toolchain, cache, full `npx tsx scripts/cli.ts 06.compile` + `08.wheel` | 6 h |
 
 ### Parallel (`build-fa2-ck-gfx1201-parallel.yml`)
 
@@ -71,7 +71,7 @@ Push to `main` does **not** auto-trigger builds.
 | `compile-d32` … `d256` | one OPT_DIM shard each, upload `.obj` | 6 h each |
 | `link-wheel` | merge objs + link + wheel + CPU smoke test | 6 h |
 
-Cache keys include a toolchain fingerprint (MSVC toolset + ROCm clang + pip toolchain versions); **exact match only** (no `restore-keys`). Serial uses `serial-v4`, parallel uses `parallel-v4-d{dim}` — isolated from each other. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
+Cache keys include three toolchain fingerprints (MSVC toolset / ROCm clang / pip toolchain); **exact match only** (no `restore-keys`). Serial: `fa2-ck-gfx1201-serial-v5-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`; parallel: `fa2-ck-gfx1201-parallel-v5-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
 
 ### Build stages
 
@@ -105,7 +105,7 @@ Expected pattern: `flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd6
 
 | Check | Script |
 |-------|--------|
-| CI smoke test (CPU) | `npx tsx scripts/cli.ts 09.verify ... --release-variant serial --ninja-cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"` |
+| CI smoke test (CPU) | `npx tsx scripts/cli.ts 09.verify ... --build-variant serial --cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"` |
 | Parallel link API dispatch recompile checks | `build/build-fa-steps.py` (merge skip + pre/post ninja asserts) |
 | Pre-deploy GPU smoke test (gfx1201 hardware) | `python test/gpu-smoke-test.py -w .` |
 

@@ -2,7 +2,7 @@
   "python": "3.12",
   "pytorch": "2.12.0+rocm7.14.0",
   "torch_device_extra": "gfx1201",
-  "hip": "7.14.0",
+  "rocm": "7.14.0",
   "rocm_index": "https://repo.amd.com/rocm/whl-multi-arch/",
   "gpu_archs": "gfx1201",
   "opt_dim": "32,64,128,256",

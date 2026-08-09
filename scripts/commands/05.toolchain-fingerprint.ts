@@ -66,7 +66,7 @@ function resolveMsvcToolset(): string {
   return toolset;
 }
 
-function resolveClangVersion(coreRoot: string): string {
+function resolveRocmClangVersion(coreRoot: string): string {
   const clangExe = path.join(coreRoot, "lib", "llvm", "bin", "clang.exe");
   if (!existsSync(clangExe)) {
     throw new Error(`ROCm clang not found: ${clangExe}`);
@@ -87,17 +87,17 @@ function fingerprintHash(payload: string): string {
 }
 
 export function runToolchainFingerprint(options?: {
-  cacheVariant?: string;
+  buildVariant?: string;
   optDim?: string;
 }): void {
   const toolset = resolveMsvcToolset();
   const { coreRoot } = getRocmSdkPaths();
-  const clangVersion = resolveClangVersion(coreRoot);
+  const rocmClangVersion = resolveRocmClangVersion(coreRoot);
 
-  const msvcHash = fingerprintHash(`${toolset}|${clangVersion}`);
-  console.log(
-    `MSVC toolset: ${toolset} | clang: ${clangVersion} (cache fingerprint ${msvcHash})`,
-  );
+  const msvcHash = fingerprintHash(toolset);
+  const rocmClangHash = fingerprintHash(rocmClangVersion);
+  console.log(`MSVC toolset: ${toolset} (fingerprint ${msvcHash})`);
+  console.log(`ROCm clang: ${rocmClangVersion} (fingerprint ${rocmClangHash})`);
 
   const pipPkgs = ["pip", "setuptools", "wheel", "ninja", "packaging", "psutil"];
   const pipFreeze = runCapture(PYTHON, ["-m", "pip", "list", "--format=freeze"]);
@@ -111,37 +111,34 @@ export function runToolchainFingerprint(options?: {
     return line;
   });
 
-  const pipHash = fingerprintHash(pipVersions.sort().join(";"));
+  const pipToolchainHash = fingerprintHash(pipVersions.sort().join(";"));
   console.log(
-    `pip toolchain: ${pipVersions.join(";")} (fingerprint ${pipHash})`,
+    `pip toolchain: ${pipVersions.join(";")} (fingerprint ${pipToolchainHash})`,
   );
 
-  const outputs: Record<string, string> = {
-    "toolchain-msvc-hash": msvcHash,
-    "toolchain-pip-hash": pipHash,
-  };
-
-  if (options?.cacheVariant) {
-    const variant = options.cacheVariant.trim().toLowerCase();
-    if (variant !== "serial" && variant !== "parallel") {
+  if (options?.buildVariant) {
+    const buildVariant = options.buildVariant.trim().toLowerCase();
+    if (buildVariant !== "serial" && buildVariant !== "parallel") {
       throw new Error(
-        `--cache-variant must be 'serial' or 'parallel', got ${options.cacheVariant}`,
+        `--build-variant must be 'serial' or 'parallel', got ${options.buildVariant}`,
       );
     }
 
-    if (variant === "parallel" && !options.optDim?.trim()) {
-      throw new Error("--opt-dim is required when --cache-variant parallel");
+    if (buildVariant === "parallel" && !options.optDim?.trim()) {
+      throw new Error("--opt-dim is required when --build-variant parallel");
     }
 
     const cacheKey = buildNinjaCacheKey({
-      variant,
+      buildVariant,
       optDim: options.optDim?.trim(),
       msvcHash,
-      pipHash,
+      rocmClangHash,
+      pipToolchainHash,
     });
-    outputs["cache-key"] = cacheKey;
     console.log(`Ninja cache key: ${cacheKey}`);
+    appendGithubOutput({ "cache-key": cacheKey });
+    return;
   }
 
-  appendGithubOutput(outputs);
+  console.log("Toolchain fingerprint complete (cache-key not requested)");
 }

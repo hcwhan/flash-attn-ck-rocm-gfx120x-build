@@ -50,8 +50,8 @@ function spawnBreproAlreadyPatched(content: string): boolean {
   );
 }
 
-export function runPatch(options: { flashAttentionRoot: string }): void {
-  const setup = path.join(path.resolve(options.flashAttentionRoot), "setup.py");
+export function runPatch(options: { faSrc: string }): void {
+  const setup = path.join(path.resolve(options.faSrc), "setup.py");
   let content: string;
   let setupEol: "\n" | "\r\n";
   try {
@@ -88,7 +88,7 @@ export function runPatch(options: { flashAttentionRoot: string }): void {
   console.log(`Patched ${setup} for inference-only CK build`);
 
   const ckSrcDir = path.join(
-    path.resolve(options.flashAttentionRoot),
+    path.resolve(options.faSrc),
     "csrc",
     "flash_attn_ck",
   );

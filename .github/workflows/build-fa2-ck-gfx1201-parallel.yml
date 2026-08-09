@@ -39,8 +39,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 45
     outputs:
-      opt-dims-json: ${{ steps.plan-opt-dim-matrix.outputs.opt_dims_json }}
-      primary-opt-dim: ${{ steps.plan-opt-dim-matrix.outputs.primary_opt_dim }}
+      opt-dims-json: ${{ steps.plan-opt-dim-matrix.outputs.opt-dims-json }}
+      primary-dim: ${{ steps.plan-opt-dim-matrix.outputs.primary-dim }}
 
     steps:
       - name: Checkout build repo
@@ -67,11 +67,11 @@ jobs:
 
       - name: Clone flash-attention source
         shell: pwsh
-        run: npx tsx scripts/cli.ts 03.prep --flash-attention-root $env:FA_SRC
+        run: npx tsx scripts/cli.ts 03.prep --fa-src $env:FA_SRC
 
       - name: Patch flash-attention for inference-only build
         shell: pwsh
-        run: npx tsx scripts/cli.ts 04.patch --flash-attention-root $env:FA_SRC
+        run: npx tsx scripts/cli.ts 04.patch --fa-src $env:FA_SRC
 
       - name: Upload patched source artifact
         uses: actions/upload-artifact@v7
@@ -83,14 +83,14 @@ jobs:
           compression-level: 9
 
   compile:
-    name: compile-d${{ matrix.opt_dim }}
+    name: compile-d${{ matrix.opt-dim }}
     needs: prep
     runs-on: windows-2022
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        opt_dim: ${{ fromJson(needs.prep.outputs.opt-dims-json) }}
+        opt-dim: ${{ fromJson(needs.prep.outputs.opt-dims-json) }}
 
     steps:
       - name: Checkout build repo
@@ -115,9 +115,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           pytorch-version: ${{ env.PYTORCH_VERSION }}
-          torch-device: ${{ env.TORCH_DEVICE }}
+          torch-device-extra: ${{ env.TORCH_DEVICE_EXTRA }}
           rocm-index: ${{ env.ROCM_INDEX }}
-          rocm-version: ${{ env.HIP_VERSION }}
+          rocm-version: ${{ env.ROCM_VERSION }}
 
       - name: Download patched flash-attention source
         uses: actions/download-artifact@v8
@@ -128,25 +128,25 @@ jobs:
       - name: Fingerprint toolchain for cache key
         id: toolchain-fingerprint
         shell: pwsh
-        run: npx tsx scripts/cli.ts 05.toolchain-fingerprint --cache-variant parallel --opt-dim "${{ matrix.opt_dim }}"
+        run: npx tsx scripts/cli.ts 05.toolchain-fingerprint --build-variant parallel --opt-dim "${{ matrix.opt-dim }}"
 
       - name: Compile OPT_DIM shard with ninja cache
         uses: "./.github/actions/03.fa-build-with-cache"
         with:
           fa-src: ${{ env.FA_SRC }}
           cache-key: ${{ steps.toolchain-fingerprint.outputs.cache-key }}
-          skip-restore: ${{ env.SKIP_CACHE_RESTORE }}
-          run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ matrix.opt_dim }}" --fa-src $env:FA_SRC
+          skip-cache-restore: ${{ env.SKIP_CACHE_RESTORE }}
+          run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ matrix.opt-dim }}" --fa-src $env:FA_SRC
 
-      - name: Validate shard and emit RELEASE_DIR
+      - name: Validate shard and emit SHARD_RELEASE_DIR
         shell: pwsh
-        run: npx tsx scripts/cli.ts 07.shard --fa-src $env:FA_SRC --opt-dim "${{ matrix.opt_dim }}"
+        run: npx tsx scripts/cli.ts 07.shard --fa-src $env:FA_SRC --opt-dim "${{ matrix.opt-dim }}"
 
       - name: Upload object files
         uses: actions/upload-artifact@v7
         with:
-          name: d${{ matrix.opt_dim }}
-          path: ${{ env.RELEASE_DIR }}
+          name: d${{ matrix.opt-dim }}
+          path: ${{ env.SHARD_RELEASE_DIR }}
           retention-days: 7
           if-no-files-found: error
           include-hidden-files: true
@@ -180,9 +180,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           pytorch-version: ${{ env.PYTORCH_VERSION }}
-          torch-device: ${{ env.TORCH_DEVICE }}
+          torch-device-extra: ${{ env.TORCH_DEVICE_EXTRA }}
           rocm-index: ${{ env.ROCM_INDEX }}
-          rocm-version: ${{ env.HIP_VERSION }}
+          rocm-version: ${{ env.ROCM_VERSION }}
 
       - name: Download patched flash-attention source
         uses: actions/download-artifact@v8
@@ -199,11 +199,11 @@ jobs:
 
       - name: Link and package wheel from merged objects
         shell: pwsh
-        run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist --staging-root $env:FA_STAGING --primary-dim "${{ needs.prep.outputs.primary-opt-dim }}"
+        run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist --staging-root $env:FA_STAGING --primary-dim "${{ needs.prep.outputs.primary-dim }}"
 
       - name: Smoke test (CPU)
         shell: pwsh
-        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --release-variant parallel
+        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --build-variant parallel
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v7
@@ -219,15 +219,15 @@ jobs:
         if: ${{ github.event.inputs.publish_release != 'false' }}
         id: publish
         shell: pwsh
-        run: npx tsx scripts/cli.ts 10.publish --dist-dir $env:GITHUB_WORKSPACE\dist --workflow-name "${{ github.workflow }}" --release-variant parallel
+        run: npx tsx scripts/cli.ts 10.publish --dist-dir $env:GITHUB_WORKSPACE\dist --workflow-name "${{ github.workflow }}" --build-variant parallel
 
       - name: Publish GitHub Release
         if: ${{ github.event.inputs.publish_release != 'false' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.publish.outputs.tag }}
-          name: ${{ steps.publish.outputs.release_title }}
-          body_path: ${{ steps.publish.outputs.body_path }}
+          tag_name: ${{ steps.publish.outputs.release-tag }}
+          name: ${{ steps.publish.outputs.release-title }}
+          body_path: ${{ steps.publish.outputs.body-path }}
           files: |
             dist/*.whl
             dist/*.sha256

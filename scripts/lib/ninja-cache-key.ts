@@ -1,16 +1,19 @@
 export function buildNinjaCacheKey(options: {
-  variant: "serial" | "parallel";
+  buildVariant: "serial" | "parallel";
   optDim?: string;
   msvcHash: string;
-  pipHash: string;
+  rocmClangHash: string;
+  pipToolchainHash: string;
 }): string {
-  if (options.variant === "serial") {
-    return `fa2-ck-gfx1201-serial-v4-msvc${options.msvcHash}-pip${options.pipHash}`;
+  const toolchain = `msvc${options.msvcHash}-rocmClang${options.rocmClangHash}-pipToolchain${options.pipToolchainHash}`;
+
+  if (options.buildVariant === "serial") {
+    return `fa2-ck-gfx1201-serial-v5-${toolchain}`;
   }
 
   if (!options.optDim) {
     throw new Error("optDim is required for parallel ninja cache key");
   }
 
-  return `fa2-ck-gfx1201-parallel-v4-d${options.optDim}-msvc${options.msvcHash}-pip${options.pipHash}`;
+  return `fa2-ck-gfx1201-parallel-v5-d${options.optDim}-${toolchain}`;
 }

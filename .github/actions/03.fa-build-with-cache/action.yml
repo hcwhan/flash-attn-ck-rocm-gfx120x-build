@@ -6,9 +6,9 @@ inputs:
     description: flash-attention source root
     required: true
   cache-key:
-    description: Primary cache key from 05.toolchain-fingerprint (serial-v4 / parallel-v4-d{dim} + toolchain fingerprint)
+    description: Primary cache key from 05.toolchain-fingerprint (serial-v5 / parallel-v5-d{dim} + toolchain fingerprint)
     required: true
-  skip-restore:
+  skip-cache-restore:
     description: When true, skip cache restore (save still gated on cache existence lookup)
     required: false
     default: "false"
@@ -25,10 +25,10 @@ runs:
       with:
         fa-src: ${{ inputs.fa-src }}
         cache-key: ${{ inputs.cache-key }}
-        skip-restore: ${{ inputs.skip-restore }}
+        skip-cache-restore: ${{ inputs.skip-cache-restore }}
 
-    - name: Compile
-      id: compile
+    - name: Run build CLI step
+      id: run-build
       shell: pwsh
       run: ${{ inputs.run }}
 
@@ -36,7 +36,7 @@ runs:
       # On a cache hit after a successful build, remove the old entry so the
       # subsequent save refreshes it (actions/cache/save fails hard on an
       # existing key). On a failed build the old entry is kept untouched.
-      if: always() && steps.compile.conclusion == 'success' && steps.fa-build-cache.outputs.cache-hit == 'true'
+      if: always() && steps.run-build.conclusion == 'success' && steps.fa-build-cache.outputs.cache-hit == 'true'
       shell: pwsh
       env:
         GH_TOKEN: ${{ github.token }}
@@ -53,7 +53,7 @@ runs:
       # Save after a successful build (fresh entry, or refresh after the delete
       # above); on a failed build only save partial objects when no entry exists
       # yet (incremental resume). Never save when the build step never ran.
-      if: always() && steps.compile.conclusion != 'skipped' && (steps.compile.conclusion == 'success' || steps.fa-build-cache.outputs.cache-hit != 'true')
+      if: always() && steps.run-build.conclusion != 'skipped' && (steps.run-build.conclusion == 'success' || steps.fa-build-cache.outputs.cache-hit != 'true')
       uses: "./.github/actions/04.fa-ninja-cache-save"
       with:
         fa-src: ${{ inputs.fa-src }}

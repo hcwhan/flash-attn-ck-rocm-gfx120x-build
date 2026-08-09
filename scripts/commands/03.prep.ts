@@ -3,13 +3,13 @@ import path from "node:path";
 import { run, runCapture } from "../lib/exec.js";
 import { requireLockEnv } from "../lib/require-env.js";
 
-export function runPrep(options: { flashAttentionRoot: string }): void {
+export function runPrep(options: { faSrc: string }): void {
   const flashAttentionRepo = requireLockEnv("FLASH_ATTENTION_REPO");
   const flashAttentionBuildCommit = requireLockEnv("FLASH_ATTENTION_BUILD_COMMIT");
   const flashAttentionBuildCommitDate = requireLockEnv(
     "FLASH_ATTENTION_BUILD_COMMIT_DATE",
   );
-  const root = path.resolve(options.flashAttentionRoot);
+  const root = path.resolve(options.faSrc);
 
   console.log(`Using flash-attention repo: ${flashAttentionRepo}`);
   console.log(

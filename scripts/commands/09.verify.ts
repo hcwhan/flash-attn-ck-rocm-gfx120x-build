@@ -87,15 +87,15 @@ function matchesGlob(name: string, pattern: string): boolean {
 
 export function runVerify(options: {
   distDir: string;
-  releaseVariant: string;
-  ninjaCacheKey?: string;
+  buildVariant: string;
+  cacheKey?: string;
 }): void {
   const expectedWheelPattern = requireLockEnv("EXPECTED_WHEEL_PATTERN");
-  const lockOptDim = requireLockEnv("LockOptDim");
+  const lockOptDim = requireLockEnv("LOCK_OPT_DIM");
   const flashAttentionBuildCommit = requireLockEnv("FLASH_ATTENTION_BUILD_COMMIT");
-  const flashAttnLocalVersion = requireLockEnv("FLASH_ATTN_LOCAL_VERSION");
+  const wheelLocalVersion = requireLockEnv("WHEEL_LOCAL_VERSION");
   const pytorchVersion = requireLockEnv("PYTORCH_VERSION");
-  const hipVersion = requireLockEnv("HIP_VERSION");
+  const rocmVersion = requireLockEnv("ROCM_VERSION");
   const pythonVersion = requireLockEnv("PYTHON_VERSION");
   const gpuArchs = requireLockEnv("GPU_ARCHS");
   const sourceDateEpoch = requireLockEnv("SOURCE_DATE_EPOCH");
@@ -104,16 +104,16 @@ export function runVerify(options: {
   const githubSha = requireGithubActionsEnv("GITHUB_SHA");
   const distDir = path.resolve(options.distDir);
 
-  const releaseVariant = options.releaseVariant.trim().toLowerCase();
-  if (releaseVariant !== "serial" && releaseVariant !== "parallel") {
+  const buildVariant = options.buildVariant.trim().toLowerCase();
+  if (buildVariant !== "serial" && buildVariant !== "parallel") {
     throw new Error(
-      `--release-variant must be 'serial' or 'parallel', got ${options.releaseVariant}`,
+      `--build-variant must be 'serial' or 'parallel', got ${options.buildVariant}`,
     );
   }
 
-  if (releaseVariant === "serial" && !options.ninjaCacheKey?.trim()) {
+  if (buildVariant === "serial" && !options.cacheKey?.trim()) {
     throw new Error(
-      "--ninja-cache-key is required when --release-variant serial",
+      "--cache-key is required when --build-variant serial",
     );
   }
 
@@ -150,7 +150,7 @@ export function runVerify(options: {
     WHEEL_INSPECT_CODE,
     whlPath,
     lockOptDim,
-    flashAttnLocalVersion,
+    wheelLocalVersion,
   ]);
 
   const whlStat = statSync(whlPath);
@@ -159,18 +159,21 @@ export function runVerify(options: {
     sha256: sha256Hex,
     size_bytes: whlStat.size,
     flash_attention_build_commit: flashAttentionBuildCommit,
-    pytorch: pytorchVersion,
-    hip: hipVersion,
+    flash_attention_build_commit_date: requireLockEnv(
+      "FLASH_ATTENTION_BUILD_COMMIT_DATE",
+    ),
     python: pythonVersion,
+    pytorch: pytorchVersion,
+    rocm: rocmVersion,
     gpu_archs: gpuArchs,
     opt_dim: lockOptDim,
-    flash_attn_local_version: flashAttnLocalVersion,
+    wheel_local_version: wheelLocalVersion,
     source_date_epoch: Number(sourceDateEpoch),
-    build_variant: releaseVariant,
-    github_run_id: githubRunId,
-    github_run_number: githubRunNumber,
-    repository_commit: githubSha,
-    ninja_cache_key: options.ninjaCacheKey?.trim() ?? null,
+    build_variant: buildVariant,
+    build_cache_key: options.cacheKey?.trim() ?? null,
+    build_github_run_id: githubRunId,
+    build_github_run_number: githubRunNumber,
+    build_repository_commit: githubSha,
   };
 
   console.log(`Wheel SHA256: ${sha256Hex}`);
@@ -185,19 +188,19 @@ export function runVerify(options: {
       "import sys",
       "import torch",
       "expected_pytorch = sys.argv[1]",
-      "expected_hip = sys.argv[2]",
+      "expected_rocm = sys.argv[2]",
       "if not torch._C._GLIBCXX_USE_CXX11_ABI:",
       "    raise SystemExit('ERROR: _GLIBCXX_USE_CXX11_ABI is False; wheel requires cxx11abiTRUE')",
       "if torch.__version__ != expected_pytorch:",
       "    raise SystemExit(f'ERROR: torch version mismatch: {torch.__version__!r} != {expected_pytorch!r}')",
-      "if torch.version.hip != expected_hip:",
-      "    raise SystemExit(f'ERROR: hip version mismatch: {torch.version.hip!r} != {expected_hip!r}')",
+      "if torch.version.hip != expected_rocm:",
+      "    raise SystemExit(f'ERROR: rocm version mismatch: {torch.version.hip!r} != {expected_rocm!r}')",
       "print('OK torch', torch.__version__)",
-      "print('OK hip', torch.version.hip)",
+      "print('OK rocm', torch.version.hip)",
       "print('OK CXX11_ABI', torch._C._GLIBCXX_USE_CXX11_ABI)",
     ].join("\n"),
     pytorchVersion,
-    hipVersion,
+    rocmVersion,
   ]);
 
   console.log("=== flash_attn extension ===");

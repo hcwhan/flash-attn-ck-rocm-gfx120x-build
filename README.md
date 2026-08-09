@@ -26,7 +26,7 @@
 | `flash_attention_min_commit` | gfx1201 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**lock 内人类可读参考** |
 | `flash_attention_build_commit_date` | 上述 commit 的 UTC 时间；解析为 `SOURCE_DATE_EPOCH` 固定 wheel zip 时间戳；PE 由 patch 注入 link `/Brepro`；**升级 commit 时须同步更新** |
 | `expected_wheel_pattern` | smoke test 校验 wheel 文件名 glob |
-| `wheel_local_version` | wheel 版本号后的 `+local` 标签（注入 `FLASH_ATTN_LOCAL_VERSION`） |
+| `wheel_local_version` | wheel 版本号后的 `+local` 标签（lock env `WHEEL_LOCAL_VERSION`；wheel 时映射 upstream `FLASH_ATTN_LOCAL_VERSION`） |
 | `wheel_artifact_name` | GitHub Actions 发布的 artifact 名称 |
 | `release_tag_prefix` | Release tag 前缀（最终 tag = `{prefix}-{variant}-build{run_number}`，variant 来自 workflow，如 `serial` / `parallel`） |
 | `release_name` | Release 标题 |
@@ -60,8 +60,8 @@ ComfyUI **推理专用** wheel：
 
 | Workflow | 用途 | 触发 |
 |----------|------|------|
-| **Build FlashAttention CK serial (Windows gfx1201)** | 单 job 全量编译 + cache（`serial-v4`） | **仅手动** |
-| **Build FlashAttention CK parallel (Windows gfx1201)** | OPT_DIM 分片 compile + link（`parallel-v4-d{dim}`） | **仅手动** |
+| **Build FlashAttention CK serial (Windows gfx1201)** | 单 job 全量编译 + cache（`serial-v5`） | **仅手动** |
+| **Build FlashAttention CK parallel (Windows gfx1201)** | OPT_DIM 分片 compile + link（`parallel-v5-d{dim}`） | **仅手动** |
 
 > 推送到 `main` **不会**自动触发编译。
 
@@ -78,7 +78,7 @@ ComfyUI **推理专用** wheel：
 | Job | 作用 | 超时 |
 |-----|------|------|
 | `prep-fa-src` | clone + patch，上传源码 artifact | 45 min |
-| `build` | toolchain、cache、`npx tsx scripts/cli.ts 06.compile` + `08.wheel`（全量） | 6 h |
+| `compile-full` | toolchain、cache、`npx tsx scripts/cli.ts 06.compile` + `08.wheel`（全量） | 6 h |
 
 ### 并行（`build-fa2-ck-gfx1201-parallel.yml`）
 
@@ -88,7 +88,7 @@ ComfyUI **推理专用** wheel：
 | `compile-d32` … `d256` | 各编一个 OPT_DIM shard，上传 `.obj` | 各 6 h |
 | `link-wheel` | 合并 obj + link + 打 wheel + CPU smoke test | 6 h |
 
-- Cache key 含工具链指纹（MSVC 工具集 + ROCm clang + pip 工具链版本）；**仅精确匹配**（无 `restore-keys`）。串行 `fa2-ck-gfx1201-serial-v4-msvc{hash}-pip{hash}`，并行 `fa2-ck-gfx1201-parallel-v4-d{dim}-msvc{hash}-pip{hash}`，互不共用。
+- Cache key 含三段工具链指纹（MSVC 工具集 / ROCm clang / pip 工具链）；**仅精确匹配**（无 `restore-keys`）。串行 `fa2-ck-gfx1201-serial-v5-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，并行 `fa2-ck-gfx1201-parallel-v5-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，互不共用。
 - 四 shard 各编 shared obj；link 仅使用 **lock `opt_dim` 第一档**（当前 `32`）的 shared obj。
 
 ### 构建阶段
@@ -144,7 +144,7 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 | 检查 | 脚本 |
 |------|------|
-| CI smoke test（CPU） | `npx tsx scripts/cli.ts 09.verify ... --release-variant serial --ninja-cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"` |
+| CI smoke test（CPU） | `npx tsx scripts/cli.ts 09.verify ... --build-variant serial --cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"` |
 | parallel link API dispatch 重编校验 | `build/build-fa-steps.py`（merge skip + ninja 前后断言） |
 | 部署前 GPU smoke test（gfx1201 真机） | `python test/gpu-smoke-test.py -w .` |
 

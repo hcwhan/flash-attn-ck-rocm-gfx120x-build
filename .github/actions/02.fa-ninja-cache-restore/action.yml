@@ -1,5 +1,5 @@
 name: Restore FA ninja build cache
-description: Restore flash-attention build/ incremental cache (exact cache-key match only; no cross-commit restore-keys fallback)
+description: Restore flash-attention build/ incremental cache (exact cache-key match only; no restore-keys fallback)
 
 inputs:
   fa-src:
@@ -8,7 +8,7 @@ inputs:
   cache-key:
     description: Primary cache key from 05.toolchain-fingerprint
     required: true
-  skip-restore:
+  skip-cache-restore:
     description: When true, skip cache restore but still look up cache existence (used to gate save)
     required: false
     default: "false"
@@ -25,7 +25,7 @@ runs:
   using: composite
   steps:
     - name: Restore ninja incremental build cache
-      if: inputs.skip-restore != 'true'
+      if: inputs.skip-cache-restore != 'true'
       uses: actions/cache/restore@v6
       id: cache-restore
       with:
@@ -33,7 +33,7 @@ runs:
         key: ${{ inputs.cache-key }}
 
     - name: Lookup cache existence (restore skipped)
-      if: inputs.skip-restore == 'true'
+      if: inputs.skip-cache-restore == 'true'
       uses: actions/cache/restore@v6
       id: cache-lookup
       with:
@@ -45,7 +45,7 @@ runs:
       id: fa-build-cache
       shell: pwsh
       run: |
-        if ('${{ inputs.skip-restore }}' -eq 'true') {
+        if ('${{ inputs.skip-cache-restore }}' -eq 'true') {
           Write-Host "Cache restore skipped by workflow input; save gated on lookup"
           "cache-primary-key=${{ inputs.cache-key }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "cache-hit=${{ steps.cache-lookup.outputs.cache-hit }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8

@@ -23,21 +23,21 @@ export function initBuildEnv(options: { optDim: string }): void {
 
   const llvmBin = path.join(coreRoot, "lib", "llvm", "bin");
   const rocmBin = path.join(develRoot, "bin");
-  const hipInclude = path.join(develRoot, "include");
+  const rocmInclude = path.join(develRoot, "include");
   const deviceLibPath = path.join(coreRoot, "lib", "llvm", "amdgcn", "bitcode");
 
   process.env.ROCM_HOME = develRoot;
   process.env.ROCM_PATH = develRoot;
   process.env.HIP_PATH = develRoot;
-  process.env.HIP_INCLUDE_PATH = hipInclude;
+  process.env.HIP_INCLUDE_PATH = rocmInclude;
   process.env.HIP_DEVICE_LIB_PATH = deviceLibPath;
   process.env.DEVICE_LIB_PATH = deviceLibPath;
   process.env.CPATH = process.env.CPATH
-    ? `${hipInclude};${process.env.CPATH}`
-    : hipInclude;
+    ? `${rocmInclude};${process.env.CPATH}`
+    : rocmInclude;
   process.env.INCLUDE = process.env.INCLUDE
-    ? `${hipInclude};${process.env.INCLUDE}`
-    : hipInclude;
+    ? `${rocmInclude};${process.env.INCLUDE}`
+    : rocmInclude;
   process.env.PATH = `${llvmBin};${rocmBin};${process.env.PATH ?? ""}`;
   process.env.CC = "clang-cl";
   process.env.CXX = "clang-cl";
@@ -55,7 +55,7 @@ export function initBuildEnv(options: { optDim: string }): void {
 
   run(PYTHON, [
     "-c",
-    "import torch; print('torch', torch.__version__); print('hip', torch.version.hip); print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)",
+    "import torch; print('torch', torch.__version__); print('rocm', torch.version.hip); print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)",
   ]);
 
   console.log(
