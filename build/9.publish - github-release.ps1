@@ -6,7 +6,9 @@ param(
     [string]$WorkspaceRoot,
 
     [Parameter(Mandatory = $true)]
-    [string]$WorkflowName
+    [string]$WorkflowName,
+
+    [string]$ReleaseVariant = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,7 +26,22 @@ if ($whls.Count -ne 1) {
 }
 $whl = $whls[0]
 
-$tag = "$($env:RELEASE_TAG_PREFIX)-build$($env:GITHUB_RUN_NUMBER)"
+$variantSlug = ""
+if ($ReleaseVariant) {
+    $variantSlug = ($ReleaseVariant.ToLower() -replace '[^a-z0-9]+', '-').Trim('-')
+    if (-not $variantSlug) {
+        throw "ReleaseVariant '$ReleaseVariant' did not produce a valid slug"
+    }
+}
+
+if ($variantSlug) {
+    $tag = "$($env:RELEASE_TAG_PREFIX)-$variantSlug-build$($env:GITHUB_RUN_NUMBER)"
+    $displayName = "$($env:RELEASE_NAME) ($ReleaseVariant)"
+} else {
+    $tag = "$($env:RELEASE_TAG_PREFIX)-build$($env:GITHUB_RUN_NUMBER)"
+    $displayName = $env:RELEASE_NAME
+}
+$releaseTitle = "$displayName (build $($env:GITHUB_RUN_NUMBER))"
 $bodyPath = Join-Path $env:RUNNER_TEMP "release-body.md"
 
 $manifestPath = Join-Path $DistDir "wheel.manifest.json"
@@ -46,6 +63,7 @@ $body = @"
 | 项 | 值 |
 |----|-----|
 | Workflow | $WorkflowName |
+| Build source | $(if ($ReleaseVariant) { $ReleaseVariant } else { 'default' }) |
 | Run | $($env:GITHUB_RUN_NUMBER) |
 | Repository commit | $($env:GITHUB_SHA) |
 | Wheel | $($whl.Name) |
@@ -61,7 +79,8 @@ if (-not $env:GITHUB_OUTPUT) {
 "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 "body_path=$bodyPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 "prerelease=$($env:RELEASE_PRERELEASE)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-"release_name=$($env:RELEASE_NAME)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+"release_name=$displayName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+"release_title=$releaseTitle" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
 Write-Host "Release tag: $tag"
 Write-Host "Release body: $bodyPath"

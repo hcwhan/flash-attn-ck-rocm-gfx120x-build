@@ -106,3 +106,4 @@ jobs:
         with:
           dist-dir: ${{ github.workspace }}/dist
           workflow-name: ${{ github.workflow }}
+          release-variant: serial

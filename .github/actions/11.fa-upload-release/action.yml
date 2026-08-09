@@ -8,6 +8,10 @@ inputs:
   workflow-name:
     description: Workflow display name for release notes
     required: true
+  release-variant:
+    description: Build source slug for tag/title (e.g. serial, parallel)
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -16,16 +20,17 @@ runs:
       id: release
       shell: pwsh
       run: |
-        . "$env:GITHUB_WORKSPACE\build\10.publish - github-release.ps1" `
+        . "$env:GITHUB_WORKSPACE\build\9.publish - github-release.ps1" `
           -DistDir "${{ inputs.dist-dir }}" `
           -WorkspaceRoot $env:GITHUB_WORKSPACE `
-          -WorkflowName "${{ inputs.workflow-name }}"
+          -WorkflowName "${{ inputs.workflow-name }}" `
+          -ReleaseVariant "${{ inputs.release-variant }}"
 
     - name: Publish GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.release.outputs.tag }}
-        name: ${{ steps.release.outputs.release_name }} (build ${{ github.run_number }})
+        name: ${{ steps.release.outputs.release_title }}
         body_path: ${{ steps.release.outputs.body_path }}
         files: |
           ${{ inputs.dist-dir }}/*.whl

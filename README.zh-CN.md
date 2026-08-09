@@ -28,7 +28,7 @@
 | `expected_wheel_pattern` | smoke test 校验 wheel 文件名 glob |
 | `wheel_local_version` | wheel 版本号后的 `+local` 标签（注入 `FLASH_ATTN_LOCAL_VERSION`） |
 | `wheel_artifact_name` | GitHub Actions 发布的 artifact 名称 |
-| `release_tag_prefix` | Release tag 前缀（最终 tag = `{prefix}-build{run_number}`） |
+| `release_tag_prefix` | Release tag 前缀（最终 tag = `{prefix}-{variant}-build{run_number}`，variant 来自 workflow，如 `serial` / `parallel`） |
 | `release_name` | Release 标题 |
 | `release_prerelease` | `"true"` / `"false"`，是否预发布 |
 
@@ -116,7 +116,12 @@ env 统一经 `base/init-fa-build-env.ps1`。
 
 Artifact：**`wheel_artifact_name`**（Actions 短期下载）
 
-GitHub Release（构建成功后自动上传，tag 形如 `fa2-ck-gfx1201-rocm714-build123`）：
+GitHub Release（构建成功后自动上传；serial / parallel 使用不同 tag 与标题）：
+
+| Workflow | Tag 示例 | Release 标题示例 |
+|----------|----------|------------------|
+| serial | `fa2-ck-gfx1201-rocm714-serial-build123` | FlashAttention 2 CK gfx1201 Windows (serial) (build 123) |
+| parallel | `fa2-ck-gfx1201-rocm714-parallel-build123` | FlashAttention 2 CK gfx1201 Windows (parallel) (build 123) |
 
 - `flash_attn-*.whl`
 - `flash_attn-*.whl.sha256`
@@ -124,7 +129,8 @@ GitHub Release（构建成功后自动上传，tag 形如 `fa2-ck-gfx1201-rocm71
 
 ```powershell
 gh release list
-gh release download fa2-ck-gfx1201-rocm714-build123 -D .\dist
+gh release download fa2-ck-gfx1201-rocm714-serial-build123 -D .\dist
+gh release download fa2-ck-gfx1201-rocm714-parallel-build123 -D .\dist
 ```
 
 预期文件名（`expected_wheel_pattern`）：
@@ -137,11 +143,11 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 | 检查 | 脚本 |
 |------|------|
-| CI smoke test（CPU + gfx1201 可用时 GPU） | `build/8.verify - wheel-smoke-test.ps1` |
+| CI smoke test（CPU） | `build/8.verify - wheel-smoke-test.ps1` |
 | parallel link API dispatch 重编校验 | `base/build-fa-steps.py`（merge skip + ninja 前后断言） |
-| 部署前 GPU smoke test（gfx1201 真机） | `build/9.test - gpu-smoke-test.ps1`（亦被 8.verify 在检测到 gfx1201 时调用） |
+| 部署前 GPU smoke test（gfx1201 真机） | `test/gpu-smoke-test.ps1` |
 
-Smoke test：wheel 文件名/结构（.pyd 体积、OPT_DIM kernel 符号、METADATA）→ pip 安装 → import flash_attn_2_cuda；parallel link 另在 merge 阶段断言 3 个 `fmha_*_api.obj` 被 skip 并由 ninja 重编。检测到 gfx1201 时同脚本续跑 GPU fwd + kvcache（appendkv/splitkv）。
+Smoke test：wheel 文件名/结构（.pyd 体积、OPT_DIM kernel 符号、METADATA）→ pip 安装 → import flash_attn_2_cuda；parallel link 另在 merge 阶段断言 3 个 `fmha_*_api.obj` 被 skip 并由 ninja 重编。GPU fwd + kvcache 见 `test/gpu-smoke-test.ps1`（部署前在真机手动跑）。
 
 ## 安装到 ComfyUI
 

@@ -31,8 +31,9 @@
 | `5.compile - compile-opt-dim.ps1` | 任意 `-OptDim` 编译入口（serial 全量 / parallel 单 dim） |
 | `6.shard - validate-shard.ps1` | 校验 compile 产物 .obj（含 `_d{dim}_` kernel）并输出 `RELEASE_DIR`（parallel 专用；workflow 内单独调） |
 | `7.wheel - build-bdist-wheel.ps1` | 设 `FLASH_ATTENTION_FORCE_BUILD`，调 link 脚本 |
-| `8.verify - wheel-smoke-test.ps1` | CI CPU smoke test；gfx1201 真机可用时同脚本续跑 GPU fwd+kvcache |
-| `9.test - gpu-smoke-test.ps1` | 部署前 / smoke 内 GPU 校验（fwd + kvcache） |
+| `8.verify - wheel-smoke-test.ps1` | CI CPU smoke test（wheel 结构 / pip 安装 / import） |
+| `9.publish - github-release.ps1` | 准备 Release 元数据（tag / body；`11.fa-upload-release` 调用） |
+| `test/gpu-smoke-test.ps1` | 部署前 GPU 校验（gfx1201 真机；fwd + kvcache，CI 不跑） |
 
 规则：lock 经 `read-version-lock.ps1`（唯一；或 get-build-paths/init-fa-build-env 间接）；ROCm 路径发现只经 `get-rocm-sdk-paths.ps1`；编译/打 wheel 只经 `build-fa-steps.py`。
 
@@ -53,7 +54,7 @@
 | `08.fa-build-with-cache` | 07+编译+09 带缓存构建 |
 | `09.fa-ninja-cache-save` | 保存 ninja 增量缓存 |
 | `10.fa-smoke-test-upload-wheel` | 冒烟测试并上传 wheel |
-| `11.fa-upload-release` | 上传 GitHub Release（tag 来自 lock） |
+| `11.fa-upload-release` | 上传 GitHub Release（tag = `{prefix}-{variant}-build{N}`，variant 由 workflow 传入） |
 
 缓存 key 含仓库 commit-id（覆盖 build 脚本/lock/action 全部仓内输入）+ 工具链指纹（MSVC+clang，镜像更新）+ pip 工具链指纹（pip/setuptools/wheel/ninja/packaging/psutil，运行时 `pip freeze` 观测）。Workflow `env`：`MAX_JOBS`/`FA_SRC`/`FA_ARTIFACT`/`FA_STAGING`/`SKIP_CACHE_RESTORE`。
 
@@ -89,7 +90,7 @@ prep clone `flash_attention_build_commit`；不参与逻辑的字段不得进脚
 
 **不要添加：** 双源校验、manifest 读回自证、`FA_SKIP_*`、多候选目录排序、git 考古、薄 one-liner 包装、排障用 build-log artifact、lock 只读字段进逻辑。
 
-**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 3 个 `fmha_*_api.obj`；link merge skip + ninja API 重编三重校验；patch before-state（含 mha_bwd guard 前置校验）；smoke 产物校验（.pyd 体积 / CXX11_ABI / dim 符号 / METADATA）；gfx1201 真机可用时 smoke 跑 GPU fwd+kvcache；cache 精确 key 含仓库 commit-id。
+**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 3 个 `fmha_*_api.obj`；link merge skip + ninja API 重编三重校验；patch before-state（含 mha_bwd guard 前置校验）；smoke 产物校验（.pyd 体积 / CXX11_ABI / dim 符号 / METADATA）；cache 精确 key 含仓库 commit-id。
 
 **改代码前：** 连续 CI 是否必发生？信息是否已在 lock/env/上游 output？能否复用上表入口？能删则删。
 
@@ -97,4 +98,4 @@ prep clone `flash_attention_build_commit`；不参与逻辑的字段不得进脚
 
 - 升级 FA：改 `flash_attention_build_commit`
 - bump PyTorch/ROCm：同步 `expected_wheel_pattern`、`wheel_local_version` 等
-- 部署前：`9.test - gpu-smoke-test.ps1`（gfx1201 真机）
+- 部署前：`test/gpu-smoke-test.ps1`（gfx1201 真机，需已 pip install wheel）
