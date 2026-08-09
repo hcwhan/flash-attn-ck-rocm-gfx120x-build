@@ -3,19 +3,19 @@ description: Python, MSVC, PyTorch ROCm, and rocm[devel] for flash-attn Windows 
 
 inputs:
   python-version:
-    description: Python version
+    description: Python version (VERSION.lock.json toolchain.python)
     required: true
   pytorch-version:
-    description: PyTorch version string
+    description: PyTorch version string (VERSION.lock.json toolchain.pytorch)
     required: true
   torch-device-extra:
-    description: torch[device-*] extra name (VERSION.lock.json torch_device_extra)
+    description: torch[device-*] extra name (VERSION.lock.json toolchain.torch_device_extra)
     required: true
   rocm-index:
-    description: pip index URL for ROCm wheels
+    description: pip index URL for ROCm wheels (VERSION.lock.json toolchain.rocm_index)
     required: true
   rocm-version:
-    description: rocm[devel] package version (VERSION.lock.json rocm)
+    description: rocm[devel] package version (VERSION.lock.json toolchain.rocm)
     required: true
 
 runs:

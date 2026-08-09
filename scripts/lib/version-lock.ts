@@ -21,21 +21,31 @@ const optDimSchema = z
   }, "must be comma-separated positive integers (e.g. 32,64,128,256)");
 
 const versionLockSchema = z.object({
-  python: z.string().min(1),
-  pytorch: z.string().min(1),
-  torch_device_extra: z.string().min(1),
-  rocm: z.string().min(1),
-  rocm_index: z.string().min(1),
-  gpu_archs: z.string().min(1),
-  opt_dim: optDimSchema,
-  flash_attention_repo: z.string().min(1),
-  flash_attention_build_commit: gitShaSchema,
-  flash_attention_build_commit_date: z.string().min(1),
-  expected_wheel_pattern: z.string().min(1),
-  wheel_local_version: z.string().min(1),
-  wheel_artifact_name: z.string().min(1),
-  release_tag_prefix: z.string().min(1),
-  release_name: z.string().min(1),
+  toolchain: z.object({
+    python: z.string().min(1),
+    pytorch: z.string().min(1),
+    torch_device_extra: z.string().min(1),
+    rocm_index: z.string().min(1),
+    rocm: z.string().min(1),
+  }),
+  flash_attention: z.object({
+    repo: z.string().min(1),
+    min_commit: gitShaSchema,
+    build_commit: gitShaSchema,
+    build_commit_date: z.string().min(1),
+  }),
+  compile: z.object({
+    gpu_archs: z.string().min(1),
+    opt_dim: optDimSchema,
+  }),
+  wheel: z.object({
+    wheel_local_version: z.string().min(1),
+    wheel_artifact_name: z.string().min(1),
+  }),
+  release: z.object({
+    release_tag_prefix: z.string().min(1),
+    release_title_prefix: z.string().min(1),
+  }),
 });
 
 export type VersionLockVars = {
@@ -56,8 +66,26 @@ export type VersionLockVars = {
   FLASH_ATTENTION_BUILD_COMMIT_DATE: string;
   SOURCE_DATE_EPOCH: string;
   RELEASE_TAG_PREFIX: string;
-  RELEASE_NAME: string;
+  RELEASE_TITLE_PREFIX: string;
 };
+
+function pythonWheelTag(python: string): string {
+  const [major, minor = ""] = python.split(".");
+  if (!major || !/^\d+$/.test(major) || (minor && !/^\d+$/.test(minor))) {
+    throw new Error(
+      `VERSION.lock.json toolchain.python must look like major.minor (e.g. 3.12), got ${python}`,
+    );
+  }
+  return `cp${major}${minor}`;
+}
+
+export function expectedWheelPattern(
+  localVersion: string,
+  python: string,
+): string {
+  const tag = pythonWheelTag(python);
+  return `flash_attn-*+${localVersion}-${tag}-${tag}-win_amd64.whl`;
+}
 
 function normalizeCommitDate(raw: string): {
   isoUtc: string;
@@ -66,21 +94,21 @@ function normalizeCommitDate(raw: string): {
   const trimmed = raw.trim();
   if (!trimmed) {
     throw new Error(
-      "VERSION.lock.json flash_attention_build_commit_date is missing",
+      "VERSION.lock.json flash_attention.build_commit_date is missing",
     );
   }
 
   const date = new Date(trimmed);
   if (Number.isNaN(date.getTime())) {
     throw new Error(
-      `VERSION.lock.json flash_attention_build_commit_date is not valid ISO 8601: ${raw}`,
+      `VERSION.lock.json flash_attention.build_commit_date is not valid ISO 8601: ${raw}`,
     );
   }
 
   const epochSeconds = Math.floor(date.getTime() / 1000);
   if (epochSeconds < 1) {
     throw new Error(
-      "VERSION.lock.json flash_attention_build_commit_date must map to a positive Unix epoch",
+      "VERSION.lock.json flash_attention.build_commit_date must map to a positive Unix epoch",
     );
   }
 
@@ -99,34 +127,39 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
 
   const lock = versionLockSchema.parse(parsed);
 
-  const optDimList = lock.opt_dim
+  const optDimList = lock.compile.opt_dim
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
 
   const { isoUtc, epochSeconds } = normalizeCommitDate(
-    lock.flash_attention_build_commit_date,
+    lock.flash_attention.build_commit_date,
   );
 
+  const wheelLocalVersion = lock.wheel.wheel_local_version;
+
   const vars: VersionLockVars = {
-    PYTHON_VERSION: lock.python,
-    PYTORCH_VERSION: lock.pytorch,
-    TORCH_DEVICE_EXTRA: lock.torch_device_extra,
-    ROCM_INDEX: lock.rocm_index,
-    GPU_ARCHS: lock.gpu_archs,
-    ROCM_VERSION: lock.rocm,
-    LOCK_OPT_DIM: lock.opt_dim,
+    PYTHON_VERSION: lock.toolchain.python,
+    PYTORCH_VERSION: lock.toolchain.pytorch,
+    TORCH_DEVICE_EXTRA: lock.toolchain.torch_device_extra,
+    ROCM_INDEX: lock.toolchain.rocm_index,
+    GPU_ARCHS: lock.compile.gpu_archs,
+    ROCM_VERSION: lock.toolchain.rocm,
+    LOCK_OPT_DIM: lock.compile.opt_dim,
     PRIMARY_DIM: optDimList[0]!,
     optDimList,
-    WHEEL_ARTIFACT_NAME: lock.wheel_artifact_name,
-    EXPECTED_WHEEL_PATTERN: lock.expected_wheel_pattern,
-    WHEEL_LOCAL_VERSION: lock.wheel_local_version,
-    FLASH_ATTENTION_REPO: lock.flash_attention_repo,
-    FLASH_ATTENTION_BUILD_COMMIT: lock.flash_attention_build_commit,
+    WHEEL_ARTIFACT_NAME: lock.wheel.wheel_artifact_name,
+    EXPECTED_WHEEL_PATTERN: expectedWheelPattern(
+      wheelLocalVersion,
+      lock.toolchain.python,
+    ),
+    WHEEL_LOCAL_VERSION: wheelLocalVersion,
+    FLASH_ATTENTION_REPO: lock.flash_attention.repo,
+    FLASH_ATTENTION_BUILD_COMMIT: lock.flash_attention.build_commit,
     FLASH_ATTENTION_BUILD_COMMIT_DATE: isoUtc,
     SOURCE_DATE_EPOCH: String(epochSeconds),
-    RELEASE_TAG_PREFIX: lock.release_tag_prefix,
-    RELEASE_NAME: lock.release_name,
+    RELEASE_TAG_PREFIX: lock.release.release_tag_prefix,
+    RELEASE_TITLE_PREFIX: lock.release.release_title_prefix,
   };
 
   console.log(
@@ -136,7 +169,9 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
   return vars;
 }
 
-export function versionLockEnvRecord(vars: VersionLockVars): Record<string, string> {
+export function versionLockEnvRecord(
+  vars: VersionLockVars,
+): Record<string, string> {
   const { optDimList: _optDimList, ...envVars } = vars;
   return envVars;
 }

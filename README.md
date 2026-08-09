@@ -14,24 +14,25 @@
 | 系统 | Windows |
 | Python | 3.12 |
 | PyTorch | `2.12.0+rocm7.14.0` |
-| flash-attention | `VERSION.lock.json` **`flash_attention_build_commit`** |
+| flash-attention | `VERSION.lock.json` **`flash_attention.build_commit`** |
 | Runner | `windows-2022`（GitHub 托管） |
 
-### FlashAttention 源码 pin（`VERSION.lock.json`）
+### `VERSION.lock.json` 分组
 
-| 字段 | 作用 |
-|------|------|
-| `flash_attention_repo` | upstream git 地址 |
-| `flash_attention_build_commit` | 每次构建精确 clone 的 commit；**升级 FA 时改此字段及 `flash_attention_build_commit_date`** |
-| `flash_attention_min_commit` | gfx1201 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**lock 内人类可读参考** |
-| `flash_attention_build_commit_date` | 上述 commit 的 UTC 时间；解析为 `SOURCE_DATE_EPOCH` 固定 wheel zip 时间戳；PE 由 patch 注入 link `/Brepro`；**升级 commit 时须同步更新** |
-| `expected_wheel_pattern` | smoke test 校验 wheel 文件名 glob |
-| `wheel_local_version` | wheel 版本号后的 `+local` 标签（lock env `WHEEL_LOCAL_VERSION`；wheel 时映射 upstream `FLASH_ATTN_LOCAL_VERSION`） |
-| `wheel_artifact_name` | GitHub Actions 发布的 artifact 名称 |
-| `release_tag_prefix` | Release tag 前缀（最终 tag = `{prefix}-{variant}-build{run_number}`，variant 来自 workflow，如 `serial` / `parallel`） |
-| `release_name` | Release 标题 |
+| 分组 | 字段 | 作用 |
+|------|------|------|
+| `toolchain` | `python`、`pytorch`、`torch_device_extra`、`rocm_index`、`rocm` | pip 工具链 pin |
+| `flash_attention` | `repo`、`build_commit`、`build_commit_date` | 每次构建精确 clone 的 FA 源码；**升级 FA 时改 `build_commit` 与 `build_commit_date`** |
+| `flash_attention` | `min_commit` | gfx1201 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**仅人类可读参考** |
+| `compile` | `gpu_archs`、`opt_dim` | HIP 编译目标与 OPT_DIM 档位 |
+| `wheel` | `wheel_local_version` | wheel 的 `+local` 标签（env `WHEEL_LOCAL_VERSION`；wheel 时映射 upstream `FLASH_ATTN_LOCAL_VERSION`） |
+| `wheel` | `wheel_artifact_name` | GitHub Actions artifact 名称 |
+| `release` | `release_tag_prefix` | Release tag 前缀（`{prefix}-{variant}-build{run_number}`） |
+| `release` | `release_title_prefix` | Release 标题前缀（env `RELEASE_TITLE_PREFIX`） |
 
-规则：CI 始终 clone **`flash_attention_build_commit`**（`fetch` + `checkout FETCH_HEAD`）。
+`EXPECTED_WHEEL_PATTERN` 由 `wheel.wheel_local_version` + `toolchain.python` 在 `version-lock.ts` 推导，不在 lock 中存储。
+
+规则：CI 始终 clone **`flash_attention.build_commit`**（`fetch` + `checkout FETCH_HEAD`）。
 
 ### 适用显卡（`gfx1201`）
 
@@ -48,7 +49,7 @@ ComfyUI **推理专用** wheel：
 
 - CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（无 bwd）
 - **`-DFLASHATTENTION_DISABLE_BACKWARD`**
-- **C++11 ABI `cxx11abiTRUE`**（与 pin 的 PyTorch 一致）
+- **C++11 ABI `cxx11.abi`**（与 pin 的 PyTorch 一致；local tag 见 `wheel.wheel_local_version`）
 - `OPT_DIM=32,64,128,256`
 
 | 范围 | 约计 ninja targets |
@@ -109,7 +110,7 @@ ComfyUI **推理专用** wheel：
 | 并行 compile | `--step compile`（每 shard 一次） | 单 shard |
 | 并行 link | `--step merge-and-wheel` + staging | 全量（env） |
 
-env 统一经 `scripts/lib/init-build-env.ts`（含 `SOURCE_DATE_EPOCH`，取自 `flash_attention_build_commit_date`）。
+env 统一经 `scripts/lib/init-build-env.ts`（含 `SOURCE_DATE_EPOCH`，取自 `flash_attention.build_commit_date`）。
 
 ## 产物
 
@@ -121,8 +122,8 @@ GitHub Release（构建成功后自动上传；serial / parallel 使用不同 ta
 
 | Workflow | Tag 示例 | Release 标题示例 |
 |----------|----------|------------------|
-| serial | `fa2-ck-gfx1201-rocm714-serial-build123` | FlashAttention 2 CK gfx1201 Windows (serial) (build 123) |
-| parallel | `fa2-ck-gfx1201-rocm714-parallel-build123` | FlashAttention 2 CK gfx1201 Windows (parallel) (build 123) |
+| serial | `fa2-ck-gfx1201-cp312-torch2.12.0-rocm7.14.0-serial-build123` | FlashAttention 2 CK gfx1201 Windows (serial) (build 123) |
+| parallel | `fa2-ck-gfx1201-cp312-torch2.12.0-rocm7.14.0-parallel-build123` | FlashAttention 2 CK gfx1201 Windows (parallel) (build 123) |
 
 - `flash_attn-*.whl`
 - `flash_attn-*.whl.sha256`
@@ -130,14 +131,14 @@ GitHub Release（构建成功后自动上传；serial / parallel 使用不同 ta
 
 ```powershell
 gh release list
-gh release download fa2-ck-gfx1201-rocm714-serial-build123 -D .\dist
-gh release download fa2-ck-gfx1201-rocm714-parallel-build123 -D .\dist
+gh release download fa2-ck-gfx1201-cp312-torch2.12.0-rocm7.14.0-serial-build123 -D .\dist
+gh release download fa2-ck-gfx1201-cp312-torch2.12.0-rocm7.14.0-parallel-build123 -D .\dist
 ```
 
-预期文件名（`expected_wheel_pattern`）：
+预期 wheel 文件名（由 `wheel.wheel_local_version` + `toolchain.python` 推导）：
 
 ```text
-flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
+flash_attn-*+torch2.12.0.rocm7.14.0.cxx11.abi-cp312-cp312-win_amd64.whl
 ```
 
 ## 验证

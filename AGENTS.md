@@ -22,11 +22,14 @@
 | 构建模式 | `--build-variant serial\|parallel` | verify / publish / fingerprint 共用 |
 | Ninja cache key | `cache-key` | output / CLI `--cache-key` / manifest `build_cache_key` |
 | shard 产物目录 | `SHARD_RELEASE_DIR` | 07.shard 写入；非 GitHub Release |
-| wheel local tag | `WHEEL_LOCAL_VERSION` | lock `wheel_local_version`；wheel 时映射为 upstream `FLASH_ATTN_LOCAL_VERSION` |
+| wheel local tag | `WHEEL_LOCAL_VERSION` | lock `wheel.wheel_local_version`；wheel 时映射为 upstream `FLASH_ATTN_LOCAL_VERSION` |
+| wheel artifact 名 | `WHEEL_ARTIFACT_NAME` | lock `wheel.wheel_artifact_name` |
+| release tag 前缀 | `RELEASE_TAG_PREFIX` | lock `release.release_tag_prefix` |
+| release title 前缀 | `RELEASE_TITLE_PREFIX` | lock `release.release_title_prefix` |
 | FA 相关 env | `FLASH_ATTENTION_*` | repo / commit / force-build 等 |
 | Python 包名 | `flash_attn` | wheel / import 名；与本仓库目录名 `flash-attn-*` 有意区分 |
 
-**lock → GITHUB_ENV 映射：** `python`→`PYTHON_VERSION`，`pytorch`→`PYTORCH_VERSION`，`torch_device_extra`→`TORCH_DEVICE_EXTRA`，`rocm`→`ROCM_VERSION`，`rocm_index`→`ROCM_INDEX`，`opt_dim`→`LOCK_OPT_DIM`（首档另导出 `PRIMARY_DIM`），`wheel_local_version`→`WHEEL_LOCAL_VERSION`，其余见 `scripts/lib/version-lock.ts`。
+**lock → GITHUB_ENV 映射：** `toolchain.python`→`PYTHON_VERSION`，`toolchain.pytorch`→`PYTORCH_VERSION`，`toolchain.torch_device_extra`→`TORCH_DEVICE_EXTRA`，`toolchain.rocm`→`ROCM_VERSION`，`toolchain.rocm_index`→`ROCM_INDEX`，`compile.opt_dim`→`LOCK_OPT_DIM`（首档另导出 `PRIMARY_DIM`），`compile.gpu_archs`→`GPU_ARCHS`，`flash_attention.repo`→`FLASH_ATTENTION_REPO`，`flash_attention.build_commit`→`FLASH_ATTENTION_BUILD_COMMIT`，`flash_attention.build_commit_date`→`FLASH_ATTENTION_BUILD_COMMIT_DATE`（另导出 `SOURCE_DATE_EPOCH`），`wheel.wheel_local_version`→`WHEEL_LOCAL_VERSION`，`wheel.wheel_artifact_name`→`WHEEL_ARTIFACT_NAME`，`release.release_tag_prefix`→`RELEASE_TAG_PREFIX`，`release.release_title_prefix`→`RELEASE_TITLE_PREFIX`；`EXPECTED_WHEEL_PATTERN` 由 `version-lock.ts` 推导。
 
 **缩写对照：** 仓库 `flash-attn-rocm-gfx1201-build`；cache/release 前缀 `fa2-ck-gfx1201`；源码 artifact `fa-src-patched-gfx1201`；wheel artifact 见 lock `wheel_artifact_name`。
 
@@ -77,9 +80,9 @@
 
 | 读入逻辑 | 仅人类可读 |
 |----------|------------|
-| `flash_attention_build_commit`、`flash_attention_build_commit_date`、`flash_attention_repo`、`opt_dim`、`expected_wheel_pattern`、`wheel_artifact_name`、`python`、`pytorch`、`rocm`、`gpu_archs`… | `flash_attention_min_commit` |
+| `flash_attention.build_commit`、`flash_attention.build_commit_date`、`flash_attention.repo`、`compile.opt_dim`、`compile.gpu_archs`、`wheel.wheel_artifact_name`、`toolchain.*`、`release.*`… | `flash_attention.min_commit` |
 
-prep clone `flash_attention_build_commit` 并校验 author date 与 `flash_attention_build_commit_date` 一致；`SOURCE_DATE_EPOCH` 固定 wheel zip；PE TimeDateStamp 由 patch 注入 link `/Brepro`（内容哈希，serial/parallel 一致）。
+prep clone `flash_attention.build_commit` 并校验 author date 与 `flash_attention.build_commit_date` 一致；`SOURCE_DATE_EPOCH` 固定 wheel zip；PE TimeDateStamp 由 patch 注入 link `/Brepro`（内容哈希，serial/parallel 一致）。
 
 ## 设计决策
 
@@ -106,6 +109,6 @@ prep clone `flash_attention_build_commit` 并校验 author date 与 `flash_atten
 
 ## 维护
 
-- 升级 FA：改 `flash_attention_build_commit` 与 `flash_attention_build_commit_date`
-- bump PyTorch/ROCm：同步 `expected_wheel_pattern`、`wheel_local_version` 等
+- 升级 FA：改 `flash_attention.build_commit` 与 `flash_attention.build_commit_date`
+- bump PyTorch/ROCm：同步 `wheel.wheel_local_version`、`release.release_tag_prefix`、`wheel.wheel_artifact_name` 等
 - 部署前：`python test/gpu-smoke-test.py -w .`（gfx1201 真机，需已 pip install wheel）

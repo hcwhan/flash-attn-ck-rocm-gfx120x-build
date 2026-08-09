@@ -82,9 +82,9 @@ export function runPrep(options: { faSrc: string }): void {
   if (gitAuthorMs !== lockCommitMs) {
     throw new Error(
       [
-        `flash_attention_build_commit_date mismatch for commit ${flashAttentionBuildCommit}.`,
+        `flash_attention.build_commit_date mismatch for commit ${flashAttentionBuildCommit}.`,
         ` lock=${flashAttentionBuildCommitDate} git author=${gitAuthorDate}`,
-        " Update VERSION.lock.json when bumping flash_attention_build_commit.",
+        " Update VERSION.lock.json when bumping flash_attention.build_commit.",
       ].join(""),
     );
   }

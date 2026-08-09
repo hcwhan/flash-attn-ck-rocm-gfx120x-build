@@ -12,7 +12,7 @@ export function runPublish(options: {
   buildVariant: string;
 }): void {
   const releaseTagPrefix = requireLockEnv("RELEASE_TAG_PREFIX");
-  const releaseName = requireLockEnv("RELEASE_NAME");
+  const releaseTitlePrefix = requireLockEnv("RELEASE_TITLE_PREFIX");
   const runNumber = requireGithubActionsEnv("GITHUB_RUN_NUMBER");
   const runnerTemp = requireGithubActionsEnv("RUNNER_TEMP");
   const githubSha = requireGithubActionsEnv("GITHUB_SHA");
@@ -40,7 +40,7 @@ export function runPublish(options: {
 
   const whlName = path.basename(whls[0]!);
   const releaseTag = `${releaseTagPrefix}-${variantSlug}-build${runNumber}`;
-  const displayName = `${releaseName} (${options.buildVariant})`;
+  const displayName = `${releaseTitlePrefix} (${options.buildVariant})`;
   const releaseTitle = `${displayName} (build ${runNumber})`;
   const bodyPath = path.join(runnerTemp, "release-body.md");
 
@@ -49,7 +49,7 @@ export function runPublish(options: {
   const manifestBlock = `\n\n### wheel.manifest.json\n\n\`\`\`json\n${manifestJson}\n\`\`\`\n`;
 
   const body = [
-    `## ${releaseName}`,
+    `## ${releaseTitlePrefix}`,
     "",
     "| Field | Value |",
     "|-------|-------|",

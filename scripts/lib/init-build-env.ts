@@ -47,7 +47,7 @@ export function initBuildEnv(options: { optDim: string }): void {
   process.env.SOURCE_DATE_EPOCH = sourceDateEpoch;
 
   console.log(
-    `SOURCE_DATE_EPOCH=${process.env.SOURCE_DATE_EPOCH} (flash_attention_build_commit_date=${flashAttentionBuildCommitDate})`,
+    `SOURCE_DATE_EPOCH=${process.env.SOURCE_DATE_EPOCH} (flash_attention.build_commit_date=${flashAttentionBuildCommitDate})`,
   );
   console.log(`GPU_ARCHS=${process.env.GPU_ARCHS}`);
   console.log(`OPT_DIM=${process.env.OPT_DIM}`);

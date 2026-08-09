@@ -190,7 +190,7 @@ export function runVerify(options: {
       "expected_pytorch = sys.argv[1]",
       "expected_rocm = sys.argv[2]",
       "if not torch._C._GLIBCXX_USE_CXX11_ABI:",
-      "    raise SystemExit('ERROR: _GLIBCXX_USE_CXX11_ABI is False; wheel requires cxx11abiTRUE')",
+      "    raise SystemExit('ERROR: _GLIBCXX_USE_CXX11_ABI is False; wheel requires cxx11.abi local tag')",
       "if torch.__version__ != expected_pytorch:",
       "    raise SystemExit(f'ERROR: torch version mismatch: {torch.__version__!r} != {expected_pytorch!r}')",
       "if torch.version.hip != expected_rocm:",

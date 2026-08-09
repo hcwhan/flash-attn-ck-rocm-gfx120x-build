@@ -10,7 +10,7 @@ import torch
 from flash_attn import flash_attn_func, flash_attn_with_kvcache
 
 
-def load_lock(workspace_root: Path) -> dict[str, str]:
+def load_lock(workspace_root: Path) -> dict:
     lock_path = workspace_root / "VERSION.lock.json"
     with lock_path.open(encoding="utf-8") as handle:
         return json.load(handle)
@@ -19,7 +19,7 @@ def load_lock(workspace_root: Path) -> dict[str, str]:
 def parse_opt_dims(opt_dim: str) -> list[int]:
     dims = [int(part.strip()) for part in opt_dim.split(",") if part.strip()]
     if not dims:
-        raise SystemExit("VERSION.lock.json opt_dim is missing or empty")
+        raise SystemExit("VERSION.lock.json compile.opt_dim is missing or empty")
     return dims
 
 
@@ -34,10 +34,21 @@ def main() -> None:
     args = parser.parse_args()
 
     lock = load_lock(Path(args.workspace_root).resolve())
-    expected_arch = lock["gpu_archs"].strip().lower()
-    opt_dims = parse_opt_dims(lock["opt_dim"])
+    compile_lock = lock.get("compile")
+    if not isinstance(compile_lock, dict):
+        raise SystemExit("VERSION.lock.json compile section is missing")
 
-    print(f"GPU smoke test on {lock['gpu_archs']} (requires ROCm PyTorch + GPU)")
+    gpu_archs = compile_lock.get("gpu_archs")
+    opt_dim = compile_lock.get("opt_dim")
+    if not isinstance(gpu_archs, str) or not gpu_archs.strip():
+        raise SystemExit("VERSION.lock.json compile.gpu_archs is missing")
+    if not isinstance(opt_dim, str) or not opt_dim.strip():
+        raise SystemExit("VERSION.lock.json compile.opt_dim is missing")
+
+    expected_arch = gpu_archs.strip().lower()
+    opt_dims = parse_opt_dims(opt_dim)
+
+    print(f"GPU smoke test on {gpu_archs} (requires ROCm PyTorch + GPU)")
     print(f"OPT_DIM tiers: {', '.join(str(dim) for dim in opt_dims)}")
 
     if not torch.cuda.is_available():

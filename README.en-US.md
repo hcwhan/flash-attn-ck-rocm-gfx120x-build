@@ -14,26 +14,29 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx
 | OS | Windows |
 | Python | 3.12 |
 | PyTorch | `2.12.0+rocm7.14.0` |
-| flash-attention | `VERSION.lock.json` **`flash_attention_build_commit`** |
+| flash-attention | `VERSION.lock.json` **`flash_attention.build_commit`** |
 | Runner | `windows-2022` (hosted) |
 
-### Source pins (`VERSION.lock.json`)
+### `VERSION.lock.json` sections
 
-| Field | Role |
-|-------|------|
-| `flash_attention_repo` | Upstream git URL |
-| `flash_attention_build_commit` | Exact commit cloned each build; **bump with `flash_attention_build_commit_date` when upgrading FA** |
-| `flash_attention_min_commit` | Minimum gfx1201 commit ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); **human-readable lock marker** |
-| `flash_attention_build_commit_date` | UTC date for that commit; parsed to `SOURCE_DATE_EPOCH` for wheel zip timestamps; PE fixed via patch injecting link `/Brepro`; **must update when bumping commit** |
-| `expected_wheel_pattern` | Glob for smoke-test wheel name |
-| `wheel_local_version` | `+local` tag appended to the wheel version (lock env `WHEEL_LOCAL_VERSION`; mapped to upstream `FLASH_ATTN_LOCAL_VERSION` at wheel time) |
-| `wheel_artifact_name` | GitHub Actions artifact name |
+| Section | Field | Role |
+|---------|-------|------|
+| `toolchain` | `python`, `pytorch`, `torch_device_extra`, `rocm_index`, `rocm` | pip toolchain pins |
+| `flash_attention` | `repo`, `build_commit`, `build_commit_date` | Exact FA source cloned each build; **bump `build_commit` and `build_commit_date` when upgrading FA** |
+| `flash_attention` | `min_commit` | Minimum gfx1201 commit ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); **human-readable reference only** |
+| `compile` | `gpu_archs`, `opt_dim` | HIP compile target and OPT_DIM tiers |
+| `wheel` | `wheel_local_version` | Wheel `+local` tag (env `WHEEL_LOCAL_VERSION`; mapped to upstream `FLASH_ATTN_LOCAL_VERSION` at wheel time) |
+| `wheel` | `wheel_artifact_name` | GitHub Actions artifact name |
+| `release` | `release_tag_prefix` | Release tag prefix (`{prefix}-{variant}-build{run_number}`) |
+| `release` | `release_title_prefix` | Release title prefix (env `RELEASE_TITLE_PREFIX`) |
 
-Prep clones **`flash_attention_build_commit`** (`fetch` + `checkout FETCH_HEAD`).
+`EXPECTED_WHEEL_PATTERN` is derived in `version-lock.ts` from `wheel.wheel_local_version` + `toolchain.python`, not stored in the lock file.
+
+Prep clones **`flash_attention.build_commit`** (`fetch` + `checkout FETCH_HEAD`).
 
 ## Build profile
 
-**Inference-only** wheel for ComfyUI: fwd + fwd_appendkv + fwd_splitkv (no bwd), `-DFLASHATTENTION_DISABLE_BACKWARD`, `cxx11abiTRUE`, `OPT_DIM=32,64,128,256`.
+**Inference-only** wheel for ComfyUI: fwd + fwd_appendkv + fwd_splitkv (no bwd), `-DFLASHATTENTION_DISABLE_BACKWARD`, `cxx11.abi` local tag (see `wheel.wheel_local_version`), `OPT_DIM=32,64,128,256`.
 
 | Scope | Approx. ninja targets |
 |-------|----------------------|
@@ -91,7 +94,7 @@ Serial and parallel compose the same entry; both produce identical wheels:
 | Parallel compile | `--step compile` (once per shard) | single shard |
 | Parallel link | `--step merge-and-wheel` + staging | full (env) |
 
-Env is set uniformly via `scripts/lib/init-build-env.ts` (includes `SOURCE_DATE_EPOCH` from `flash_attention_build_commit_date`).
+Env is set uniformly via `scripts/lib/init-build-env.ts` (includes `SOURCE_DATE_EPOCH` from `flash_attention.build_commit_date`).
 
 ## Output
 
@@ -99,7 +102,11 @@ Artifact: **`wheel_artifact_name`** — `.whl`, `.sha256`, `wheel.manifest.json`
 
 Under the same `VERSION.lock.json`, **serial and parallel should produce byte-identical wheels** (matching SHA256); `/Brepro` fixes PE TimeDateStamp, `SOURCE_DATE_EPOCH` fixes wheel zip metadata.
 
-Expected pattern: `flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl`
+Expected wheel name (derived from `wheel.wheel_local_version` + `toolchain.python`):
+
+```text
+flash_attn-*+torch2.12.0.rocm7.14.0.cxx11.abi-cp312-cp312-win_amd64.whl
+```
 
 ## Verification
 
