@@ -49,6 +49,36 @@ if (-not $flashAttentionBuildCommit) {
     throw "VERSION.lock.json flash_attention_build_commit is missing"
 }
 
+$rawCommitDate = $lock.flash_attention_build_commit_date
+if (-not $rawCommitDate) {
+    throw "VERSION.lock.json flash_attention_build_commit_date is missing"
+}
+if ($rawCommitDate -is [DateTime]) {
+    # ConvertFrom-Json parses ISO-8601 values as DateTime; normalize to UTC Z string.
+    $commitDateOffset = [DateTimeOffset]::new($rawCommitDate.ToUniversalTime())
+    $flashAttentionBuildCommitDate = $commitDateOffset.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+} elseif ($rawCommitDate -is [string]) {
+    $flashAttentionBuildCommitDate = $rawCommitDate.Trim()
+    if (-not $flashAttentionBuildCommitDate) {
+        throw "VERSION.lock.json flash_attention_build_commit_date is missing"
+    }
+    try {
+        $commitDateOffset = [DateTimeOffset]::Parse(
+            $flashAttentionBuildCommitDate,
+            [Globalization.CultureInfo]::InvariantCulture
+        )
+    } catch {
+        throw "VERSION.lock.json flash_attention_build_commit_date is not valid ISO 8601: $flashAttentionBuildCommitDate"
+    }
+    $flashAttentionBuildCommitDate = $commitDateOffset.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+} else {
+    throw "VERSION.lock.json flash_attention_build_commit_date has unsupported type: $($rawCommitDate.GetType().FullName)"
+}
+$sourceDateEpoch = [int64]$commitDateOffset.ToUnixTimeSeconds()
+if ($sourceDateEpoch -lt 1) {
+    throw "VERSION.lock.json flash_attention_build_commit_date must map to a positive Unix epoch"
+}
+
 # Remaining lock fields feed toolchain/CI directly; fail fast on empty values
 # instead of letting them surface mid-pipeline (e.g. empty GPU_ARCHS).
 foreach ($requiredField in @(
@@ -72,9 +102,11 @@ $vars = @{
     WHEEL_ARTIFACT_NAME           = $wheelArtifactName
     EXPECTED_WHEEL_PATTERN        = $expectedWheelPattern
     FLASH_ATTN_LOCAL_VERSION      = $wheelLocalVersion
-    FLASH_ATTENTION_REPO          = $flashAttentionRepo
-    FLASH_ATTENTION_BUILD_COMMIT  = $flashAttentionBuildCommit
-    RELEASE_TAG_PREFIX            = [string]$lock.release_tag_prefix
+    FLASH_ATTENTION_REPO              = $flashAttentionRepo
+    FLASH_ATTENTION_BUILD_COMMIT      = $flashAttentionBuildCommit
+    FLASH_ATTENTION_BUILD_COMMIT_DATE = $flashAttentionBuildCommitDate
+    SOURCE_DATE_EPOCH                 = [string]$sourceDateEpoch
+    RELEASE_TAG_PREFIX                = [string]$lock.release_tag_prefix
     RELEASE_NAME                  = [string]$lock.release_name
     RELEASE_PRERELEASE            = [string]$lock.release_prerelease
 }

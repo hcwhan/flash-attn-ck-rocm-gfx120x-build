@@ -52,7 +52,9 @@ $env:CXX = "clang-cl"
 $env:DISTUTILS_USE_SDK = "1"
 $env:GPU_ARCHS = [string]$GPU_ARCHS
 $env:BUILD_TARGET = "rocm"
+$env:SOURCE_DATE_EPOCH = [string]$SOURCE_DATE_EPOCH
 
+Write-Host "SOURCE_DATE_EPOCH=$env:SOURCE_DATE_EPOCH (flash_attention_build_commit_date=$FLASH_ATTENTION_BUILD_COMMIT_DATE)"
 Write-Host "GPU_ARCHS=$env:GPU_ARCHS"
 Write-Host "OPT_DIM=$env:OPT_DIM"
 Write-Host "ROCM_HOME=$env:ROCM_HOME"

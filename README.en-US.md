@@ -22,9 +22,9 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `.github
 | Field | Role |
 |-------|------|
 | `flash_attention_repo` | Upstream git URL |
-| `flash_attention_build_commit` | Exact commit cloned each build; **bump to upgrade FA** |
+| `flash_attention_build_commit` | Exact commit cloned each build; **bump with `flash_attention_build_commit_date` when upgrading FA** |
 | `flash_attention_min_commit` | Minimum gfx1201 commit ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); **human-readable lock marker** |
-| `flash_attention_build_commit_date` | UTC date for that commit; **human-readable only**, not used by scripts/CI |
+| `flash_attention_build_commit_date` | UTC date for that commit; parsed to `SOURCE_DATE_EPOCH` for PE TimeDateStamp and wheel zip timestamps; **must update when bumping commit** |
 | `expected_wheel_pattern` | Glob for smoke-test wheel name |
 | `wheel_local_version` | `+local` tag appended to the wheel version (fed to `FLASH_ATTN_LOCAL_VERSION`) |
 | `wheel_artifact_name` | GitHub Actions artifact name |
@@ -91,11 +91,13 @@ Serial and parallel compose the same entry; both produce identical wheels:
 | Parallel compile | `--step compile` (once per shard) | single shard |
 | Parallel link | `--step merge-and-wheel` + staging | full (env) |
 
-Env is set uniformly via `base/init-fa-build-env.ps1`.
+Env is set uniformly via `base/init-fa-build-env.ps1` (includes `SOURCE_DATE_EPOCH` from `flash_attention_build_commit_date`).
 
 ## Output
 
 Artifact: **`wheel_artifact_name`** — `.whl`, `.sha256`, `wheel.manifest.json`.
+
+Under the same `VERSION.lock.json`, **serial and parallel should produce byte-identical wheels** (matching SHA256); reproducibility is anchored on `flash_attention_build_commit_date`.
 
 Expected pattern: `flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl`
 

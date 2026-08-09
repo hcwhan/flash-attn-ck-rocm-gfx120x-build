@@ -21,12 +21,12 @@
 |------|------|
 | `read-version-lock.ps1`（base 目录） | **唯一直接读 lock 的 PS1**；`$script:` 变量 + `VersionLockVars` 暴露 |
 | `1.config - read-version-lock.ps1` | 调 base 版 + `-ExportToGitHubEnv` 写 CI env（`01.fa-read-version-lock` 专用） |
-| `2.prep - prep-flash-attention.ps1` | clone FA 源码（读 lock 取 repo/commit） |
+| `2.prep - prep-flash-attention.ps1` | clone FA 源码（读 lock 取 repo/commit）；校验 commit author date 与 lock 一致 |
 | `3.patch - patch-fa-inference.ps1` | 改 setup.py：跳过 bwd + 启用 CK 禁用 backward 标志（`02.fa-prep-src` 第二步调） |
 | `get-build-paths.ps1`（base 目录） | `BuildRoot`；`-LoadVersionLock` 供测试脚本 |
 | `get-rocm-sdk-paths.ps1`（base 目录） | 输出 `CoreRoot`/`DevelRoot`（init-fa-build-env 与 msvc 指纹共用；唯一 ROCm 路径发现） |
 | `4.sdk - get-rocm-sdk-paths.ps1` | 调 base 版（`06.fa-toolchain-fingerprint` 专用适配） |
-| `init-fa-build-env.ps1`（base 目录） | numpy + `OPT_DIM` + ROCm 编译 env（内部 dot-source lock） |
+| `init-fa-build-env.ps1`（base 目录） | numpy + `OPT_DIM` + ROCm 编译 env + `SOURCE_DATE_EPOCH`（内部 dot-source lock） |
 | `build-fa-steps.py`（base 目录） | `--step compile` / `--step wheel` / `--step merge-and-wheel`（parallel link+staging 校验） |
 | `5.compile - compile-opt-dim.ps1` | 任意 `-OptDim` 编译入口（serial 全量 / parallel 单 dim） |
 | `6.shard - validate-shard.ps1` | 校验 compile 产物 .obj（含 `_d{dim}_` kernel）并输出 `RELEASE_DIR`（parallel 专用；workflow 内单独调） |
@@ -64,9 +64,9 @@
 
 | 读入逻辑 | 仅人类可读 |
 |----------|------------|
-| `flash_attention_build_commit`、`flash_attention_repo`、`opt_dim`、`expected_wheel_pattern`、`wheel_artifact_name`、`python`、`pytorch`、`hip`、`gpu_archs`… | `flash_attention_min_commit`、`flash_attention_build_commit_date` |
+| `flash_attention_build_commit`、`flash_attention_build_commit_date`、`flash_attention_repo`、`opt_dim`、`expected_wheel_pattern`、`wheel_artifact_name`、`python`、`pytorch`、`hip`、`gpu_archs`… | `flash_attention_min_commit` |
 
-prep clone `flash_attention_build_commit`；不参与逻辑的字段不得进脚本分支。
+prep clone `flash_attention_build_commit` 并校验 author date 与 `flash_attention_build_commit_date` 一致；后者经 `init-fa-build-env.ps1` 注入 `SOURCE_DATE_EPOCH`（PE TimeDateStamp + wheel zip）。
 
 ## 设计决策
 
@@ -75,7 +75,7 @@ prep clone `flash_attention_build_commit`；不参与逻辑的字段不得进脚
 - **不为不可能场景加诊断**
 - **干净 runner**：compile 后仅一棵 `temp.win-*`；不为脏 workspace / 人工改目录加兜底。
 - **连续 CI 链**：prep → compile/link → smoke 自动跑完；staging/shard 齐全等流水线检查保留。
-- **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=TRUE`（避免 FA `CachedWheelsCommand` 下载上游 wheel 短路）+ prebuilt `.obj` 时间戳 merge。
+- **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=TRUE`（避免 FA `CachedWheelsCommand` 下载上游 wheel 短路）+ prebuilt `.obj` 时间戳 merge；`SOURCE_DATE_EPOCH`（lock `flash_attention_build_commit_date`）使 serial / parallel wheel **byte-identical**。
 - **`PRIMARY_OPT_DIM`** = lock `opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
 - **`ninja_workers` 默认 4**（OOM 改 2）；**`skip_cache_restore` 默认 false**（命中时构建成功后先删旧缓存再重存刷新，构建失败保留旧缓存；设为 true 时 lookup-only 探测）。
 - **全模式 prebuilt obj 两向 stamp**：compile/serial 恢复缓存后、link 合并后，用单一未来时间戳（`max(now, 最新 fmha_*.cu, 最新 csrc 头文件)+1s`）同时写 `.obj` mtime 与 `.ninja_log` 条目 mtime（Windows HIP 无 `deps=` 规则、不生成 `.ninja_deps`；只 stamp obj 会触发 ninja `entry<input` 脏检查，缓存与 merge 均全量重编；`.ninja_log` 版本头必须保留，否则 ninja unlink 日志全量重编）。link 合并四 shard 的 `.ninja_log`（上传需 `include-hidden-files: true`），真实 ninja 运行前先 `ninja -n` dry-run 预检 merged obj 是否会被重编，违者立即退出；运行后再校验 merged obj mtime，违者报错退出。
@@ -96,6 +96,6 @@ prep clone `flash_attention_build_commit`；不参与逻辑的字段不得进脚
 
 ## 维护
 
-- 升级 FA：改 `flash_attention_build_commit`
+- 升级 FA：改 `flash_attention_build_commit` 与 `flash_attention_build_commit_date`（commit author date UTC；prep 会校验）
 - bump PyTorch/ROCm：同步 `expected_wheel_pattern`、`wheel_local_version` 等
 - 部署前：`test/gpu-smoke-test.ps1`（gfx1201 真机，需已 pip install wheel）
