@@ -128,7 +128,7 @@ jobs:
       - name: Fingerprint toolchain for cache key
         id: toolchain-fingerprint
         shell: pwsh
-        run: npx tsx scripts/cli.ts 05.toolchain-fingerprint --build-variant parallel --opt-dim "${{ matrix.opt-dim }}"
+        run: npx tsx scripts/cli.ts 05.toolchain-fingerprint -w $env:GITHUB_WORKSPACE --build-variant parallel --opt-dim "${{ matrix.opt-dim }}"
 
       - name: Compile OPT_DIM shard with ninja cache
         uses: "./.github/actions/03.fa-build-with-cache"

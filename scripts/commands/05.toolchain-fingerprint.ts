@@ -5,6 +5,7 @@ import { runCapture } from "../lib/exec.js";
 import { appendGithubOutput } from "../lib/github.js";
 import { buildNinjaCacheKey } from "../lib/ninja-cache-key.js";
 import { getRocmSdkPaths } from "../lib/rocm-sdk-paths.js";
+import { versionLockFileHash8 } from "../lib/version-lock.js";
 
 const PYTHON = "python";
 
@@ -87,6 +88,7 @@ function fingerprintHash(payload: string): string {
 }
 
 export function runToolchainFingerprint(options?: {
+  workspaceRoot?: string;
   buildVariant?: string;
   optDim?: string;
 }): void {
@@ -128,8 +130,19 @@ export function runToolchainFingerprint(options?: {
       throw new Error("--opt-dim is required when --build-variant parallel");
     }
 
+    const workspaceRoot = options.workspaceRoot?.trim();
+    if (!workspaceRoot) {
+      throw new Error(
+        "--workspace-root is required when --build-variant is set",
+      );
+    }
+
+    const lockHash = versionLockFileHash8(workspaceRoot);
+    console.log(`VERSION.lock.json fingerprint: ${lockHash}`);
+
     const cacheKey = buildNinjaCacheKey({
       buildVariant,
+      lockHash,
       optDim: options.optDim?.trim(),
       msvcHash,
       rocmClangHash,

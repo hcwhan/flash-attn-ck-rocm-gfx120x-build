@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
@@ -85,6 +86,17 @@ export function expectedWheelPattern(
 ): string {
   const tag = pythonWheelTag(python);
   return `flash_attn-*+${localVersion}-${tag}-${tag}-win_amd64.whl`;
+}
+
+export function versionLockFileHash8(workspaceRoot: string): string {
+  const lockPath = path.join(workspaceRoot, "VERSION.lock.json");
+  let contents: Buffer;
+  try {
+    contents = readFileSync(lockPath);
+  } catch {
+    throw new Error(`VERSION.lock.json not found: ${lockPath}`);
+  }
+  return createHash("sha256").update(contents).digest("hex").slice(0, 8);
 }
 
 function normalizeCommitDate(raw: string): {

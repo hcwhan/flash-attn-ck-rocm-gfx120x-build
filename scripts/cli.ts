@@ -53,10 +53,12 @@ program
 program
   .command("05.toolchain-fingerprint")
   .description("Emit MSVC/clang and pip toolchain cache fingerprints")
+  .option("-w, --workspace-root <path>", "repo root (required with --build-variant)")
   .option("--build-variant <mode>", "serial or parallel (emit cache-key output)")
   .option("--opt-dim <value>", "OPT_DIM shard when --build-variant parallel")
   .action((opts) => {
     runToolchainFingerprint({
+      workspaceRoot: opts.workspaceRoot,
       buildVariant: opts.buildVariant,
       optDim: opts.optDim,
     });

@@ -9,7 +9,7 @@
 | **serial** | prep → 全量 build_ext → 原地 `bdist_wheel`（同 job 同目录，stamp 跳过重编）→ smoke test |
 | **parallel** | prep → compile-d32\|d64\|d128\|d256 → link-wheel → smoke test |
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Cache 前缀：`serial-v5` / `parallel-v5-d{dim}`（精确 key，无 `restore-keys`；key 含 `msvc` + `rocmClang` + `pipToolchain` 三段指纹）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Cache 前缀：`serial-v5-{lockHash8}` / `parallel-v5-{lockHash8}-d{dim}`（`lockHash8` = `VERSION.lock.json` SHA256 前 8 位；精确 key，无 `restore-keys`；key 含 `msvc` + `rocmClang` + `pipToolchain` 三段指纹）。
 
 ## 命名约定
 
@@ -105,7 +105,7 @@ prep clone `flash_attention.build_commit` 并校验 author date 与 `flash_atten
 
 **不要添加：** 双源校验、manifest 读回自证、`FA_SKIP_*`、多候选目录排序、git 考古、薄 one-liner 包装、排障用 build-log artifact、lock 只读字段进逻辑、**命令内二次 `readVersionLock`**、**`GITHUB_ENV` 存在却不 export**、**缺 env 时用 `??` 或本地再读 lock 顶上**。
 
-**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 3 个 `fmha_*_api.obj`；link merge skip + ninja API 重编三重校验；patch before-state；smoke 产物校验；cache 精确 key（`serial-v5` / `parallel-v5-d{dim}` + `msvc`/`rocmClang`/`pipToolchain` 指纹）。
+**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 3 个 `fmha_*_api.obj`；link merge skip + ninja API 重编三重校验；patch before-state；smoke 产物校验；cache 精确 key（`serial-v5-{lockHash8}` / `parallel-v5-{lockHash8}-d{dim}` + `msvc`/`rocmClang`/`pipToolchain` 指纹）。
 
 ## 维护
 
