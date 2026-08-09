@@ -13,7 +13,6 @@ export function runPublish(options: {
 }): void {
   const releaseTagPrefix = requireLockEnv("RELEASE_TAG_PREFIX");
   const releaseName = requireLockEnv("RELEASE_NAME");
-  const releasePrerelease = requireLockEnv("RELEASE_PRERELEASE");
   const runNumber = requireGithubActionsEnv("GITHUB_RUN_NUMBER");
   const runnerTemp = requireGithubActionsEnv("RUNNER_TEMP");
   const githubSha = requireGithubActionsEnv("GITHUB_SHA");
@@ -52,8 +51,8 @@ export function runPublish(options: {
   const body = [
     `## ${releaseName}`,
     "",
-    "| 项 | 值 |",
-    "|----|-----|",
+    "| Field | Value |",
+    "|-------|-------|",
     `| Workflow | ${options.workflowName} |`,
     `| Build source | ${options.releaseVariant} |`,
     `| Run | ${runNumber} |`,
@@ -67,7 +66,6 @@ export function runPublish(options: {
   appendGithubOutput({
     tag,
     body_path: bodyPath,
-    prerelease: releasePrerelease,
     release_title: releaseTitle,
   });
 

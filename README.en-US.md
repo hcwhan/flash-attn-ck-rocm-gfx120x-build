@@ -71,7 +71,7 @@ Push to `main` does **not** auto-trigger builds.
 | `compile-d32` … `d256` | one OPT_DIM shard each, upload `.obj` | 6 h each |
 | `link-wheel` | merge objs + link + wheel + CPU smoke test | 6 h |
 
-Cache keys include the repository commit SHA and a toolchain fingerprint (MSVC toolset + ROCm clang + pip toolchain versions); **exact match only** (no `restore-keys`). Serial uses `serial-v4`, parallel uses `parallel-v4-d{dim}` — isolated from each other. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
+Cache keys include a toolchain fingerprint (MSVC toolset + ROCm clang + pip toolchain versions); **exact match only** (no `restore-keys`). Serial uses `serial-v4`, parallel uses `parallel-v4-d{dim}` — isolated from each other. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
 
 ### Build stages
 
@@ -105,7 +105,7 @@ Expected pattern: `flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd6
 
 | Check | Script |
 |-------|--------|
-| CI smoke test (CPU) | `npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist` |
+| CI smoke test (CPU) | `npx tsx scripts/cli.ts 09.verify ... --release-variant serial --ninja-cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"` |
 | Parallel link API dispatch recompile checks | `build/build-fa-steps.py` (merge skip + pre/post ninja asserts) |
 | Pre-deploy GPU smoke test (gfx1201 hardware) | `python test/gpu-smoke-test.py -w .` |
 

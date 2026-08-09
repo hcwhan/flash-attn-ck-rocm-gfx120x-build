@@ -2,6 +2,24 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 
+const gitShaSchema = z
+  .string()
+  .regex(/^[0-9a-f]{40}$/i, "must be a 40-character git commit SHA");
+
+const optDimSchema = z
+  .string()
+  .min(1)
+  .refine((value) => {
+    const parts = value
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    return (
+      parts.length >= 1 &&
+      parts.every((part) => /^[1-9]\d*$/.test(part))
+    );
+  }, "must be comma-separated positive integers (e.g. 32,64,128,256)");
+
 const versionLockSchema = z.object({
   python: z.string().min(1),
   pytorch: z.string().min(1),
@@ -9,16 +27,15 @@ const versionLockSchema = z.object({
   hip: z.string().min(1),
   rocm_index: z.string().min(1),
   gpu_archs: z.string().min(1),
-  opt_dim: z.string().min(1),
+  opt_dim: optDimSchema,
   flash_attention_repo: z.string().min(1),
-  flash_attention_build_commit: z.string().min(1),
+  flash_attention_build_commit: gitShaSchema,
   flash_attention_build_commit_date: z.string().min(1),
   expected_wheel_pattern: z.string().min(1),
   wheel_local_version: z.string().min(1),
   wheel_artifact_name: z.string().min(1),
   release_tag_prefix: z.string().min(1),
   release_name: z.string().min(1),
-  release_prerelease: z.string().min(1),
 });
 
 export type VersionLockVars = {
@@ -40,7 +57,6 @@ export type VersionLockVars = {
   SOURCE_DATE_EPOCH: string;
   RELEASE_TAG_PREFIX: string;
   RELEASE_NAME: string;
-  RELEASE_PRERELEASE: string;
 };
 
 function normalizeCommitDate(raw: string): {
@@ -87,9 +103,6 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
-  if (optDimList.length < 1) {
-    throw new Error("VERSION.lock.json opt_dim is missing or empty");
-  }
 
   const { isoUtc, epochSeconds } = normalizeCommitDate(
     lock.flash_attention_build_commit_date,
@@ -114,7 +127,6 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
     SOURCE_DATE_EPOCH: String(epochSeconds),
     RELEASE_TAG_PREFIX: lock.release_tag_prefix,
     RELEASE_NAME: lock.release_name,
-    RELEASE_PRERELEASE: lock.release_prerelease,
   };
 
   console.log(

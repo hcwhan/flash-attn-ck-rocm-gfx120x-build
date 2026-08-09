@@ -6,7 +6,7 @@ inputs:
     description: flash-attention source root
     required: true
   cache-key:
-    description: Primary cache key (must include resolved flash-attention commit SHA)
+    description: Primary cache key from 05.toolchain-fingerprint
     required: true
   skip-restore:
     description: When true, skip cache restore but still look up cache existence (used to gate save)

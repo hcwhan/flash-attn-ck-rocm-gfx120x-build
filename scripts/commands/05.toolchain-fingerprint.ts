@@ -3,6 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { runCapture } from "../lib/exec.js";
 import { appendGithubOutput } from "../lib/github.js";
+import { buildNinjaCacheKey } from "../lib/ninja-cache-key.js";
 import { getRocmSdkPaths } from "../lib/rocm-sdk-paths.js";
 
 const PYTHON = "python";
@@ -10,7 +11,9 @@ const PYTHON = "python";
 function resolveMsvcToolset(): string {
   const programFilesX86 = process.env["ProgramFiles(x86)"];
   if (!programFilesX86) {
-    return "unknown";
+    throw new Error(
+      "ProgramFiles(x86) env is not set; cannot locate MSVC toolset",
+    );
   }
 
   const vswhere = path.join(
@@ -20,7 +23,7 @@ function resolveMsvcToolset(): string {
     "vswhere.exe",
   );
   if (!existsSync(vswhere)) {
-    return "unknown";
+    throw new Error(`vswhere.exe not found: ${vswhere}`);
   }
 
   const vcRoot = runCapture(vswhere, [
@@ -35,7 +38,9 @@ function resolveMsvcToolset(): string {
 
   const toolsDir = path.join(vcRoot, "VC", "Tools", "MSVC");
   if (!vcRoot || !existsSync(toolsDir)) {
-    return "unknown";
+    throw new Error(
+      `MSVC tools directory not found under ${vcRoot || "(empty vcRoot)"}`,
+    );
   }
 
   const toolsets = readdirSync(toolsDir, { withFileTypes: true })
@@ -53,28 +58,41 @@ function resolveMsvcToolset(): string {
       }
     });
 
-  return toolsets[0] ?? "unknown";
+  const toolset = toolsets[0];
+  if (!toolset) {
+    throw new Error(`No MSVC toolset directories under ${toolsDir}`);
+  }
+
+  return toolset;
+}
+
+function resolveClangVersion(coreRoot: string): string {
+  const clangExe = path.join(coreRoot, "lib", "llvm", "bin", "clang.exe");
+  if (!existsSync(clangExe)) {
+    throw new Error(`ROCm clang not found: ${clangExe}`);
+  }
+
+  const firstLine = runCapture(clangExe, ["--version"])
+    .split(/\r?\n/)[0]
+    ?.trim();
+  if (!firstLine) {
+    throw new Error(`ROCm clang --version returned no output from ${clangExe}`);
+  }
+
+  return firstLine;
 }
 
 function fingerprintHash(payload: string): string {
   return createHash("sha256").update(payload, "utf8").digest("hex").slice(0, 12);
 }
 
-export function runToolchainFingerprint(): void {
+export function runToolchainFingerprint(options?: {
+  cacheVariant?: string;
+  optDim?: string;
+}): void {
   const toolset = resolveMsvcToolset();
-
   const { coreRoot } = getRocmSdkPaths();
-  const clangExe = path.join(coreRoot, "lib", "llvm", "bin", "clang.exe");
-  let clangVersion = "unknown";
-  if (existsSync(clangExe)) {
-    try {
-      clangVersion = runCapture(clangExe, ["--version"])
-        .split(/\r?\n/)[0]
-        ?.trim() ?? "unknown";
-    } catch {
-      clangVersion = "unknown";
-    }
-  }
+  const clangVersion = resolveClangVersion(coreRoot);
 
   const msvcHash = fingerprintHash(`${toolset}|${clangVersion}`);
   console.log(
@@ -98,8 +116,32 @@ export function runToolchainFingerprint(): void {
     `pip toolchain: ${pipVersions.join(";")} (fingerprint ${pipHash})`,
   );
 
-  appendGithubOutput({
-    "msvc-hash": msvcHash,
-    "pip-hash": pipHash,
-  });
+  const outputs: Record<string, string> = {
+    "toolchain-msvc-hash": msvcHash,
+    "toolchain-pip-hash": pipHash,
+  };
+
+  if (options?.cacheVariant) {
+    const variant = options.cacheVariant.trim().toLowerCase();
+    if (variant !== "serial" && variant !== "parallel") {
+      throw new Error(
+        `--cache-variant must be 'serial' or 'parallel', got ${options.cacheVariant}`,
+      );
+    }
+
+    if (variant === "parallel" && !options.optDim?.trim()) {
+      throw new Error("--opt-dim is required when --cache-variant parallel");
+    }
+
+    const cacheKey = buildNinjaCacheKey({
+      variant,
+      optDim: options.optDim?.trim(),
+      msvcHash,
+      pipHash,
+    });
+    outputs["cache-key"] = cacheKey;
+    console.log(`Ninja cache key: ${cacheKey}`);
+  }
+
+  appendGithubOutput(outputs);
 }

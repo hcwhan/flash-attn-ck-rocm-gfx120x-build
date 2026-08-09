@@ -9,7 +9,7 @@
 | **serial** | prep → 全量 build_ext → 原地 `bdist_wheel`（同 job 同目录，stamp 跳过重编）→ smoke test |
 | **parallel** | prep → compile-d32\|d64\|d128\|d256 → link-wheel → smoke test |
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Cache 前缀：`serial-v4` / `parallel-v4-d{dim}`（精确 key，无 `restore-keys`；key 含仓库 commit-id + 工具链指纹（MSVC+clang）+ pip 工具链指纹）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Cache 前缀：`serial-v4` / `parallel-v4-d{dim}`（精确 key，无 `restore-keys`；key 含工具链指纹（MSVC+clang）+ pip 工具链指纹）。
 
 ## 复用入口
 
@@ -28,7 +28,7 @@
 | `02.plan-opt-dim-matrix` | 导出 parallel OPT_DIM matrix（`GITHUB_OUTPUT`） |
 | `03.prep` | clone FA 源码；校验 commit author date 与 lock 一致 |
 | `04.patch` | 改 setup.py：跳过 bwd + 启用 CK 禁用 backward 标志 + link `spawn` 注入 `/Brepro` |
-| `05.toolchain-fingerprint` | MSVC/clang + pip 工具链指纹（缓存 key） |
+| `05.toolchain-fingerprint` | MSVC/clang + pip 工具链指纹；`--cache-variant` 输出 `cache-key`（`scripts/lib/ninja-cache-key.ts`） |
 | `06.compile` | 任意 `--opt-dim` 编译入口（serial 全量 / parallel 单 dim） |
 | `07.shard` | 校验 compile 产物 .obj；写 `RELEASE_DIR` 到 `GITHUB_ENV` |
 | `08.wheel` | 设 `FLASH_ATTENTION_FORCE_BUILD`，调 link 脚本 |
@@ -73,7 +73,6 @@ prep clone `flash_attention_build_commit` 并校验 author date 与 `flash_atten
 - **`PRIMARY_OPT_DIM`** = lock `opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
 - **`ninja_workers` 默认 4**（OOM 改 2）；**`skip_cache_restore` 默认 false**（命中时构建成功后先删旧缓存再重存刷新，构建失败保留旧缓存；设为 true 时 lookup-only 探测）。
 - **全模式 prebuilt obj 两向 stamp** / **link 排除 `fmha_*_api.obj`**：见 `build/build-fa-steps.py` 注释。
-- **`05.toolchain-fingerprint` 的 `unknown` toolset/clang**：缓存指纹观测 runner 实际工具链，非 pipeline 兜底。
 
 ## 编写规范
 
@@ -84,7 +83,7 @@ prep clone `flash_attention_build_commit` 并校验 author date 与 `flash_atten
 
 **不要添加：** 双源校验、manifest 读回自证、`FA_SKIP_*`、多候选目录排序、git 考古、薄 one-liner 包装、排障用 build-log artifact、lock 只读字段进逻辑、**命令内二次 `readVersionLock`**、**`GITHUB_ENV` 存在却不 export**、**缺 env 时用 `??` 或本地再读 lock 顶上**。
 
-**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 3 个 `fmha_*_api.obj`；link merge skip + ninja API 重编三重校验；patch before-state；smoke 产物校验；cache 精确 key 含仓库 commit-id。
+**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 3 个 `fmha_*_api.obj`；link merge skip + ninja API 重编三重校验；patch before-state；smoke 产物校验；cache 精确 key（`serial-v4` / `parallel-v4-d{dim}` + 工具链指纹）。
 
 ## 维护
 

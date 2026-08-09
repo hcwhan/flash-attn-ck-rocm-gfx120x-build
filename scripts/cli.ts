@@ -55,8 +55,13 @@ program
 program
   .command("05.toolchain-fingerprint")
   .description("Emit MSVC/clang and pip toolchain cache fingerprints")
-  .action(() => {
-    runToolchainFingerprint();
+  .option("--cache-variant <mode>", "serial or parallel (emit cache-key output)")
+  .option("--opt-dim <value>", "OPT_DIM shard when --cache-variant parallel")
+  .action((opts) => {
+    runToolchainFingerprint({
+      cacheVariant: opts.cacheVariant,
+      optDim: opts.optDim,
+    });
   });
 
 program
@@ -103,9 +108,13 @@ program
   .command("09.verify")
   .description("CPU wheel smoke test")
   .requiredOption("--dist-dir <path>")
+  .requiredOption("--release-variant <name>", "serial or parallel")
+  .option("--ninja-cache-key <key>", "compile ninja cache key (required for serial)")
   .action((opts) => {
     runVerify({
       distDir: opts.distDir,
+      releaseVariant: opts.releaseVariant,
+      ninjaCacheKey: opts.ninjaCacheKey,
     });
   });
 

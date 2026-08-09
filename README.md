@@ -30,7 +30,6 @@
 | `wheel_artifact_name` | GitHub Actions 发布的 artifact 名称 |
 | `release_tag_prefix` | Release tag 前缀（最终 tag = `{prefix}-{variant}-build{run_number}`，variant 来自 workflow，如 `serial` / `parallel`） |
 | `release_name` | Release 标题 |
-| `release_prerelease` | `"true"` / `"false"`，是否预发布 |
 
 规则：CI 始终 clone **`flash_attention_build_commit`**（`fetch` + `checkout FETCH_HEAD`）。
 
@@ -89,7 +88,7 @@ ComfyUI **推理专用** wheel：
 | `compile-d32` … `d256` | 各编一个 OPT_DIM shard，上传 `.obj` | 各 6 h |
 | `link-wheel` | 合并 obj + link + 打 wheel + CPU smoke test | 6 h |
 
-- Cache key 含仓库 commit-id 与工具链指纹（MSVC 工具集 + ROCm clang + pip 工具链版本）；**仅精确匹配**（无 `restore-keys`）。串行 `serial-v4`，并行 `parallel-v4-d{dim}`，互不共用。
+- Cache key 含工具链指纹（MSVC 工具集 + ROCm clang + pip 工具链版本）；**仅精确匹配**（无 `restore-keys`）。串行 `fa2-ck-gfx1201-serial-v4-msvc{hash}-pip{hash}`，并行 `fa2-ck-gfx1201-parallel-v4-d{dim}-msvc{hash}-pip{hash}`，互不共用。
 - 四 shard 各编 shared obj；link 仅使用 **lock `opt_dim` 第一档**（当前 `32`）的 shared obj。
 
 ### 构建阶段
@@ -145,7 +144,7 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 | 检查 | 脚本 |
 |------|------|
-| CI smoke test（CPU） | `npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist` |
+| CI smoke test（CPU） | `npx tsx scripts/cli.ts 09.verify ... --release-variant serial --ninja-cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"` |
 | parallel link API dispatch 重编校验 | `build/build-fa-steps.py`（merge skip + ninja 前后断言） |
 | 部署前 GPU smoke test（gfx1201 真机） | `python test/gpu-smoke-test.py -w .` |
 

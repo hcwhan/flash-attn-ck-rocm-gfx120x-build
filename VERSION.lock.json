@@ -14,6 +14,5 @@
   "wheel_local_version": "rocm714torch212cxx11abiTRUE",
   "wheel_artifact_name": "flash-attn-ck-gfx1201-cp312-rocm714",
   "release_tag_prefix": "fa2-ck-gfx1201-rocm714",
-  "release_name": "FlashAttention 2 CK gfx1201 Windows",
-  "release_prerelease": "true"
+  "release_name": "FlashAttention 2 CK gfx1201 Windows"
 }

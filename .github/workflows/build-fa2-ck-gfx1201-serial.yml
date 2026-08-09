@@ -115,15 +115,15 @@ jobs:
           path: ${{ env.FA_SRC }}
 
       - name: Fingerprint toolchain for cache key
-        id: msvc-fp
+        id: toolchain-fingerprint
         shell: pwsh
-        run: npx tsx scripts/cli.ts 05.toolchain-fingerprint
+        run: npx tsx scripts/cli.ts 05.toolchain-fingerprint --cache-variant serial
 
       - name: Compile OPT_DIM full with ninja cache
         uses: "./.github/actions/03.fa-build-with-cache"
         with:
           fa-src: ${{ env.FA_SRC }}
-          cache-key: fa2-ck-gfx1201-serial-v4-msvc${{ steps.msvc-fp.outputs.msvc-hash }}-pip${{ steps.msvc-fp.outputs.pip-hash }}
+          cache-key: ${{ steps.toolchain-fingerprint.outputs.cache-key }}
           skip-restore: ${{ env.SKIP_CACHE_RESTORE }}
           run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ env.LockOptDim }}" --fa-src $env:FA_SRC
 
@@ -133,7 +133,7 @@ jobs:
 
       - name: Smoke test (CPU)
         shell: pwsh
-        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist
+        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --release-variant serial --ninja-cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v7
@@ -147,7 +147,7 @@ jobs:
 
       - name: Prepare release metadata
         if: ${{ github.event.inputs.publish_release != 'false' }}
-        id: release
+        id: publish
         shell: pwsh
         run: npx tsx scripts/cli.ts 10.publish --dist-dir $env:GITHUB_WORKSPACE\dist --workflow-name "${{ github.workflow }}" --release-variant serial
 
@@ -155,12 +155,12 @@ jobs:
         if: ${{ github.event.inputs.publish_release != 'false' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.release.outputs.tag }}
-          name: ${{ steps.release.outputs.release_title }}
-          body_path: ${{ steps.release.outputs.body_path }}
+          tag_name: ${{ steps.publish.outputs.tag }}
+          name: ${{ steps.publish.outputs.release_title }}
+          body_path: ${{ steps.publish.outputs.body_path }}
           files: |
             dist/*.whl
             dist/*.sha256
             dist/wheel.manifest.json
-          prerelease: ${{ steps.release.outputs.prerelease == 'true' }}
+          prerelease: true
           make_latest: false

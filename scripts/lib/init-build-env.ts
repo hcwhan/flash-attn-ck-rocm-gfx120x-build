@@ -1,11 +1,15 @@
 import path from "node:path";
 import { run } from "./exec.js";
+import { requireMaxJobs } from "./max-jobs.js";
 import { getRocmSdkPaths } from "./rocm-sdk-paths.js";
 import { requireLockEnv } from "./require-env.js";
 
 const PYTHON = "python";
 
 export function initBuildEnv(options: { optDim: string }): void {
+  const maxJobs = requireMaxJobs();
+  console.log(`MAX_JOBS=${maxJobs}`);
+
   run(PYTHON, ["-m", "pip", "install", "numpy", "-q"], { quiet: true });
 
   process.env.OPT_DIM = options.optDim;
