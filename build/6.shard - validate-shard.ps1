@@ -44,7 +44,7 @@ if ($dimKernelCount -lt 1) {
 }
 foreach ($required in @('.ninja_log', '.ninja_deps')) {
     if (-not (Test-Path (Join-Path $releaseDir $required))) {
-        throw "Release dir missing $required: $releaseDir (upload-artifact must set include-hidden-files: true)"
+        throw "Release dir missing ${required}: $releaseDir (upload-artifact must set include-hidden-files: true)"
     }
 }
 
