@@ -4,7 +4,7 @@
 
 GitHub Actions workflow to build **FlashAttention 2 CK backend** for **Windows / gfx1201 / PyTorch 2.12.0+rocm7.14.0**.
 
-Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `.github/actions/01.fa-read-version-lock`.
+Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env` in each workflow job.
 
 ## Target
 
@@ -61,7 +61,7 @@ Push to `main` does **not** auto-trigger builds.
 | Job | Role | Timeout |
 |-----|------|---------|
 | `prep-fa-src` | clone + patch, upload source | 45 min |
-| `build-win-gfx1201` | toolchain, cache, full `build-bdist-wheel.ps1` | 6 h |
+| `build` | toolchain, cache, full `npx tsx scripts/cli.ts 06.compile` + `08.wheel` | 6 h |
 
 ### Parallel (`build-fa2-ck-gfx1201-parallel.yml`)
 
@@ -91,7 +91,7 @@ Serial and parallel compose the same entry; both produce identical wheels:
 | Parallel compile | `--step compile` (once per shard) | single shard |
 | Parallel link | `--step merge-and-wheel` + staging | full (env) |
 
-Env is set uniformly via `base/init-fa-build-env.ps1` (includes `SOURCE_DATE_EPOCH` from `flash_attention_build_commit_date`).
+Env is set uniformly via `scripts/lib/init-build-env.ts` (includes `SOURCE_DATE_EPOCH` from `flash_attention_build_commit_date`).
 
 ## Output
 
@@ -105,11 +105,11 @@ Expected pattern: `flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd6
 
 | Check | Script |
 |-------|--------|
-| CI smoke test (CPU) | `build/8.verify - wheel-smoke-test.ps1` |
-| Parallel link API dispatch recompile checks | `base/build-fa-steps.py` (merge skip + pre/post ninja asserts) |
-| Pre-deploy GPU smoke test (gfx1201 hardware) | `test/gpu-smoke-test.ps1` |
+| CI smoke test (CPU) | `npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist` |
+| Parallel link API dispatch recompile checks | `build/build-fa-steps.py` (merge skip + pre/post ninja asserts) |
+| Pre-deploy GPU smoke test (gfx1201 hardware) | `python test/gpu-smoke-test.py -w .` |
 
-Smoke test covers wheel structure, pip install, and extension import. Parallel link additionally asserts the three `fmha_*_api.obj` dispatch objects are skipped during merge and recompiled by ninja. GPU fwd + kvcache smoke is in `test/gpu-smoke-test.ps1` (run manually on gfx1201 hardware before deploy).
+Smoke test covers wheel structure, pip install, and extension import. Parallel link additionally asserts the three `fmha_*_api.obj` dispatch objects are skipped during merge and recompiled by ninja. GPU fwd + kvcache smoke is in `test/gpu-smoke-test.py` (run manually on gfx1201 hardware before deploy).
 
 ## ComfyUI install
 

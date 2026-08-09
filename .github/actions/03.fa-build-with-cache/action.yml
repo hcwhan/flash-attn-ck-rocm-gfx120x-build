@@ -1,0 +1,56 @@
+name: FA build with ninja cache
+description: Restore ninja cache, run a build CLI step, then save cache
+
+inputs:
+  fa-src:
+    description: flash-attention source root
+    required: true
+  cache-key:
+    description: Primary cache key (must include FA commit SHA)
+    required: true
+  skip-restore:
+    description: When true, skip cache restore (save still gated on cache existence lookup)
+    required: false
+    default: "false"
+  run:
+    description: Shell script executed between cache restore and save
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Restore ninja incremental build cache
+      id: fa-build-cache
+      uses: "./.github/actions/02.fa-ninja-cache-restore"
+      with:
+        fa-src: ${{ inputs.fa-src }}
+        cache-key: ${{ inputs.cache-key }}
+        skip-restore: ${{ inputs.skip-restore }}
+
+    - name: Build
+      id: build
+      shell: pwsh
+      run: ${{ inputs.run }}
+
+    - name: Delete stale ninja cache entry
+      # On a cache hit after a successful build, remove the old entry so the
+      # subsequent save refreshes it (actions/cache/save fails hard on an
+      # existing key). On a failed build the old entry is kept untouched.
+      if: always() && steps.build.conclusion == 'success' && steps.fa-build-cache.outputs.cache-hit == 'true'
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        $key = [uri]::EscapeDataString('${{ steps.fa-build-cache.outputs.cache-primary-key }}')
+        $ref = [uri]::EscapeDataString('${{ github.ref }}')
+        gh api --method DELETE "/repos/${{ github.repository }}/actions/caches?key=$key&ref=$ref" --silent
+
+    - name: Save ninja incremental build cache
+      # Save after a successful build (fresh entry, or refresh after the delete
+      # above); on a failed build only save partial objects when no entry exists
+      # yet (incremental resume). Never save when the build step never ran.
+      if: always() && steps.build.conclusion != 'skipped' && (steps.build.conclusion == 'success' || steps.fa-build-cache.outputs.cache-hit != 'true')
+      uses: "./.github/actions/04.fa-ninja-cache-save"
+      with:
+        fa-src: ${{ inputs.fa-src }}
+        cache-primary-key: ${{ steps.fa-build-cache.outputs.cache-primary-key }}

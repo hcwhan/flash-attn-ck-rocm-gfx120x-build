@@ -4,7 +4,7 @@
 
 使用 GitHub Actions 为 **Windows / gfx1201 / PyTorch 2.12.0+rocm7.14.0** 编译 **FlashAttention 2 CK 后端** wheel。
 
-工具链版本以 **`VERSION.lock.json`** 为唯一来源，经 `.github/actions/01.fa-read-version-lock` 注入 CI。
+工具链版本以 **`VERSION.lock.json`** 为唯一来源，经 workflow 内 `npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env` 注入 CI。
 
 ## 目标环境
 
@@ -79,7 +79,7 @@ ComfyUI **推理专用** wheel：
 | Job | 作用 | 超时 |
 |-----|------|------|
 | `prep-fa-src` | clone + patch，上传源码 artifact | 45 min |
-| `build-win-gfx1201` | toolchain、cache、`build/7.wheel - build-bdist-wheel.ps1`（全量） | 6 h |
+| `build` | toolchain、cache、`npx tsx scripts/cli.ts 06.compile` + `08.wheel`（全量） | 6 h |
 
 ### 并行（`build-fa2-ck-gfx1201-parallel.yml`）
 
@@ -110,7 +110,7 @@ ComfyUI **推理专用** wheel：
 | 并行 compile | `--step compile`（每 shard 一次） | 单 shard |
 | 并行 link | `--step merge-and-wheel` + staging | 全量（env） |
 
-env 统一经 `base/init-fa-build-env.ps1`（含 `SOURCE_DATE_EPOCH`，取自 `flash_attention_build_commit_date`）。
+env 统一经 `scripts/lib/init-build-env.ts`（含 `SOURCE_DATE_EPOCH`，取自 `flash_attention_build_commit_date`）。
 
 ## 产物
 
@@ -145,11 +145,11 @@ flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl
 
 | 检查 | 脚本 |
 |------|------|
-| CI smoke test（CPU） | `build/8.verify - wheel-smoke-test.ps1` |
-| parallel link API dispatch 重编校验 | `base/build-fa-steps.py`（merge skip + ninja 前后断言） |
-| 部署前 GPU smoke test（gfx1201 真机） | `test/gpu-smoke-test.ps1` |
+| CI smoke test（CPU） | `npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist` |
+| parallel link API dispatch 重编校验 | `build/build-fa-steps.py`（merge skip + ninja 前后断言） |
+| 部署前 GPU smoke test（gfx1201 真机） | `python test/gpu-smoke-test.py -w .` |
 
-Smoke test：wheel 文件名/结构（.pyd 体积、OPT_DIM kernel 符号、METADATA）→ pip 安装 → import flash_attn_2_cuda；parallel link 另在 merge 阶段断言 3 个 `fmha_*_api.obj` 被 skip 并由 ninja 重编。GPU fwd + kvcache 见 `test/gpu-smoke-test.ps1`（部署前在真机手动跑）。
+Smoke test：wheel 文件名/结构（.pyd 体积、OPT_DIM kernel 符号、METADATA）→ pip 安装 → import flash_attn_2_cuda；parallel link 另在 merge 阶段断言 3 个 `fmha_*_api.obj` 被 skip 并由 ninja 重编。GPU fwd + kvcache 见 `test/gpu-smoke-test.py`（部署前在真机手动跑）。
 
 ## 安装到 ComfyUI
 

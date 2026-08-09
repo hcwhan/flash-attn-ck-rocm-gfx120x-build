@@ -22,8 +22,6 @@ concurrency:
   group: build-fa2-ck-gfx1201-parallel
   cancel-in-progress: true
 
-# actions: write needed for the cache delete-and-refresh flow (REST API);
-# contents: write needed for GitHub Releases upload.
 permissions:
   actions: write
   contents: write
@@ -41,25 +39,51 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 45
     outputs:
-      opt-dims-json: ${{ steps.opt-dim-plan.outputs.opt-dims-json }}
-      primary-opt-dim: ${{ steps.opt-dim-plan.outputs.primary-opt-dim }}
+      opt-dims-json: ${{ steps.opt-dim-plan.outputs.opt_dims_json }}
+      primary-opt-dim: ${{ steps.opt-dim-plan.outputs.primary_opt_dim }}
 
     steps:
       - name: Checkout build repo
         uses: actions/checkout@v7
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+          cache: npm
+
+      - name: Install npm dependencies
+        shell: pwsh
+        run: npm ci
+
+      - name: Load VERSION.lock.json
+        shell: pwsh
+        run: npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env
+
       - name: Plan OPT_DIM matrix
         id: opt-dim-plan
-        uses: "./.github/actions/00.fa-plan-opt-dim-matrix"
+        shell: pwsh
+        run: npx tsx scripts/cli.ts 02.plan-opt-dim-matrix
 
-      - name: Prepare patched flash-attention source
-        uses: "./.github/actions/02.fa-prep-src"
+      - name: Clone flash-attention source
+        shell: pwsh
+        run: npx tsx scripts/cli.ts 03.prep --flash-attention-root $env:FA_SRC
+
+      - name: Patch flash-attention for inference-only build
+        shell: pwsh
+        run: npx tsx scripts/cli.ts 04.patch --flash-attention-root $env:FA_SRC
+
+      - name: Upload patched source artifact
+        uses: actions/upload-artifact@v7
         with:
-          fa-src: ${{ env.FA_SRC }}
-          artifact-name: ${{ env.FA_ARTIFACT }}
+          name: ${{ env.FA_ARTIFACT }}
+          path: ${{ env.FA_SRC }}
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 9
 
   compile:
-    name: compile-win-gfx1201-d${{ matrix.opt_dim }}
+    name: compile-d${{ matrix.opt_dim }}
     needs: prep
     runs-on: windows-2022
     timeout-minutes: 360
@@ -72,41 +96,51 @@ jobs:
       - name: Checkout build repo
         uses: actions/checkout@v7
 
-      - name: Bootstrap toolchain and FA source
-        uses: "./.github/actions/05.fa-job-bootstrap"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          fa-src: ${{ env.FA_SRC }}
-          artifact-name: ${{ env.FA_ARTIFACT }}
+          node-version: "26"
+          cache: npm
+
+      - name: Install npm dependencies
+        shell: pwsh
+        run: npm ci
+
+      - name: Load VERSION.lock.json
+        shell: pwsh
+        run: npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env
+
+      - name: Setup ROCm toolchain
+        uses: "./.github/actions/01.fa-rocm-toolchain"
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          pytorch-version: ${{ env.PYTORCH_VERSION }}
+          torch-device: ${{ env.TORCH_DEVICE }}
+          rocm-index: ${{ env.ROCM_INDEX }}
+          rocm-version: ${{ env.HIP_VERSION }}
+
+      - name: Download patched flash-attention source
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ env.FA_ARTIFACT }}
+          path: ${{ env.FA_SRC }}
 
       - name: Fingerprint toolchain for cache key
         id: msvc-fp
-        uses: "./.github/actions/06.fa-toolchain-fingerprint"
+        shell: pwsh
+        run: npx tsx scripts/cli.ts 05.toolchain-fingerprint
 
       - name: Compile OPT_DIM shard with ninja cache
-        uses: "./.github/actions/08.fa-build-with-cache"
+        uses: "./.github/actions/03.fa-build-with-cache"
         with:
           fa-src: ${{ env.FA_SRC }}
-          # Repository commit covers all build inputs that live in this repo
-          # (scripts, VERSION.lock.json incl. the pinned FA commit); the runtime
-          # fingerprints cover external inputs: MSVC/clang toolchain (image
-          # updates) and the unpinned pip toolchain installs.
-          # cache-key: fa2-ck-gfx1201-parallel-v4-d${{ matrix.opt_dim }}-${{ github.sha }}-msvc${{ steps.msvc-fp.outputs.msvc-hash }}-pip${{ steps.msvc-fp.outputs.pip-hash }}
           cache-key: fa2-ck-gfx1201-parallel-v4-d${{ matrix.opt_dim }}-msvc${{ steps.msvc-fp.outputs.msvc-hash }}-pip${{ steps.msvc-fp.outputs.pip-hash }}
           skip-restore: ${{ env.SKIP_CACHE_RESTORE }}
-          run: |
-            . "$env:GITHUB_WORKSPACE\build\5.compile - compile-opt-dim.ps1" `
-              -OptDim "${{ matrix.opt_dim }}" `
-              -WorkspaceRoot $env:GITHUB_WORKSPACE `
-              -FaSrc $env:FA_SRC
+          run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ matrix.opt_dim }}" --fa-src $env:FA_SRC
 
       - name: Validate shard and emit RELEASE_DIR
         shell: pwsh
-        run: |
-          $releaseDir = . "$env:GITHUB_WORKSPACE\build\6.shard - validate-shard.ps1" `
-            -FaSrc $env:FA_SRC `
-            -OptDim "${{ matrix.opt_dim }}"
-          "RELEASE_DIR=$releaseDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          Write-Host "Uploading object files from $releaseDir"
+        run: npx tsx scripts/cli.ts 07.shard --fa-src $env:FA_SRC --opt-dim "${{ matrix.opt_dim }}"
 
       - name: Upload object files
         uses: actions/upload-artifact@v7
@@ -115,8 +149,6 @@ jobs:
           path: ${{ env.RELEASE_DIR }}
           retention-days: 7
           if-no-files-found: error
-          # Link merges each shard's .ninja_log into the link build dir; without
-          # it ninja rebuilds all kernels from scratch.
           include-hidden-files: true
 
   link:
@@ -129,11 +161,34 @@ jobs:
       - name: Checkout build repo
         uses: actions/checkout@v7
 
-      - name: Bootstrap toolchain and FA source
-        uses: "./.github/actions/05.fa-job-bootstrap"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          fa-src: ${{ env.FA_SRC }}
-          artifact-name: ${{ env.FA_ARTIFACT }}
+          node-version: "26"
+          cache: npm
+
+      - name: Install npm dependencies
+        shell: pwsh
+        run: npm ci
+
+      - name: Load VERSION.lock.json
+        shell: pwsh
+        run: npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env
+
+      - name: Setup ROCm toolchain
+        uses: "./.github/actions/01.fa-rocm-toolchain"
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          pytorch-version: ${{ env.PYTORCH_VERSION }}
+          torch-device: ${{ env.TORCH_DEVICE }}
+          rocm-index: ${{ env.ROCM_INDEX }}
+          rocm-version: ${{ env.HIP_VERSION }}
+
+      - name: Download patched flash-attention source
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ env.FA_ARTIFACT }}
+          path: ${{ env.FA_SRC }}
 
       - name: Download OPT_DIM object artifacts
         uses: actions/download-artifact@v8
@@ -142,25 +197,40 @@ jobs:
           path: ${{ env.FA_STAGING }}
           merge-multiple: false
 
-        # same as serial link-wheel step, but use merged objects
       - name: Link and package wheel from merged objects
         shell: pwsh
-        run: |
-          . "$env:GITHUB_WORKSPACE\build\7.wheel - build-bdist-wheel.ps1" `
-            -FaSrc $env:FA_SRC `
-            -DistDir $env:GITHUB_WORKSPACE\dist `
-            -WorkspaceRoot $env:GITHUB_WORKSPACE `
-            -StagingRoot $env:FA_STAGING `
-            -PrimaryDim "${{ needs.prep.outputs.primary-opt-dim }}"
-          Get-ChildItem $env:GITHUB_WORKSPACE\dist
+        run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist --staging-root $env:FA_STAGING --primary-dim "${{ needs.prep.outputs.primary-opt-dim }}"
 
-      - name: Smoke test and upload wheel
-        uses: "./.github/actions/10.fa-smoke-test-upload-wheel"
+      - name: Smoke test (CPU)
+        shell: pwsh
+        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.WHEEL_ARTIFACT_NAME }}
+          path: |
+            dist/*.whl
+            dist/*.sha256
+            dist/wheel.manifest.json
+          retention-days: 30
+
+      - name: Prepare release metadata
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        id: release
+        shell: pwsh
+        run: npx tsx scripts/cli.ts 10.publish --dist-dir $env:GITHUB_WORKSPACE\dist --workflow-name "${{ github.workflow }}" --release-variant parallel
 
       - name: Publish GitHub Release
         if: ${{ github.event.inputs.publish_release != 'false' }}
-        uses: "./.github/actions/11.fa-upload-release"
+        uses: softprops/action-gh-release@v2
         with:
-          dist-dir: ${{ github.workspace }}/dist
-          workflow-name: ${{ github.workflow }}
-          release-variant: parallel
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: ${{ steps.release.outputs.release_title }}
+          body_path: ${{ steps.release.outputs.body_path }}
+          files: |
+            dist/*.whl
+            dist/*.sha256
+            dist/wheel.manifest.json
+          prerelease: ${{ steps.release.outputs.prerelease == 'true' }}
+          make_latest: false
