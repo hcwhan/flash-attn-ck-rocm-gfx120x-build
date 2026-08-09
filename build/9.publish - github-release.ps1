@@ -47,13 +47,15 @@ $bodyPath = Join-Path $env:RUNNER_TEMP "release-body.md"
 $manifestPath = Join-Path $DistDir "wheel.manifest.json"
 $manifestBlock = ""
 if (Test-Path $manifestPath) {
+    $fence = '```'
+    $manifestJson = (Get-Content $manifestPath -Raw).TrimEnd()
     $manifestBlock = @"
 
 ### wheel.manifest.json
 
-```json
-$(Get-Content $manifestPath -Raw)
-```
+$($fence)json
+$manifestJson
+$($fence)
 "@
 }
 
