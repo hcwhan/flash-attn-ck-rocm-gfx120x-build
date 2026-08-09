@@ -28,16 +28,43 @@ const patchPoints = [
   },
 ] as const;
 
+function readNormalized(filePath: string): { content: string; eol: "\n" | "\r\n" } {
+  const raw = readFileSync(filePath, "utf8");
+  const eol: "\n" | "\r\n" = raw.includes("\r\n") ? "\r\n" : "\n";
+  return { content: raw.replace(/\r\n/g, "\n"), eol };
+}
+
+function writeNormalized(
+  filePath: string,
+  content: string,
+  eol: "\n" | "\r\n",
+): void {
+  const out = eol === "\r\n" ? content.replace(/\n/g, "\r\n") : content;
+  writeFileSync(filePath, out, "utf8");
+}
+
+function spawnBreproAlreadyPatched(content: string): boolean {
+  return (
+    content.includes('if "/Brepro" not in cmd and "-Brepro" not in cmd:') &&
+    content.includes('cmd.append("/Brepro")')
+  );
+}
+
 export function runPatch(options: { flashAttentionRoot: string }): void {
   const setup = path.join(path.resolve(options.flashAttentionRoot), "setup.py");
   let content: string;
+  let setupEol: "\n" | "\r\n";
   try {
-    content = readFileSync(setup, "utf8");
+    ({ content, eol: setupEol } = readNormalized(setup));
   } catch {
     throw new Error(`setup.py not found: ${setup}`);
   }
 
   for (const point of patchPoints) {
+    if (point.name === "link-spawn-brepro" && spawnBreproAlreadyPatched(content)) {
+      console.log(`  OK ${point.name}: already patched`);
+      continue;
+    }
     const matched = point.regex
       ? point.before.test(content)
       : content.includes(point.before);
@@ -48,13 +75,16 @@ export function runPatch(options: { flashAttentionRoot: string }): void {
   }
 
   for (const point of patchPoints) {
+    if (point.name === "link-spawn-brepro" && spawnBreproAlreadyPatched(content)) {
+      continue;
+    }
     content = point.regex
       ? content.replace(point.before, point.after)
       : content.replace(point.before, point.after);
     console.log(`  OK ${point.name}: patched`);
   }
 
-  writeFileSync(setup, content, "utf8");
+  writeNormalized(setup, content, setupEol);
   console.log(`Patched ${setup} for inference-only CK build`);
 
   const ckSrcDir = path.join(
