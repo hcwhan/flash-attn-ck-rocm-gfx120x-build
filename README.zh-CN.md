@@ -28,6 +28,9 @@
 | `expected_wheel_pattern` | smoke test 校验 wheel 文件名 glob |
 | `wheel_local_version` | wheel 版本号后的 `+local` 标签（注入 `FLASH_ATTN_LOCAL_VERSION`） |
 | `wheel_artifact_name` | GitHub Actions 发布的 artifact 名称 |
+| `release_tag_prefix` | Release tag 前缀（最终 tag = `{prefix}-build{run_number}`） |
+| `release_name` | Release 标题 |
+| `release_prerelease` | `"true"` / `"false"`，是否预发布 |
 
 规则：CI 始终 clone **`flash_attention_build_commit`**（`fetch` + `checkout FETCH_HEAD`）。
 
@@ -69,6 +72,7 @@ ComfyUI **推理专用** wheel：
 |------|------|------|
 | `ninja_workers` | `4` | Ninja 并行 worker 数（OOM 时可改为 `2`） |
 | `skip_cache_restore` | `false` | 设为 `true` 时跳过 cache restore（仅 lookup 探测，仍会在编译后保存） |
+| `publish_release` | `true` | 设为 `false` 时跳过 GitHub Release 上传 |
 
 ### 串行（`build-fa2-ck-gfx1201-serial.yml`）
 
@@ -110,11 +114,18 @@ env 统一经 `base/init-fa-build-env.ps1`。
 
 ## 产物
 
-Artifact：**`wheel_artifact_name`**
+Artifact：**`wheel_artifact_name`**（Actions 短期下载）
+
+GitHub Release（构建成功后自动上传，tag 形如 `fa2-ck-gfx1201-rocm714-build123`）：
 
 - `flash_attn-*.whl`
 - `flash_attn-*.whl.sha256`
 - `wheel.manifest.json`
+
+```powershell
+gh release list
+gh release download fa2-ck-gfx1201-rocm714-build123 -D .\dist
+```
 
 预期文件名（`expected_wheel_pattern`）：
 

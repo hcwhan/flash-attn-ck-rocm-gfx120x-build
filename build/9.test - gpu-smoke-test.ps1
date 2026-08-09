@@ -48,15 +48,26 @@ for headdim in opt_dims:
 
 # kvcache path: exercises the fmha_fwd_appendkv kernels (k_new) plus the
 # fmha_fwd_splitkv kernels (main attention over cache_seqlens + seqlen_knew).
+# CK requires seqlen_q <= kcache.size(1) when k/v are supplied.
 from flash_attn import flash_attn_with_kvcache
-seqlen_k, seqlen_knew = 8, 8
+seqlen_q_kv, seqlen_k, seqlen_knew, cache_seqlen = 8, 16, 8, 8
 for headdim in opt_dims:
-    q = torch.randn(batch, seqlen, nheads, headdim, device=device, dtype=torch.float16)
-    kcache = torch.zeros(batch, seqlen_k, nheads, headdim, device=device, dtype=torch.float16)
-    vcache = torch.zeros(batch, seqlen_k, nheads, headdim, device=device, dtype=torch.float16)
+    q = torch.randn(batch, seqlen_q_kv, nheads, headdim, device=device, dtype=torch.float16)
+    kcache = torch.randn(batch, seqlen_k, nheads, headdim, device=device, dtype=torch.float16)
+    vcache = torch.randn(batch, seqlen_k, nheads, headdim, device=device, dtype=torch.float16)
     k_new = torch.randn(batch, seqlen_knew, nheads, headdim, device=device, dtype=torch.float16)
     v_new = torch.randn(batch, seqlen_knew, nheads, headdim, device=device, dtype=torch.float16)
-    cache_seqlens = torch.full((batch,), seqlen_k, dtype=torch.int32, device=device)
+    cache_seqlens = torch.full((batch,), cache_seqlen, dtype=torch.int32, device=device)
+    if seqlen_q_kv > seqlen_k:
+        raise SystemExit(
+            f'ERROR: kvcache smoke requires seqlen_q <= kcache.size(1): '
+            f'{seqlen_q_kv} > {seqlen_k}'
+        )
+    if cache_seqlen + seqlen_knew > seqlen_k:
+        raise SystemExit(
+            f'ERROR: kvcache smoke params overflow cache: '
+            f'{cache_seqlen} + {seqlen_knew} > {seqlen_k}'
+        )
     out = flash_attn_with_kvcache(
         q, kcache, vcache, k_new, v_new,
         cache_seqlens=cache_seqlens, causal=True,

@@ -53,6 +53,7 @@
 | `08.fa-build-with-cache` | 07+编译+09 带缓存构建 |
 | `09.fa-ninja-cache-save` | 保存 ninja 增量缓存 |
 | `10.fa-smoke-test-upload-wheel` | 冒烟测试并上传 wheel |
+| `11.fa-upload-release` | 上传 GitHub Release（tag 来自 lock） |
 
 缓存 key 含仓库 commit-id（覆盖 build 脚本/lock/action 全部仓内输入）+ 工具链指纹（MSVC+clang，镜像更新）+ pip 工具链指纹（pip/setuptools/wheel/ninja/packaging/psutil，运行时 `pip freeze` 观测）。Workflow `env`：`MAX_JOBS`/`FA_SRC`/`FA_ARTIFACT`/`FA_STAGING`/`SKIP_CACHE_RESTORE`。
 

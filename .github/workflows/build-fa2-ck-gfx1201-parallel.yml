@@ -12,16 +12,21 @@ on:
         type: boolean
         required: false
         default: false
+      publish_release:
+        description: "Upload wheel to GitHub Releases after successful build"
+        type: boolean
+        required: false
+        default: true
 
 concurrency:
   group: build-fa2-ck-gfx1201-parallel
   cancel-in-progress: true
 
 # actions: write needed for the cache delete-and-refresh flow (REST API);
-# contents: read keeps actions/checkout working (unspecified scopes default to none).
+# contents: write needed for GitHub Releases upload.
 permissions:
   actions: write
-  contents: read
+  contents: write
 
 env:
   MAX_JOBS: ${{ github.event.inputs.ninja_workers }}
@@ -151,3 +156,10 @@ jobs:
 
       - name: Smoke test and upload wheel
         uses: "./.github/actions/10.fa-smoke-test-upload-wheel"
+
+      - name: Publish GitHub Release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        uses: "./.github/actions/11.fa-upload-release"
+        with:
+          dist-dir: ${{ github.workspace }}/dist
+          workflow-name: ${{ github.workflow }}

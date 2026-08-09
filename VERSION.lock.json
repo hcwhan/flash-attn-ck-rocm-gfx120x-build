@@ -12,5 +12,8 @@
   "flash_attention_build_commit_date": "2026-08-07T05:21:24Z",
   "expected_wheel_pattern": "flash_attn-*+rocm714torch212cxx11abiTRUE-cp312-cp312-win_amd64.whl",
   "wheel_local_version": "rocm714torch212cxx11abiTRUE",
-  "wheel_artifact_name": "flash-attn-ck-gfx1201-cp312-rocm714"
+  "wheel_artifact_name": "flash-attn-ck-gfx1201-cp312-rocm714",
+  "release_tag_prefix": "fa2-ck-gfx1201-rocm714",
+  "release_name": "FlashAttention 2 CK gfx1201 Windows",
+  "release_prerelease": "true"
 }
