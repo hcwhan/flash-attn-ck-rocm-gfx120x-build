@@ -87,10 +87,6 @@ jobs:
           skip-cache-restore: ${{ env.SKIP_CACHE_RESTORE }}
           run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ env.LOCK_OPT_DIM }}" --fa-src $env:FA_SRC
 
-      - name: Link and package wheel from in-place objects
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist
-
       - name: Write compile cache metadata
         shell: pwsh
         run: |
@@ -101,6 +97,10 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $entry | ConvertTo-Json -Depth 3 -AsArray | Out-File -FilePath dist/build-caches.json -Encoding utf8
+
+      - name: Link and package wheel from in-place objects
+        shell: pwsh
+        run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist
 
       - name: Smoke test (CPU)
         shell: pwsh
@@ -114,7 +114,7 @@ jobs:
             dist/*.whl
             dist/*.sha256
             dist/wheel.manifest.json
-          retention-days: 30
+          retention-days: 7
 
       - name: Prepare release metadata
         if: ${{ github.event.inputs.publish_release != 'false' }}

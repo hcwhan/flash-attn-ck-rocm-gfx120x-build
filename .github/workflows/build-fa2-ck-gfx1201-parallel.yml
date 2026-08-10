@@ -122,6 +122,10 @@ jobs:
           skip-cache-restore: ${{ env.SKIP_CACHE_RESTORE }}
           run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ matrix.opt-dim }}" --fa-src $env:FA_SRC
 
+      - name: Validate shard and emit SHARD_RELEASE_DIR
+        shell: pwsh
+        run: npx tsx scripts/cli.ts 07.shard --fa-src $env:FA_SRC --opt-dim "${{ matrix.opt-dim }}"
+
       - name: Write compile cache metadata
         shell: pwsh
         run: |
@@ -140,10 +144,6 @@ jobs:
           path: cache-meta/d${{ matrix.opt-dim }}.json
           retention-days: 7
           if-no-files-found: error
-
-      - name: Validate shard and emit SHARD_RELEASE_DIR
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 07.shard --fa-src $env:FA_SRC --opt-dim "${{ matrix.opt-dim }}"
 
       - name: Upload object files
         uses: actions/upload-artifact@v7
@@ -224,7 +224,7 @@ jobs:
             dist/*.whl
             dist/*.sha256
             dist/wheel.manifest.json
-          retention-days: 30
+          retention-days: 7
 
       - name: Prepare release metadata
         if: ${{ github.event.inputs.publish_release != 'false' }}
