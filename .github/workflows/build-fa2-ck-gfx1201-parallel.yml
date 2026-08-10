@@ -42,6 +42,9 @@ jobs:
       primary-dim: ${{ steps.plan-opt-dim-matrix.outputs.primary-dim }}
 
     steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v7
+
       - name: Bootstrap build job
         uses: "./.github/actions/A00.fa-job-bootstrap"
         with:
@@ -64,6 +67,9 @@ jobs:
         opt-dim: ${{ fromJson(needs.plan-opt-dim.outputs.opt-dims-json) }}
 
     steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v7
+
       - name: Bootstrap build job
         uses: "./.github/actions/A00.fa-job-bootstrap"
 
@@ -120,6 +126,9 @@ jobs:
     timeout-minutes: 360
 
     steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v7
+
       - name: Bootstrap build job
         uses: "./.github/actions/A00.fa-job-bootstrap"
 

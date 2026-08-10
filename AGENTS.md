@@ -71,14 +71,14 @@
 
 | Action | 用途 |
 |--------|------|
-| `A00.fa-job-bootstrap` | checkout + Node/npm + `01.config`；inputs `prep-source` / `setup-toolchain`（默认 true）；toolchain 读 `01.config` env |
+| `A00.fa-job-bootstrap` | Node/npm + `01.config`；inputs `prep-source` / `setup-toolchain`（默认 true）；toolchain 读 `01.config` env；**job 须先 `actions/checkout`** |
 | `A01.fa-rocm-toolchain` | 安装 Python / MSVC / PyTorch / ROCm（pip toolchain cache：`PIP_TOOLCHAIN_CACHE_KEY`） |
 | `A02.fa-ninja-cache-restore` | 恢复 ninja 增量缓存 |
 | `A03.fa-build-with-cache` | A02+编译+A04 带缓存构建 |
 | `A04.fa-ninja-cache-save` | 保存 ninja 增量缓存 |
 | `A99.fa-verify-publish` | `09.verify` + upload wheel artifact + 可选 `10.publish` / GitHub Release（读 `workflow_dispatch.publish_release`）；inputs `build-variant` / `build-caches`（相对 workspace） |
 
-每个 job：**必须**经 `A00.fa-job-bootstrap`（或等价地 checkout + Node/npm + `01.config --export-github-env`）；compile/link/serial 另开 prep/toolchain/fingerprint。随后步骤缺 env / 缺产物直接 throw。
+每个 job：**须先** `actions/checkout`，再经 `A00.fa-job-bootstrap`（或等价地 Node/npm + `01.config --export-github-env`）；compile/link/serial 另开 prep/toolchain/fingerprint。随后步骤缺 env / 缺产物直接 throw。
 
 **有意不合并：** compile 阶段 `shard` dim 校验 vs link 阶段 `validate-staging.ts`；四 shard 重复编 shared obj（link 只用 d32）；parallel link-wheel 无 ninja cache；obj artifact 名 `d{dim}` 即 staging 子目录名（勿 normalize）。
 

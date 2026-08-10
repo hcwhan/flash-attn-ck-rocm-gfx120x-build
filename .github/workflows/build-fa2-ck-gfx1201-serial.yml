@@ -38,6 +38,9 @@ jobs:
     timeout-minutes: 360
 
     steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v7
+
       - name: Bootstrap build job
         uses: "./.github/actions/A00.fa-job-bootstrap"
 
