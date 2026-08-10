@@ -1,8 +1,8 @@
-# flash-attn-ck-rocm-gfx1201-build
+# flash-attn-ck-rocm-gfx120x-build
 
 [English](README.en-US.md)
 
-使用 GitHub Actions 为 **Windows / gfx1201 / PyTorch 2.12.0+rocm7.14.0** 编译 **FlashAttention 2 CK 后端** wheel。
+使用 GitHub Actions 为 **Windows / gfx120x（RDNA4）/ PyTorch 2.12.0+rocm7.14.0** 编译 **FlashAttention 2 CK 后端** wheel。
 
 工具链版本以 **`VERSION.lock.json`** 为唯一来源，经 workflow 内 `npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env` 注入 CI。
 
@@ -10,7 +10,7 @@
 
 | 项 | 值 |
 |----|-----|
-| GPU 架构 | `gfx1201`（RDNA4，Navi 48） |
+| GPU 架构 | lock **`compile.gpu_archs`**（当前 `gfx1200;gfx1201`） |
 | 系统 | Windows |
 | Python | 3.12 |
 | PyTorch | `2.12.0+rocm7.14.0` |
@@ -23,8 +23,8 @@
 |------|------|------|
 | `toolchain` | `python`、`pytorch`、`torch_device_extra`、`rocm_index`、`rocm` | pip 工具链 pin |
 | `flash_attention` | `repo`、`build_commit`、`build_commit_date` | 每次构建精确 clone 的 FA 源码；**升级 FA 时改 `build_commit` 与 `build_commit_date`** |
-| `flash_attention` | `min_commit` | gfx1201 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**仅人类可读参考** |
-| `compile` | `gpu_archs`、`opt_dim` | HIP 编译目标与 OPT_DIM 档位 |
+| `flash_attention` | `min_commit` | RDNA4 gfx12x 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**仅人类可读参考** |
+| `compile` | `gpu_archs`、`opt_dim` | HIP 编译目标与 OPT_DIM 档位（**唯一架构源**） |
 | `wheel` | `wheel_local_version` | wheel 的 `+local` 标签（env `WHEEL_LOCAL_VERSION`；wheel 时映射 upstream `FLASH_ATTN_LOCAL_VERSION`） |
 | `wheel` | `wheel_artifact_name` | GitHub Actions artifact 名称 |
 | `release` | `release_tag_prefix` | Release tag 前缀（`{prefix}-{variant}-build{run_number}`） |
@@ -32,16 +32,14 @@
 
 `EXPECTED_WHEEL_PATTERN` 由 `wheel.wheel_local_version` + `toolchain.python` 在 `version-lock.ts` 推导，不在 lock 中存储。
 
-规则：CI 始终 clone **`flash_attention.build_commit`**（`fetch` + `checkout FETCH_HEAD`）。
+规则：CI 始终 clone **`flash_attention.build_commit`**（`fetch` + `checkout FETCH_HEAD`）；`GPU_ARCHS` 只从 lock `compile.gpu_archs` 读取（Windows 分号分隔）。
 
-### 适用显卡（`gfx1201`）
+### 适用显卡（gfx120x / RDNA4）
 
-| 类别 | 型号 |
-|------|------|
-| 消费级 | Radeon RX 9070 XT / RX 9070 / RX 9070 GRE |
-| 专业级 | Radeon AI PRO R9700 / R9700S / R9600D |
-
-> **`gfx1200`** 型号（如 RX 9060 系列）不在本 wheel 目标内。
+| HIP 代号 | 芯片 | 代表型号 |
+|----------|------|----------|
+| **gfx1201** | Navi 48 | RX 9070 XT / RX 9070 / RX 9070 GRE；Radeon AI PRO R9700 系列 |
+| **gfx1200** | Navi 44 | RX 9060 XT / RX 9060 / RX 9060 XT LP；RX 9050 系列 |
 
 ## 编译配置
 
@@ -50,19 +48,22 @@ ComfyUI **推理专用** wheel：
 - CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（无 bwd）
 - **`-DFLASHATTENTION_DISABLE_BACKWARD`**
 - **C++11 ABI `cxx11.abi`**（与 pin 的 PyTorch 一致；local tag 见 `wheel.wheel_local_version`）
+- **`GPU_ARCHS`** = lock `compile.gpu_archs`（Windows 分号分隔）
 - `OPT_DIM=32,64,128,256`
 
 | 范围 | 约计 ninja targets |
 |------|-------------------|
-| link 汇总全量 | **~924** |
-| 单 OPT_DIM shard | **~230** |
+| link 汇总全量（双 arch） | **~924** |
+| 单 OPT_DIM shard（双 arch） | **~218–288** |
+
+> `GPU_ARCHS=gfx1200;gfx1201` 时 hipcc 在同一 ninja rule 内为两个 arch 生成代码，**不会**按 arch 数量倍增 compile targets（CI 日志中可见 `[n/924]`）。
 
 ## 触发方式
 
 | Workflow | 用途 | 触发 |
 |----------|------|------|
-| **Build FlashAttention CK serial (Windows gfx1201)** | 单 job 全量编译 + cache（`serial-v5`） | **仅手动** |
-| **Build FlashAttention CK parallel (Windows gfx1201)** | OPT_DIM 分片 compile + link（`parallel-v5-d{dim}`） | **仅手动** |
+| **Build FlashAttention CK serial (Windows gfx120x)** | 单 job 全量编译 + cache（`serial-v5`） | **仅手动** |
+| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM 分片 compile + link（`parallel-v5-d{dim}`） | **仅手动** |
 
 > 推送到 `main` **不会**自动触发编译。
 
@@ -74,13 +75,13 @@ ComfyUI **推理专用** wheel：
 | `skip_cache_restore` | `false` | 设为 `true` 时跳过 cache restore（仅 lookup 探测，仍会在编译后保存） |
 | `publish_release` | `true` | 设为 `false` 时跳过 GitHub Release 上传 |
 
-### 串行（`build-fa2-ck-gfx1201-serial.yml`）
+### 串行（`build-fa2-ck-gfx120x-serial.yml`）
 
 | Job | 作用 | 超时 |
 |-----|------|------|
 | `compile-full-and-link` | clone+patch、toolchain、cache、`06.compile` + `08.wheel`、smoke test | 6 h |
 
-### 并行（`build-fa2-ck-gfx1201-parallel.yml`）
+### 并行（`build-fa2-ck-gfx120x-parallel.yml`）
 
 | Job | 作用 | 超时 |
 |-----|------|------|
@@ -88,7 +89,7 @@ ComfyUI **推理专用** wheel：
 | `compile-d32` … `d256` | 各 job 内 clone+patch，编一个 OPT_DIM shard，上传 `.obj` | 各 6 h |
 | `link-wheel` | clone+patch、合并 obj + link + 打 wheel + CPU smoke test | 6 h |
 
-- Cache key 含 `VERSION.lock.json` SHA256 前 8 位（`-v5-{lockHash8}-`）及三段工具链指纹（MSVC 工具集 / ROCm clang / pip 工具链）；**仅精确匹配**（无 `restore-keys`）。串行 `fa2-ck-gfx1201-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，并行 `fa2-ck-gfx1201-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，互不共用。
+- Cache key 含 `VERSION.lock.json` SHA256 前 8 位（`-v5-{lockHash8}-`）及三段工具链指纹（MSVC 工具集 / ROCm clang / pip 工具链）；**仅精确匹配**（无 `restore-keys`）。串行 `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，并行 `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，互不共用。
 - 四 shard 各编 shared obj；link 仅使用 **lock `opt_dim` 第一档**（当前 `32`）的 shared obj。
 
 ### 构建阶段
@@ -121,8 +122,8 @@ GitHub Release（构建成功后自动上传；serial / parallel 使用不同 ta
 
 | Workflow | Tag 示例 | Release 标题示例 |
 |----------|----------|------------------|
-| serial | `fa2-ck-gfx1201-cp312-torch2.12.0-rocm7.14.0-serial-build123` | FlashAttention 2 CK gfx1201 Windows (serial) (build 123) |
-| parallel | `fa2-ck-gfx1201-cp312-torch2.12.0-rocm7.14.0-parallel-build123` | FlashAttention 2 CK gfx1201 Windows (parallel) (build 123) |
+| serial | `fa2-ck-gfx120x-cp312-torch2.12.0-rocm7.14.0-serial-build123` | FlashAttention 2 CK gfx120x Windows (serial) (build 123) |
+| parallel | `fa2-ck-gfx120x-cp312-torch2.12.0-rocm7.14.0-parallel-build123` | FlashAttention 2 CK gfx120x Windows (parallel) (build 123) |
 
 - `flash_attn-*.whl`
 - `flash_attn-*.whl.sha256`
@@ -130,8 +131,8 @@ GitHub Release（构建成功后自动上传；serial / parallel 使用不同 ta
 
 ```powershell
 gh release list
-gh release download fa2-ck-gfx1201-cp312-torch2.12.0-rocm7.14.0-serial-build123 -D .\dist
-gh release download fa2-ck-gfx1201-cp312-torch2.12.0-rocm7.14.0-parallel-build123 -D .\dist
+gh release download fa2-ck-gfx120x-cp312-torch2.12.0-rocm7.14.0-serial-build123 -D .\dist
+gh release download fa2-ck-gfx120x-cp312-torch2.12.0-rocm7.14.0-parallel-build123 -D .\dist
 ```
 
 预期 wheel 文件名（由 `wheel.wheel_local_version` + `toolchain.python` 推导）：
@@ -147,9 +148,9 @@ flash_attn-*+torch2.12.0.rocm7.14.0.cxx11.abi-cp312-cp312-win_amd64.whl
 | CI smoke test serial（CPU） | `npx tsx scripts/cli.ts 09.verify --dist-dir dist --build-variant serial --build-caches dist\build-caches.json` |
 | CI smoke test parallel（CPU） | `npx tsx scripts/cli.ts 09.verify --dist-dir dist --build-variant parallel --build-caches cache-meta` |
 | parallel link API dispatch 重编校验 | `build/build-fa-steps.py`（merge skip + ninja 前后断言） |
-| 部署前 GPU smoke test（gfx1201 真机） | `python test/gpu-smoke-test.py -w .` |
+| 部署前 GPU smoke test（gfx120x 真机） | `python test/gpu-smoke-test.py -w .` |
 
-Smoke test：wheel 文件名/结构（.pyd 体积、OPT_DIM kernel 符号、METADATA）→ pip 安装 → import flash_attn_2_cuda；parallel link 另在 merge 阶段断言 3 个 `fmha_*_api.obj` 被 skip 并由 ninja 重编。GPU fwd + kvcache 见 `test/gpu-smoke-test.py`（部署前在真机手动跑）。
+Smoke test：wheel 文件名/结构（.pyd 体积、OPT_DIM kernel 符号、METADATA）→ pip 安装 → import flash_attn_2_cuda；parallel link 另在 merge 阶段断言 3 个 `fmha_*_api.obj` 被 skip 并由 ninja 重编。GPU fwd + kvcache 见 `test/gpu-smoke-test.py`（部署前在 gfx1200/gfx1201 真机手动跑）。
 
 ## 安装到 ComfyUI
 

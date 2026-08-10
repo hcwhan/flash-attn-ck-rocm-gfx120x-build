@@ -1,4 +1,4 @@
-name: Build FlashAttention CK parallel (Windows gfx1201)
+name: Build FlashAttention CK parallel (Windows gfx120x)
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ on:
         default: true
 
 concurrency:
-  group: build-fa2-ck-gfx1201-parallel
+  group: build-fa2-ck-gfx120x-parallel
   cancel-in-progress: true
 
 permissions:

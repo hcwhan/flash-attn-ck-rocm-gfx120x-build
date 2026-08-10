@@ -13,7 +13,7 @@ import { runPublish } from "./commands/10.publish.js";
 
 const program = new Command();
 
-program.name("fa-build").description("FlashAttention gfx1201 build CLI");
+program.name("fa-build").description("FlashAttention gfx120x build CLI");
 
 program
   .command("01.config")
