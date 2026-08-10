@@ -6,7 +6,6 @@ const buildCacheEntrySchema = z.object({
   opt_dim: z.string().min(1),
   key: z.string().min(1),
   hit: z.boolean(),
-  restore_skipped: z.boolean(),
 });
 
 export type BuildCacheEntry = z.infer<typeof buildCacheEntrySchema>;

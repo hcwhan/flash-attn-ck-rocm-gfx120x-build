@@ -130,7 +130,6 @@ jobs:
             opt_dim = '${{ matrix.opt-dim }}'
             key = '${{ steps.toolchain-fingerprint.outputs.cache-key }}'
             hit = '${{ steps.compile-shard.outputs.cache-hit }}' -eq 'true'
-            restore_skipped = $env:SKIP_CACHE_RESTORE -eq 'true'
           }
           $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath cache-meta/d${{ matrix.opt-dim }}.json -Encoding utf8
 

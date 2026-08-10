@@ -89,6 +89,31 @@ function matchesGlob(name: string, pattern: string): boolean {
   return regex.test(name);
 }
 
+function readWorkflowDispatch(): {
+  ninja_workers: number;
+  skip_cache_restore: boolean;
+} {
+  const maxJobs = requireGithubActionsEnv("MAX_JOBS");
+  const skipCacheRestore = requireGithubActionsEnv("SKIP_CACHE_RESTORE");
+  const ninjaWorkers = Number(maxJobs);
+  if (
+    !Number.isFinite(ninjaWorkers) ||
+    !Number.isInteger(ninjaWorkers) ||
+    ninjaWorkers < 1
+  ) {
+    throw new Error(`MAX_JOBS must be a positive integer, got ${maxJobs}`);
+  }
+  if (skipCacheRestore !== "true" && skipCacheRestore !== "false") {
+    throw new Error(
+      `SKIP_CACHE_RESTORE must be 'true' or 'false', got ${skipCacheRestore}`,
+    );
+  }
+  return {
+    ninja_workers: ninjaWorkers,
+    skip_cache_restore: skipCacheRestore === "true",
+  };
+}
+
 export function runVerify(options: {
   distDir: string;
   buildVariant: string;
@@ -179,6 +204,7 @@ export function runVerify(options: {
     wheel_local_version: wheelLocalVersion,
     source_date_epoch: Number(sourceDateEpoch),
     build_variant: buildVariant,
+    dispatch: readWorkflowDispatch(),
     build_caches: buildCaches,
     build_github_run_id: githubRunId,
     build_github_run_number: githubRunNumber,
