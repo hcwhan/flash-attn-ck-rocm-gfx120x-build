@@ -12,6 +12,7 @@ export function initBuildEnv(options: { optDim: string }): void {
 
   run(PYTHON, ["-m", "pip", "install", "numpy", "-q"], { quiet: true });
 
+  // Upstream flash-attention setup.py reads OPT_DIM; value comes from CK_OPT_DIM or a shard tier.
   process.env.OPT_DIM = options.optDim;
 
   const gpuArchs = requireLockEnv("GPU_ARCHS");

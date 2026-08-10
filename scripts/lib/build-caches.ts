@@ -76,15 +76,15 @@ export function readBuildCaches(inputPath: string): BuildCacheEntry[] {
 export function validateBuildCachesForVariant(options: {
   buildCaches: BuildCacheEntry[];
   buildVariant: string;
-  lockOptDim: string;
+  ckOptDim: string;
 }): BuildCacheEntry[] {
-  const expectedDims = options.lockOptDim
+  const expectedDims = options.ckOptDim
     .split(",")
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
 
   if (expectedDims.length < 1) {
-    throw new Error("LOCK_OPT_DIM must contain at least one OPT_DIM");
+    throw new Error("CK_OPT_DIM must contain at least one CK FMHA opt_dim tier");
   }
 
   const buildVariant = options.buildVariant.trim().toLowerCase();
@@ -95,9 +95,9 @@ export function validateBuildCachesForVariant(options: {
       );
     }
     const entry = options.buildCaches[0]!;
-    if (entry.opt_dim !== options.lockOptDim) {
+    if (entry.opt_dim !== options.ckOptDim) {
       throw new Error(
-        `serial build cache opt_dim mismatch: ${entry.opt_dim} != ${options.lockOptDim}`,
+        `serial build cache opt_dim mismatch: ${entry.opt_dim} != ${options.ckOptDim}`,
       );
     }
     return options.buildCaches;

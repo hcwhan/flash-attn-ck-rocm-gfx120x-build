@@ -16,10 +16,10 @@ def load_lock(workspace_root: Path) -> dict:
         return json.load(handle)
 
 
-def parse_opt_dims(opt_dim: str) -> list[int]:
-    dims = [int(part.strip()) for part in opt_dim.split(",") if part.strip()]
+def parse_ck_opt_dims(ck_opt_dim: str) -> list[int]:
+    dims = [int(part.strip()) for part in ck_opt_dim.split(",") if part.strip()]
     if not dims:
-        raise SystemExit("VERSION.lock.json compile.opt_dim is missing or empty")
+        raise SystemExit("VERSION.lock.json compile.ck_opt_dim is missing or empty")
     return dims
 
 
@@ -50,17 +50,17 @@ def main() -> None:
         raise SystemExit("VERSION.lock.json compile section is missing")
 
     gpu_archs = compile_lock.get("gpu_archs")
-    opt_dim = compile_lock.get("opt_dim")
+    ck_opt_dim = compile_lock.get("ck_opt_dim")
     if not isinstance(gpu_archs, str) or not gpu_archs.strip():
         raise SystemExit("VERSION.lock.json compile.gpu_archs is missing")
-    if not isinstance(opt_dim, str) or not opt_dim.strip():
-        raise SystemExit("VERSION.lock.json compile.opt_dim is missing")
+    if not isinstance(ck_opt_dim, str) or not ck_opt_dim.strip():
+        raise SystemExit("VERSION.lock.json compile.ck_opt_dim is missing")
 
     expected_archs = parse_gpu_archs(gpu_archs)
-    opt_dims = parse_opt_dims(opt_dim)
+    head_dims = parse_ck_opt_dims(ck_opt_dim)
 
     print(f"GPU smoke test on {gpu_archs} (requires ROCm PyTorch + GPU)")
-    print(f"OPT_DIM tiers: {', '.join(str(dim) for dim in opt_dims)}")
+    print(f"CK OPT_DIM tiers: {', '.join(str(dim) for dim in head_dims)}")
 
     if not torch.cuda.is_available():
         raise SystemExit("ERROR: torch.cuda.is_available() is False; need ROCm GPU")
@@ -79,7 +79,7 @@ def main() -> None:
     print(f"OK GPU arch matches lock entry {matched!r}")
 
     batch, seqlen, nheads = 1, 64, 4
-    for headdim in opt_dims:
+    for headdim in head_dims:
         q = torch.randn(batch, seqlen, nheads, headdim, device=device, dtype=torch.float16)
         k = torch.randn(batch, seqlen, nheads, headdim, device=device, dtype=torch.float16)
         v = torch.randn(batch, seqlen, nheads, headdim, device=device, dtype=torch.float16)
@@ -92,7 +92,7 @@ def main() -> None:
         print(f"GPU forward OK headdim={headdim} shape={tuple(out.shape)}")
 
     seqlen_q_kv, seqlen_k, seqlen_knew, cache_seqlen = 8, 16, 8, 8
-    for headdim in opt_dims:
+    for headdim in head_dims:
         q = torch.randn(batch, seqlen_q_kv, nheads, headdim, device=device, dtype=torch.float16)
         kcache = torch.randn(batch, seqlen_k, nheads, headdim, device=device, dtype=torch.float16)
         vcache = torch.randn(batch, seqlen_k, nheads, headdim, device=device, dtype=torch.float16)

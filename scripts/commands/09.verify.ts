@@ -25,9 +25,13 @@ import zipfile
 from pathlib import Path
 
 wheel = sys.argv[1]
-opt_dims = [int(x) for x in sys.argv[2].split(',') if x]
+ck_opt_dim = sys.argv[2]
 expected_local = sys.argv[3]
 min_pyd_bytes = 1024 * 1024
+
+opt_dims = [int(part) for part in ck_opt_dim.split(',') if part.strip()]
+if not opt_dims:
+    raise SystemExit('ERROR: CK_OPT_DIM is missing or empty')
 
 wheel_name = Path(wheel).name
 local_tag = f'+{expected_local}'
@@ -52,7 +56,7 @@ with zipfile.ZipFile(wheel) as zf:
         data = zf.read(name)
         missing = [tok for tok in [f'_d{d}_' for d in opt_dims] if tok.encode('ascii') not in data]
         if missing:
-            raise SystemExit(f'ERROR: {name} missing OPT_DIM kernels {missing}')
+            raise SystemExit(f'ERROR: {name} missing CK FMHA opt_dim kernels {missing}')
         dims_str = ','.join(str(d) for d in opt_dims)
         print(f'OK {name} size={info.file_size} dims={dims_str}')
 
@@ -120,7 +124,7 @@ export function runVerify(options: {
   buildCaches: string;
 }): void {
   const expectedWheelPattern = requireLockEnv("EXPECTED_WHEEL_PATTERN");
-  const lockOptDim = requireLockEnv("LOCK_OPT_DIM");
+  const ckOptDim = requireLockEnv("CK_OPT_DIM");
   const flashAttentionBuildCommit = requireLockEnv("FLASH_ATTENTION_BUILD_COMMIT");
   const wheelLocalVersion = requireLockEnv("WHEEL_LOCAL_VERSION");
   const pytorchVersion = requireLockEnv("PYTORCH_VERSION");
@@ -148,7 +152,7 @@ export function runVerify(options: {
   const buildCaches = validateBuildCachesForVariant({
     buildCaches: readBuildCaches(buildCachesPath),
     buildVariant,
-    lockOptDim,
+    ckOptDim,
   });
 
   const whls = readdirSync(distDir)
@@ -183,7 +187,7 @@ export function runVerify(options: {
     "-c",
     WHEEL_INSPECT_CODE,
     whlPath,
-    lockOptDim,
+    ckOptDim,
     wheelLocalVersion,
   ]);
 
@@ -200,7 +204,7 @@ export function runVerify(options: {
     pytorch: pytorchVersion,
     rocm: rocmVersion,
     gpu_archs: gpuArchs,
-    opt_dim: lockOptDim,
+    ck_opt_dim: ckOptDim,
     wheel_local_version: wheelLocalVersion,
     source_date_epoch: Number(sourceDateEpoch),
     build_variant: buildVariant,

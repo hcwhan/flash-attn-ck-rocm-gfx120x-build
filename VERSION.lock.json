@@ -14,7 +14,7 @@
   },
   "compile": {
     "gpu_archs": "gfx1200;gfx1201",
-    "opt_dim": "32,64,128,256"
+    "ck_opt_dim": "32,64,128,256"
   },
   "wheel": {
     "wheel_local_version": "torch2.12.0.rocm7.14.0.cxx11.abi",

@@ -5,7 +5,7 @@ import { initBuildEnv } from "../lib/init-build-env.js";
 import { resolveBuildDir } from "../lib/paths.js";
 import { requireLockEnv } from "../lib/require-env.js";
 import {
-  parseLockOptDims,
+  parseCkOptDims,
   validateStaging,
 } from "../lib/validate-staging.js";
 
@@ -38,7 +38,7 @@ export function runWheel(options: {
   process.env.FLASH_ATTN_LOCAL_VERSION = requireLockEnv("WHEEL_LOCAL_VERSION");
 
   initBuildEnv({
-    optDim: requireLockEnv("LOCK_OPT_DIM"),
+    optDim: requireLockEnv("CK_OPT_DIM"),
   });
 
   const buildScript = path.join(resolveBuildDir(), "build-fa-steps.py");
@@ -59,7 +59,7 @@ export function runWheel(options: {
     const stagingRoot = path.resolve(options.stagingRoot!);
     validateStaging({
       stagingRoot,
-      expectedDims: parseLockOptDims(requireLockEnv("LOCK_OPT_DIM")),
+      expectedDims: parseCkOptDims(requireLockEnv("CK_OPT_DIM")),
       primaryDim: options.primaryDim!,
     });
 

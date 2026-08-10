@@ -24,7 +24,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx
 | `toolchain` | `python`, `pytorch`, `torch_device_extra`, `rocm_index`, `rocm` | pip toolchain pins |
 | `flash_attention` | `repo`, `build_commit`, `build_commit_date` | Exact FA source cloned each build; **bump `build_commit` and `build_commit_date` when upgrading FA** |
 | `flash_attention` | `min_commit` | Minimum RDNA4 gfx12x commit ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); **human-readable reference only** |
-| `compile` | `gpu_archs`, `opt_dim` | HIP compile targets and OPT_DIM tiers (**sole arch source**) |
+| `compile` | `gpu_archs`, `ck_opt_dim` | HIP compile targets (**sole arch source**) and CK FMHA `opt_dim` tiers |
 | `wheel` | `wheel_local_version` | Wheel `+local` tag (env `WHEEL_LOCAL_VERSION`; mapped to upstream `FLASH_ATTN_LOCAL_VERSION` at wheel time) |
 | `wheel` | `wheel_artifact_name` | GitHub Actions artifact name |
 | `release` | `release_tag_prefix` | Release tag prefix (`{prefix}-{variant}-build{run_number}`) |
@@ -43,7 +43,7 @@ Prep clones **`flash_attention.build_commit`** (`fetch` + `checkout FETCH_HEAD`)
 
 ## Build profile
 
-**Inference-only** wheel for ComfyUI: fwd + fwd_appendkv + fwd_splitkv (no bwd), `-DFLASHATTENTION_DISABLE_BACKWARD`, `cxx11.abi` local tag (see `wheel.wheel_local_version`), **`GPU_ARCHS`** from lock `compile.gpu_archs`, `OPT_DIM=32,64,128,256`.
+**Inference-only** wheel for ComfyUI: fwd + fwd_appendkv + fwd_splitkv (no bwd), `-DFLASHATTENTION_DISABLE_BACKWARD`, `cxx11.abi` local tag (see `wheel.wheel_local_version`), **`GPU_ARCHS`** from lock `compile.gpu_archs`, **`CK_OPT_DIM`** from lock `compile.ck_opt_dim` (mapped to upstream `OPT_DIM` env at compile time).
 
 | Scope | Approx. ninja targets |
 |-------|----------------------|
@@ -82,7 +82,7 @@ Push to `main` does **not** auto-trigger builds.
 | `compile-d32` … `d256` | clone+patch per job, one OPT_DIM shard each, upload `.obj` | 6 h each |
 | `link-wheel` | clone+patch, merge objs + link + wheel + CPU smoke test | 6 h |
 
-Cache keys include `VERSION.lock.json` SHA256 prefix (`-v5-{lockHash8}-`) and three toolchain fingerprints (MSVC toolset / ROCm clang / pip toolchain); **exact match only** (no `restore-keys`). Serial: `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`; parallel: `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
+Cache keys include `VERSION.lock.json` SHA256 prefix (`-v5-{lockHash8}-`) and three toolchain fingerprints (MSVC toolset / ROCm clang / pip toolchain); **exact match only** (no `restore-keys`). Serial: `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`; parallel: `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`. Link uses **first lock `ck_opt_dim` tier** (`32`) for shared objs only.
 
 ### Build stages
 

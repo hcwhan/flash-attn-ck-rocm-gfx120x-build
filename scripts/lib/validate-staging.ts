@@ -27,14 +27,14 @@ function walkObjFiles(dir: string): string[] {
   return results;
 }
 
-export function parseLockOptDims(optDim: string): readonly string[] {
-  const trimmed = optDim.trim();
+export function parseCkOptDims(ckOptDim: string): readonly string[] {
+  const trimmed = ckOptDim.trim();
   if (!trimmed) {
-    throw new Error("OPT_DIM env is required");
+    throw new Error("CK_OPT_DIM env is required");
   }
   if (!trimmed.includes(",")) {
     throw new Error(
-      `OPT_DIM must be comma-separated tiers for link, got '${trimmed}'`,
+      `CK_OPT_DIM must be comma-separated tiers for link, got '${trimmed}'`,
     );
   }
   const dims = trimmed
@@ -42,7 +42,7 @@ export function parseLockOptDims(optDim: string): readonly string[] {
     .map((part) => part.trim())
     .filter(Boolean);
   if (dims.length === 0) {
-    throw new Error("OPT_DIM is empty");
+    throw new Error("CK_OPT_DIM is empty");
   }
   return dims;
 }
@@ -56,7 +56,7 @@ function resolvePrimaryDim(
   }
   if (!expectedDims.includes(primaryDim)) {
     throw new Error(
-      `primary_dim ${primaryDim} is not in OPT_DIM list: ${expectedDims.join(", ")}`,
+      `primary_dim ${primaryDim} is not in CK_OPT_DIM list: ${expectedDims.join(", ")}`,
     );
   }
   return primaryDim;

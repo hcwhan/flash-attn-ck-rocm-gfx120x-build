@@ -24,7 +24,7 @@
 | `toolchain` | `python`、`pytorch`、`torch_device_extra`、`rocm_index`、`rocm` | pip 工具链 pin |
 | `flash_attention` | `repo`、`build_commit`、`build_commit_date` | 每次构建精确 clone 的 FA 源码；**升级 FA 时改 `build_commit` 与 `build_commit_date`** |
 | `flash_attention` | `min_commit` | RDNA4 gfx12x 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**仅人类可读参考** |
-| `compile` | `gpu_archs`、`opt_dim` | HIP 编译目标与 OPT_DIM 档位（**唯一架构源**） |
+| `compile` | `gpu_archs`、`ck_opt_dim` | HIP 编译目标（**唯一架构源**）与 CK FMHA `opt_dim` 档位 |
 | `wheel` | `wheel_local_version` | wheel 的 `+local` 标签（env `WHEEL_LOCAL_VERSION`；wheel 时映射 upstream `FLASH_ATTN_LOCAL_VERSION`） |
 | `wheel` | `wheel_artifact_name` | GitHub Actions artifact 名称 |
 | `release` | `release_tag_prefix` | Release tag 前缀（`{prefix}-{variant}-build{run_number}`） |
@@ -49,7 +49,7 @@ ComfyUI **推理专用** wheel：
 - **`-DFLASHATTENTION_DISABLE_BACKWARD`**
 - **C++11 ABI `cxx11.abi`**（与 pin 的 PyTorch 一致；local tag 见 `wheel.wheel_local_version`）
 - **`GPU_ARCHS`** = lock `compile.gpu_archs`（Windows 分号分隔）
-- `OPT_DIM=32,64,128,256`
+- **`CK_OPT_DIM`** = lock `compile.ck_opt_dim`（当前 `32,64,128,256`）；`init-build-env.ts` 映射为 upstream `OPT_DIM` env
 
 | 范围 | 约计 ninja targets |
 |------|-------------------|
@@ -90,7 +90,7 @@ ComfyUI **推理专用** wheel：
 | `link-wheel` | clone+patch、合并 obj + link + 打 wheel + CPU smoke test | 6 h |
 
 - Cache key 含 `VERSION.lock.json` SHA256 前 8 位（`-v5-{lockHash8}-`）及三段工具链指纹（MSVC 工具集 / ROCm clang / pip 工具链）；**仅精确匹配**（无 `restore-keys`）。串行 `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，并行 `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，互不共用。
-- 四 shard 各编 shared obj；link 仅使用 **lock `opt_dim` 第一档**（当前 `32`）的 shared obj。
+- 四 shard 各编 shared obj；link 仅使用 **lock `ck_opt_dim` 第一档**（当前 `32`）的 shared obj。
 
 ### 构建阶段
 

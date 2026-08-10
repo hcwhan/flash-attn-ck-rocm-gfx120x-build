@@ -8,7 +8,7 @@ const gitShaSchema = z
   .string()
   .regex(/^[0-9a-f]{40}$/i, "must be a 40-character git commit SHA");
 
-const optDimSchema = z
+const ckOptDimSchema = z
   .string()
   .min(1)
   .refine((value) => {
@@ -38,7 +38,7 @@ const versionLockSchema = z.object({
   }),
   compile: z.object({
     gpu_archs: z.string().min(1),
-    opt_dim: optDimSchema,
+    ck_opt_dim: ckOptDimSchema,
   }),
   wheel: z.object({
     wheel_local_version: z.string().min(1),
@@ -58,9 +58,9 @@ export type VersionLockVars = {
   ROCM_VERSION: string;
   PIP_TOOLCHAIN_CACHE_KEY: string;
   GPU_ARCHS: string;
-  LOCK_OPT_DIM: string;
+  CK_OPT_DIM: string;
   PRIMARY_DIM: string;
-  optDimList: string[];
+  ckOptDimList: string[];
   WHEEL_ARTIFACT_NAME: string;
   EXPECTED_WHEEL_PATTERN: string;
   WHEEL_LOCAL_VERSION: string;
@@ -141,7 +141,7 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
 
   const lock = versionLockSchema.parse(parsed);
 
-  const optDimList = lock.compile.opt_dim
+  const ckOptDimList = lock.compile.ck_opt_dim
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
@@ -166,9 +166,9 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
       rocmIndex: lock.toolchain.rocm_index,
     }),
     GPU_ARCHS: lock.compile.gpu_archs,
-    LOCK_OPT_DIM: lock.compile.opt_dim,
-    PRIMARY_DIM: optDimList[0]!,
-    optDimList,
+    CK_OPT_DIM: lock.compile.ck_opt_dim,
+    PRIMARY_DIM: ckOptDimList[0]!,
+    ckOptDimList,
     WHEEL_ARTIFACT_NAME: lock.wheel.wheel_artifact_name,
     EXPECTED_WHEEL_PATTERN: expectedWheelPattern(
       wheelLocalVersion,
@@ -184,7 +184,7 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
   };
 
   console.log(
-    `VERSION.lock: python=${vars.PYTHON_VERSION} pytorch=${vars.PYTORCH_VERSION} gpu=${vars.GPU_ARCHS} opt_dim=${vars.LOCK_OPT_DIM}`,
+    `VERSION.lock: python=${vars.PYTHON_VERSION} pytorch=${vars.PYTORCH_VERSION} gpu=${vars.GPU_ARCHS} ck_opt_dim=${vars.CK_OPT_DIM}`,
   );
 
   return vars;
@@ -193,6 +193,6 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
 export function versionLockEnvRecord(
   vars: VersionLockVars,
 ): Record<string, string> {
-  const { optDimList: _optDimList, ...envVars } = vars;
+  const { ckOptDimList: _ckOptDimList, ...envVars } = vars;
   return envVars;
 }

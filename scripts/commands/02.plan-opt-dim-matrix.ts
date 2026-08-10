@@ -2,9 +2,9 @@ import { appendGithubOutput } from "../lib/github.js";
 import { requireLockEnv } from "../lib/require-env.js";
 
 export function runPlanOptDimMatrix(): void {
-  const lockOptDim = requireLockEnv("LOCK_OPT_DIM");
+  const ckOptDim = requireLockEnv("CK_OPT_DIM");
   const primaryDim = requireLockEnv("PRIMARY_DIM");
-  const optDimList = lockOptDim
+  const optDimList = ckOptDim
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);

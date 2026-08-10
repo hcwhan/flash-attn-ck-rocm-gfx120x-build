@@ -56,13 +56,13 @@ jobs:
           fa-src: ${{ env.FA_SRC }}
           cache-key: ${{ steps.toolchain-fingerprint.outputs.cache-key }}
           skip-cache-restore: ${{ env.SKIP_CACHE_RESTORE }}
-          run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ env.LOCK_OPT_DIM }}" --fa-src $env:FA_SRC
+          run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ env.CK_OPT_DIM }}" --fa-src $env:FA_SRC
 
       - name: Write compile cache metadata
         shell: pwsh
         run: |
           $entry = [ordered]@{
-            opt_dim = $env:LOCK_OPT_DIM
+            opt_dim = $env:CK_OPT_DIM
             key = '${{ steps.toolchain-fingerprint.outputs.cache-key }}'
             hit = '${{ steps.compile-full.outputs.cache-hit }}' -eq 'true'
           }

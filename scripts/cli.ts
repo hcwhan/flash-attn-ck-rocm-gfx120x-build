@@ -66,7 +66,7 @@ program
 
 program
   .command("06.compile")
-  .description("Compile one OPT_DIM shard or full lock opt_dim")
+  .description("Compile one OPT_DIM shard or full lock ck_opt_dim")
   .requiredOption("--opt-dim <value>")
   .requiredOption("--fa-src <path>")
   .action((opts) => {
