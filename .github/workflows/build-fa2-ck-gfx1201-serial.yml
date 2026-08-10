@@ -101,7 +101,7 @@ jobs:
             restore_skipped = $env:SKIP_CACHE_RESTORE -eq 'true'
           }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath dist/build-caches.json -Encoding utf8
+          @($entry) | ConvertTo-Json -Depth 3 | Out-File -FilePath dist/build-caches.json -Encoding utf8
 
       - name: Smoke test (CPU)
         shell: pwsh
