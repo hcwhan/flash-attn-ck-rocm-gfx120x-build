@@ -264,6 +264,7 @@ export function runVerify(options: {
     [
       "import importlib.metadata",
       "import importlib.util",
+      "import sys",
       "import flash_attn",
       "import flash_attn_2_cuda",
       "from flash_attn import flash_attn_func",
