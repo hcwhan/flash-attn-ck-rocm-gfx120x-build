@@ -1,12 +1,13 @@
 
+# Node.js
 node_modules/
 
+# Dist
 dist/
 
+# Python
 __pycache__/
-.pytest_cache/
-
 *.pyc
-*.whl
 
-test/monitor-*.txt
+# Wheels
+*.whl
