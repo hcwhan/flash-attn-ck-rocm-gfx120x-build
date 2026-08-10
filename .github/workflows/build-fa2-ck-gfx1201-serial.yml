@@ -120,6 +120,7 @@ jobs:
         run: npx tsx scripts/cli.ts 05.toolchain-fingerprint -w $env:GITHUB_WORKSPACE --build-variant serial
 
       - name: Compile OPT_DIM full with ninja cache
+        id: compile-full
         uses: "./.github/actions/03.fa-build-with-cache"
         with:
           fa-src: ${{ env.FA_SRC }}
@@ -133,7 +134,7 @@ jobs:
 
       - name: Smoke test (CPU)
         shell: pwsh
-        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --build-variant serial --cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"
+        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --build-variant serial --cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}" --cache-hit "${{ steps.compile-full.outputs.cache-hit }}" --skip-cache-restore "${{ env.SKIP_CACHE_RESTORE }}"
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v7

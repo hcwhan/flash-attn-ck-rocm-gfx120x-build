@@ -20,7 +20,8 @@
 | 第一档 OPT_DIM | `PRIMARY_DIM` / `--primary-dim` / job output `primary-dim` | parallel link 用 |
 | 单 shard OPT_DIM | matrix `opt-dim` / CLI `--opt-dim` | parallel compile 单值 |
 | 构建模式 | `--build-variant serial\|parallel` | verify / publish / fingerprint 共用 |
-| Ninja cache key | `cache-key` | output / CLI `--cache-key` / manifest `build_cache_key` |
+| Ninja cache key | `cache-key` | output / CLI `--cache-key` / manifest `build_cache.key` |
+| Ninja cache hit | `cache-hit` | 03.fa-build-with-cache output / CLI `--cache-hit` / manifest `build_cache.hit` |
 | shard 产物目录 | `SHARD_RELEASE_DIR` | 07.shard 写入；非 GitHub Release |
 | wheel local tag | `WHEEL_LOCAL_VERSION` | lock `wheel.wheel_local_version`；wheel 时映射为 upstream `FLASH_ATTN_LOCAL_VERSION` |
 | wheel artifact 名 | `WHEEL_ARTIFACT_NAME` | lock `wheel.wheel_artifact_name` |

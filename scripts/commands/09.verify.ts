@@ -85,10 +85,64 @@ function matchesGlob(name: string, pattern: string): boolean {
   return regex.test(name);
 }
 
+function parseBooleanFlag(value: string, name: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") {
+    return true;
+  }
+  if (normalized === "false") {
+    return false;
+  }
+  throw new Error(`${name} must be 'true' or 'false', got ${value}`);
+}
+
+function resolveBuildCacheManifest(options: {
+  buildVariant: string;
+  cacheKey?: string;
+  cacheHit?: string;
+  skipCacheRestore?: string;
+}): {
+  key: string;
+  hit: boolean;
+  restore_skipped: boolean;
+} | null {
+  if (options.buildVariant === "parallel") {
+    return null;
+  }
+
+  const cacheKey = options.cacheKey?.trim();
+  if (!cacheKey) {
+    throw new Error("--cache-key is required when --build-variant serial");
+  }
+
+  const cacheHit = options.cacheHit?.trim();
+  if (!cacheHit) {
+    throw new Error("--cache-hit is required when --build-variant serial");
+  }
+
+  const skipCacheRestore = options.skipCacheRestore?.trim();
+  if (!skipCacheRestore) {
+    throw new Error(
+      "--skip-cache-restore is required when --build-variant serial",
+    );
+  }
+
+  return {
+    key: cacheKey,
+    hit: parseBooleanFlag(cacheHit, "--cache-hit"),
+    restore_skipped: parseBooleanFlag(
+      skipCacheRestore,
+      "--skip-cache-restore",
+    ),
+  };
+}
+
 export function runVerify(options: {
   distDir: string;
   buildVariant: string;
   cacheKey?: string;
+  cacheHit?: string;
+  skipCacheRestore?: string;
 }): void {
   const expectedWheelPattern = requireLockEnv("EXPECTED_WHEEL_PATTERN");
   const lockOptDim = requireLockEnv("LOCK_OPT_DIM");
@@ -111,11 +165,12 @@ export function runVerify(options: {
     );
   }
 
-  if (buildVariant === "serial" && !options.cacheKey?.trim()) {
-    throw new Error(
-      "--cache-key is required when --build-variant serial",
-    );
-  }
+  const buildCache = resolveBuildCacheManifest({
+    buildVariant,
+    cacheKey: options.cacheKey,
+    cacheHit: options.cacheHit,
+    skipCacheRestore: options.skipCacheRestore,
+  });
 
   const whls = readdirSync(distDir)
     .filter((name) => name.endsWith(".whl"))
@@ -170,7 +225,7 @@ export function runVerify(options: {
     wheel_local_version: wheelLocalVersion,
     source_date_epoch: Number(sourceDateEpoch),
     build_variant: buildVariant,
-    build_cache_key: options.cacheKey?.trim() ?? null,
+    build_cache: buildCache,
     build_github_run_id: githubRunId,
     build_github_run_number: githubRunNumber,
     build_repository_commit: githubSha,

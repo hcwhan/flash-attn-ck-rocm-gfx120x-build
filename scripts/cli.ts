@@ -110,11 +110,18 @@ program
   .requiredOption("--dist-dir <path>")
   .requiredOption("--build-variant <name>", "serial or parallel")
   .option("--cache-key <key>", "compile cache key (required for serial)")
+  .option("--cache-hit <value>", "ninja cache restore hit (required for serial)")
+  .option(
+    "--skip-cache-restore <value>",
+    "workflow skip_cache_restore input (required for serial)",
+  )
   .action((opts) => {
     runVerify({
       distDir: opts.distDir,
       buildVariant: opts.buildVariant,
       cacheKey: opts.cacheKey,
+      cacheHit: opts.cacheHit,
+      skipCacheRestore: opts.skipCacheRestore,
     });
   });
 

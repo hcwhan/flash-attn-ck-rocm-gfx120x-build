@@ -16,6 +16,11 @@ inputs:
     description: Shell script executed between cache restore and save
     required: true
 
+outputs:
+  cache-hit:
+    description: Exact cache key match from restore or lookup-only probe
+    value: ${{ steps.fa-build-cache.outputs.cache-hit }}
+
 runs:
   using: composite
   steps:
