@@ -22,8 +22,6 @@ concurrency:
   group: build-fa2-ck-gfx1201-serial
   cancel-in-progress: true
 
-# actions: write needed for the cache delete-and-refresh flow (REST API);
-# contents: write needed for GitHub Releases upload.
 permissions:
   actions: write
   contents: write
@@ -41,7 +39,7 @@ jobs:
 
     steps:
       - name: Bootstrap build job
-        uses: "./.github/actions/00.fa-job-bootstrap"
+        uses: "./.github/actions/A00.fa-job-bootstrap"
 
       - name: Fingerprint toolchain for cache key
         id: toolchain-fingerprint
@@ -50,7 +48,7 @@ jobs:
 
       - name: Compile OPT_DIM full with ninja cache
         id: compile-full
-        uses: "./.github/actions/03.fa-build-with-cache"
+        uses: "./.github/actions/A03.fa-build-with-cache"
         with:
           fa-src: ${{ env.FA_SRC }}
           cache-key: ${{ steps.toolchain-fingerprint.outputs.cache-key }}
@@ -73,7 +71,7 @@ jobs:
         run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist
 
       - name: Verify wheel and publish
-        uses: "./.github/actions/99.fa-verify-publish"
+        uses: "./.github/actions/A99.fa-verify-publish"
         with:
           build-variant: serial
           build-caches: dist/build-caches.json

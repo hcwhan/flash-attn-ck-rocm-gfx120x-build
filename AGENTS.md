@@ -20,8 +20,8 @@
 | 第一档 OPT_DIM | `PRIMARY_DIM` / `--primary-dim` / job output `primary-dim` | parallel link 用 |
 | 单 shard OPT_DIM | matrix `opt-dim` / CLI `--opt-dim` | parallel compile 单值 |
 | 构建模式 | `--build-variant serial\|parallel` | verify / publish / fingerprint 共用 |
-| Ninja cache key | `cache-key` | 05.toolchain-fingerprint output → 03.fa-build-with-cache input / manifest `build_caches[].key` |
-| Ninja cache hit | `cache-hit` | 03.fa-build-with-cache output / manifest `build_caches[].hit` |
+| Ninja cache key | `cache-key` | 05.toolchain-fingerprint output → A03.fa-build-with-cache input / manifest `build_caches[].key` |
+| Ninja cache hit | `cache-hit` | A03.fa-build-with-cache output / manifest `build_caches[].hit` |
 | Compile cache metadata | `--build-caches` | workflow 写入 JSON（serial 单文件 / parallel 目录）→ 09.verify → manifest `build_caches`（仅 `opt_dim/key/hit`） |
 | workflow_dispatch 快照 | `dispatch` | manifest 顶层；`09.verify` 从 `MAX_JOBS` / `SKIP_CACHE_RESTORE` 写入 `ninja_workers` / `skip_cache_restore` |
 | shard 产物目录 | `SHARD_RELEASE_DIR` | 07.shard 写入；非 GitHub Release |
@@ -59,7 +59,7 @@
 | `07.shard` | 校验 compile 产物 .obj；写 `SHARD_RELEASE_DIR` 到 `GITHUB_ENV` |
 | `08.wheel` | parallel link staging 校验 + `FLASH_ATTENTION_FORCE_BUILD` + link 脚本 |
 | `09.verify` | CI CPU smoke test；读 `--build-caches` 写入 manifest `build_caches` 与 `dispatch` |
-| `10.publish` | 准备 Release 元数据（由 `99.fa-verify-publish` 调用 + `softprops/action-gh-release`） |
+| `10.publish` | 准备 Release 元数据（由 `A99.fa-verify-publish` 调用 + `softprops/action-gh-release`） |
 | `build/build-fa-steps.py` | `--step compile` / `--step wheel` / `--step merge-and-wheel` |
 | `test/gpu-smoke-test.py` | 部署前 GPU 校验（gfx1201 真机；CI 不跑） |
 
@@ -71,14 +71,14 @@
 
 | Action | 用途 |
 |--------|------|
-| `00.fa-job-bootstrap` | checkout + Node/npm + `01.config`；inputs `prep-source` / `setup-toolchain`（默认 true）；toolchain 读 `01.config` env |
-| `01.fa-rocm-toolchain` | 安装 Python / MSVC / PyTorch / ROCm（pip toolchain cache：`PIP_TOOLCHAIN_CACHE_KEY`） |
-| `02.fa-ninja-cache-restore` | 恢复 ninja 增量缓存 |
-| `03.fa-build-with-cache` | 02+编译+04 带缓存构建 |
-| `04.fa-ninja-cache-save` | 保存 ninja 增量缓存 |
-| `99.fa-verify-publish` | `09.verify` + upload wheel artifact + 可选 `10.publish` / GitHub Release（读 `workflow_dispatch.publish_release`）；inputs `build-variant` / `build-caches`（相对 workspace） |
+| `A00.fa-job-bootstrap` | checkout + Node/npm + `01.config`；inputs `prep-source` / `setup-toolchain`（默认 true）；toolchain 读 `01.config` env |
+| `A01.fa-rocm-toolchain` | 安装 Python / MSVC / PyTorch / ROCm（pip toolchain cache：`PIP_TOOLCHAIN_CACHE_KEY`） |
+| `A02.fa-ninja-cache-restore` | 恢复 ninja 增量缓存 |
+| `A03.fa-build-with-cache` | A02+编译+A04 带缓存构建 |
+| `A04.fa-ninja-cache-save` | 保存 ninja 增量缓存 |
+| `A99.fa-verify-publish` | `09.verify` + upload wheel artifact + 可选 `10.publish` / GitHub Release（读 `workflow_dispatch.publish_release`）；inputs `build-variant` / `build-caches`（相对 workspace） |
 
-每个 job：**必须**经 `00.fa-job-bootstrap`（或等价地 checkout + Node/npm + `01.config --export-github-env`）；compile/link/serial 另开 prep/toolchain/fingerprint。随后步骤缺 env / 缺产物直接 throw。
+每个 job：**必须**经 `A00.fa-job-bootstrap`（或等价地 checkout + Node/npm + `01.config --export-github-env`）；compile/link/serial 另开 prep/toolchain/fingerprint。随后步骤缺 env / 缺产物直接 throw。
 
 **有意不合并：** compile 阶段 `shard` dim 校验 vs link 阶段 `validate-staging.ts`；四 shard 重复编 shared obj（link 只用 d32）；parallel link-wheel 无 ninja cache；obj artifact 名 `d{dim}` 即 staging 子目录名（勿 normalize）。
 

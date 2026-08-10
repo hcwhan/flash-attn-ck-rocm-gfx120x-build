@@ -26,7 +26,7 @@ runs:
   steps:
     - name: Restore ninja incremental build cache
       id: fa-build-cache
-      uses: "./.github/actions/02.fa-ninja-cache-restore"
+      uses: "./.github/actions/A02.fa-ninja-cache-restore"
       with:
         fa-src: ${{ inputs.fa-src }}
         cache-key: ${{ inputs.cache-key }}
@@ -59,7 +59,7 @@ runs:
       # above); on a failed build only save partial objects when no entry exists
       # yet (incremental resume). Never save when the build step never ran.
       if: always() && steps.run-build.conclusion != 'skipped' && (steps.run-build.conclusion == 'success' || steps.fa-build-cache.outputs.cache-hit != 'true')
-      uses: "./.github/actions/04.fa-ninja-cache-save"
+      uses: "./.github/actions/A04.fa-ninja-cache-save"
       with:
         fa-src: ${{ inputs.fa-src }}
         cache-primary-key: ${{ steps.fa-build-cache.outputs.cache-primary-key }}

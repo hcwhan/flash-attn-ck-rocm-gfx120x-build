@@ -7,7 +7,7 @@ inputs:
     required: false
     default: "true"
   setup-toolchain:
-    description: Run 01.fa-rocm-toolchain (reads PYTHON_* / ROCM_* / PIP_TOOLCHAIN_CACHE_KEY from 01.config)
+    description: Run A01.fa-rocm-toolchain (reads PYTHON_* / ROCM_* / PIP_TOOLCHAIN_CACHE_KEY from 01.config)
     required: false
     default: "true"
 
@@ -40,7 +40,7 @@ runs:
 
     - name: Setup ROCm toolchain
       if: inputs.setup-toolchain == 'true'
-      uses: "./.github/actions/01.fa-rocm-toolchain"
+      uses: "./.github/actions/A01.fa-rocm-toolchain"
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         pytorch-version: ${{ env.PYTORCH_VERSION }}
