@@ -4,6 +4,10 @@ import { run } from "../lib/exec.js";
 import { initBuildEnv } from "../lib/init-build-env.js";
 import { resolveBuildDir } from "../lib/paths.js";
 import { requireLockEnv } from "../lib/require-env.js";
+import {
+  parseLockOptDims,
+  validateStaging,
+} from "../lib/validate-staging.js";
 
 const PYTHON = "python";
 
@@ -52,12 +56,14 @@ export function runWheel(options: {
   ];
 
   if (hasStagingRoot) {
-    args.push(
-      "--staging-root",
-      path.resolve(options.stagingRoot!),
-      "--primary-dim",
-      options.primaryDim!,
-    );
+    const stagingRoot = path.resolve(options.stagingRoot!);
+    validateStaging({
+      stagingRoot,
+      expectedDims: parseLockOptDims(requireLockEnv("LOCK_OPT_DIM")),
+      primaryDim: options.primaryDim!,
+    });
+
+    args.push("--staging-root", stagingRoot, "--primary-dim", options.primaryDim!);
   }
 
   run(PYTHON, args);

@@ -47,30 +47,6 @@ def is_api_dispatch_obj(name: str) -> bool:
 _LOG_HEADER_RE = re.compile(r"^# ninja log v(\d+)$")
 
 
-def load_opt_dims() -> tuple[str, ...]:
-    opt_dim = os.environ.get("OPT_DIM", "").strip()
-    if not opt_dim:
-        raise SystemExit("OPT_DIM env is required")
-    if "," not in opt_dim:
-        raise SystemExit(
-            f"OPT_DIM must be comma-separated tiers for link, got {opt_dim!r}"
-        )
-    dims = tuple(part.strip() for part in opt_dim.split(",") if part.strip())
-    if not dims:
-        raise SystemExit("OPT_DIM is empty")
-    return dims
-
-
-def resolve_primary_dim(primary_dim: str, expected_dims: tuple[str, ...]) -> str:
-    if not primary_dim:
-        raise SystemExit("primary_dim is required")
-    if primary_dim not in expected_dims:
-        raise SystemExit(
-            f"primary_dim {primary_dim} is not in OPT_DIM list: {', '.join(expected_dims)}"
-        )
-    return primary_dim
-
-
 def _exec_setup_py(fa_src: Path, command_argv: list[str]) -> None:
     import importlib.util
 
@@ -91,73 +67,6 @@ def build_ext_only(fa_src: Path, *, verbose: bool = False) -> None:
     if verbose:
         argv.append("-v")
     _exec_setup_py(fa_src, argv)
-
-
-def validate_staging(
-    staging_root: Path,
-    *,
-    expected_dims: tuple[str, ...],
-    primary_dim: str,
-) -> None:
-    staging_root = staging_root.resolve()
-    if not staging_root.is_dir():
-        raise SystemExit(f"Staging root missing: {staging_root}")
-
-    primary_dim = resolve_primary_dim(primary_dim, expected_dims)
-    summary: dict[str, int] = {}
-
-    for dim in expected_dims:
-        shard = staging_root / f"d{dim}"
-        if not shard.is_dir():
-            raise SystemExit(f"Missing OPT_DIM staging dir: {shard}")
-
-        objs = list(shard.rglob("*.obj"))
-        summary[dim] = len(objs)
-        if not objs:
-            raise SystemExit(f"No .obj files under {shard}")
-
-        dim_specific = [obj for obj in objs if DIM_PATTERN.search(obj.name) and f"_d{dim}_" in obj.name]
-        if not dim_specific:
-            raise SystemExit(f"Shard d{dim} has no *_d{dim}_* kernel objects")
-
-        if not (shard / ".ninja_log").is_file():
-            raise SystemExit(
-                f"Shard d{dim} missing .ninja_log (upload-artifact must set "
-                "include-hidden-files: true)"
-            )
-
-    primary = staging_root / f"d{primary_dim}"
-    shared = [
-        obj
-        for obj in primary.rglob("*.obj")
-        if "csrc/flash_attn_ck/" in obj.relative_to(primary).as_posix()
-    ]
-    if not shared:
-        raise SystemExit(
-            f"Primary shard d{primary_dim} missing csrc/flash_attn_ck shared objects"
-        )
-
-    api_in_primary = {
-        obj.name for obj in primary.rglob("*.obj") if is_api_dispatch_obj(obj.name)
-    }
-    missing_api = REQUIRED_API_OBJS - api_in_primary
-    if missing_api:
-        raise SystemExit(
-            f"Primary shard d{primary_dim} missing API dispatch objs: "
-            f"{sorted(missing_api)}"
-        )
-    extra_api = api_in_primary - REQUIRED_API_OBJS
-    if extra_api:
-        raise SystemExit(
-            f"Primary shard d{primary_dim} unexpected API dispatch objs: "
-            f"{sorted(extra_api)}"
-        )
-
-    print(
-        "Link staging validation OK: "
-        + ", ".join(f"d{dim}={summary[dim]}" for dim in expected_dims),
-        flush=True,
-    )
 
 
 def _newest_mtime_under(root: Path) -> int:
@@ -536,7 +445,7 @@ def main() -> None:
         choices=["compile", "merge-and-wheel", "wheel"],
         required=True,
         help="compile: build_ext only; wheel: stamp + bdist_wheel; "
-        "merge-and-wheel: staging validation + merge prebuilt objs + bdist_wheel",
+        "merge-and-wheel: merge prebuilt objs + bdist_wheel",
     )
     parser.add_argument("--fa-src", type=Path, required=True)
     parser.add_argument("--dist-dir", type=Path)
@@ -566,14 +475,10 @@ def main() -> None:
     if args.staging_root is None or not args.staging_root.is_dir():
         raise SystemExit(f"Staging root missing: {args.staging_root}")
 
-    expected_dims = load_opt_dims()
-    primary_dim = resolve_primary_dim(args.primary_dim, expected_dims)
+    primary_dim = args.primary_dim.strip()
+    if not primary_dim:
+        raise SystemExit("--primary-dim is required for step merge-and-wheel")
 
-    validate_staging(
-        args.staging_root,
-        expected_dims=expected_dims,
-        primary_dim=primary_dim,
-    )
     require_parallel_link_force_build_true()
     install_patch(args.staging_root, args.fa_src, primary_dim=primary_dim)
     build_wheel(args.fa_src, args.dist_dir, verbose=args.verbose)

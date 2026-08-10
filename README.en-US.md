@@ -83,7 +83,7 @@ Single entry point for compile and wheel packaging: `build-fa-steps.py` (in-proc
 |------|------|
 | `compile` | `build_ext` compile; stamps existing objects so the ninja cache pays off |
 | `wheel` | stamp + `bdist_wheel` (objects from the in-place compile) |
-| `merge-and-wheel` | staging validation + FORCE_BUILD check + merge objects + stamp + `bdist_wheel` |
+| `merge-and-wheel` | merge objects + stamp + `bdist_wheel` (staging validation runs in `08.wheel` first) |
 
 Serial and parallel compose the same entry; both produce identical wheels:
 

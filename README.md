@@ -99,7 +99,7 @@ ComfyUI **推理专用** wheel：
 |------|------|
 | `compile` | `build_ext` 编译；stamp 已有对象，让 ninja 缓存生效 |
 | `wheel` | stamp + `bdist_wheel`（对象来自原地编译） |
-| `merge-and-wheel` | staging 校验 + FORCE_BUILD 检查 + merge 对象 + stamp + `bdist_wheel` |
+| `merge-and-wheel` | merge 对象 + stamp + `bdist_wheel`（staging 校验在 `08.wheel` 前置） |
 
 串行 / 并行共用同一入口编排，产物相同：
 

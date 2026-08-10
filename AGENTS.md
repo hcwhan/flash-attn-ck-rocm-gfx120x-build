@@ -49,6 +49,7 @@
 | `scripts/lib/require-env.ts` | CI env 读取（`requireLockEnv` / `requireGithubActionsEnv`）；缺 env 直接 throw |
 | `scripts/lib/rocm-sdk-paths.ts` | ROCm SDK `CoreRoot`/`DevelRoot`（唯一路径发现） |
 | `scripts/lib/init-build-env.ts` | numpy + `OPT_DIM` + ROCm 编译 env（lock 字段只经 `requireLockEnv`） |
+| `scripts/lib/validate-staging.ts` | parallel link staging 校验（`08.wheel` 前置） |
 | `01.config` | 读 lock；`--export-github-env` 写 CI env |
 | `02.plan-opt-dim-matrix` | 导出 parallel OPT_DIM matrix（`GITHUB_OUTPUT`：`opt-dims-json` / `primary-dim`） |
 | `03.prep` | clone FA 源码；校验 commit author date 与 lock 一致 |
@@ -56,7 +57,7 @@
 | `05.toolchain-fingerprint` | MSVC/clang + pip 工具链指纹；`--build-variant` 输出 `cache-key`（`scripts/lib/ninja-cache-key.ts`） |
 | `06.compile` | 任意 `--opt-dim` 编译入口（serial 全量 / parallel 单 dim） |
 | `07.shard` | 校验 compile 产物 .obj；写 `SHARD_RELEASE_DIR` 到 `GITHUB_ENV` |
-| `08.wheel` | 设 `FLASH_ATTENTION_FORCE_BUILD`，调 link 脚本 |
+| `08.wheel` | parallel link staging 校验 + `FLASH_ATTENTION_FORCE_BUILD` + link 脚本 |
 | `09.verify` | CI CPU smoke test；读 `--build-caches` 写入 manifest `build_caches` 与 `dispatch` |
 | `10.publish` | 准备 Release 元数据（workflow 内联 + `softprops/action-gh-release`） |
 | `build/build-fa-steps.py` | `--step compile` / `--step wheel` / `--step merge-and-wheel` |
@@ -77,7 +78,7 @@
 
 每个 job：`actions/setup-node@v7`（Node 26）+ `npm ci`，然后**必须**跑 `01.config --export-github-env`（`GITHUB_ENV` 已设时不得省略 `--export-github-env`）；随后步骤缺 env / 缺产物直接 throw。
 
-**有意不合并：** compile 阶段 `shard` dim 校验 vs link 阶段 `validate_staging`；四 shard 重复编 shared obj（link 只用 d32）；parallel link-wheel 无 ninja cache；obj artifact 名 `d{dim}` 即 staging 子目录名（勿 normalize）。
+**有意不合并：** compile 阶段 `shard` dim 校验 vs link 阶段 `validate-staging.ts`；四 shard 重复编 shared obj（link 只用 d32）；parallel link-wheel 无 ninja cache；obj artifact 名 `d{dim}` 即 staging 子目录名（勿 normalize）。
 
 ## VERSION.lock.json
 
