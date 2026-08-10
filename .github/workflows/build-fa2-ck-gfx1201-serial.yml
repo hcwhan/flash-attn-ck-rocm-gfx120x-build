@@ -133,9 +133,21 @@ jobs:
         shell: pwsh
         run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist
 
+      - name: Write compile cache metadata
+        shell: pwsh
+        run: |
+          $entry = [ordered]@{
+            opt_dim = $env:LOCK_OPT_DIM
+            key = '${{ steps.toolchain-fingerprint.outputs.cache-key }}'
+            hit = '${{ steps.compile-full.outputs.cache-hit }}' -eq 'true'
+            restore_skipped = $env:SKIP_CACHE_RESTORE -eq 'true'
+          }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath dist/build-caches.json -Encoding utf8
+
       - name: Smoke test (CPU)
         shell: pwsh
-        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --build-variant serial --cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}" --cache-hit "${{ steps.compile-full.outputs.cache-hit }}" --skip-cache-restore "${{ env.SKIP_CACHE_RESTORE }}"
+        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --build-variant serial --build-caches $env:GITHUB_WORKSPACE\dist\build-caches.json
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v7

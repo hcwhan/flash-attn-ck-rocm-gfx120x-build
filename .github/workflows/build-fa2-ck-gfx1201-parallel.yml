@@ -132,12 +132,33 @@ jobs:
         run: npx tsx scripts/cli.ts 05.toolchain-fingerprint -w $env:GITHUB_WORKSPACE --build-variant parallel --opt-dim "${{ matrix.opt-dim }}"
 
       - name: Compile OPT_DIM shard with ninja cache
+        id: compile-shard
         uses: "./.github/actions/03.fa-build-with-cache"
         with:
           fa-src: ${{ env.FA_SRC }}
           cache-key: ${{ steps.toolchain-fingerprint.outputs.cache-key }}
           skip-cache-restore: ${{ env.SKIP_CACHE_RESTORE }}
           run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ matrix.opt-dim }}" --fa-src $env:FA_SRC
+
+      - name: Write compile cache metadata
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path cache-meta | Out-Null
+          $entry = [ordered]@{
+            opt_dim = '${{ matrix.opt-dim }}'
+            key = '${{ steps.toolchain-fingerprint.outputs.cache-key }}'
+            hit = '${{ steps.compile-shard.outputs.cache-hit }}' -eq 'true'
+            restore_skipped = $env:SKIP_CACHE_RESTORE -eq 'true'
+          }
+          $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath cache-meta/d${{ matrix.opt-dim }}.json -Encoding utf8
+
+      - name: Upload compile cache metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: cache-meta-d${{ matrix.opt-dim }}
+          path: cache-meta/d${{ matrix.opt-dim }}.json
+          retention-days: 7
+          if-no-files-found: error
 
       - name: Validate shard and emit SHARD_RELEASE_DIR
         shell: pwsh
@@ -199,13 +220,20 @@ jobs:
           path: ${{ env.FA_STAGING }}
           merge-multiple: false
 
+      - name: Download compile cache metadata
+        uses: actions/download-artifact@v8
+        with:
+          pattern: cache-meta-d*
+          path: cache-meta
+          merge-multiple: true
+
       - name: Link and package wheel from merged objects
         shell: pwsh
         run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist --staging-root $env:FA_STAGING --primary-dim "${{ needs.prep.outputs.primary-dim }}"
 
       - name: Smoke test (CPU)
         shell: pwsh
-        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --build-variant parallel
+        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --build-variant parallel --build-caches $env:GITHUB_WORKSPACE\cache-meta
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v7
