@@ -39,6 +39,14 @@ function readJsonFilesRecursive(dir: string): BuildCacheEntry[] {
   return entries;
 }
 
+function readBuildCachesFromFile(resolved: string): BuildCacheEntry[] {
+  const raw = JSON.parse(readFileSync(resolved, "utf8")) as unknown;
+  if (Array.isArray(raw)) {
+    return buildCachesSchema.parse(raw);
+  }
+  return [parseBuildCacheEntry(raw, resolved)];
+}
+
 function sortBuildCaches(entries: BuildCacheEntry[]): BuildCacheEntry[] {
   return [...entries].sort((left, right) => {
     const leftFirst = Number(left.opt_dim.split(",")[0]?.trim());
@@ -57,7 +65,7 @@ export function readBuildCaches(inputPath: string): BuildCacheEntry[] {
   const stat = statSync(resolved);
   const entries = stat.isDirectory()
     ? readJsonFilesRecursive(resolved)
-    : buildCachesSchema.parse(JSON.parse(readFileSync(resolved, "utf8")));
+    : readBuildCachesFromFile(resolved);
 
   if (entries.length < 1) {
     throw new Error(`No build cache entries found at ${resolved}`);
