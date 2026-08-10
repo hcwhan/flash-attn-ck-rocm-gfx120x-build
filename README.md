@@ -24,7 +24,7 @@
 | `toolchain` | `python`、`pytorch`、`torch_device_extra`、`rocm_index`、`rocm` | pip 工具链 pin |
 | `flash_attention` | `repo`、`build_commit`、`build_commit_date` | 每次构建精确 clone 的 FA 源码；**升级 FA 时改 `build_commit` 与 `build_commit_date`** |
 | `flash_attention` | `min_commit` | RDNA4 gfx12x 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**仅人类可读参考** |
-| `compile` | `gpu_archs`、`ck_opt_dim` | HIP 编译目标（**唯一架构源**）与 CK FMHA `opt_dim` 档位 |
+| `compile` | `gpu_archs`、`ck_opt_dim`、`ck_disable_bwd` | HIP 编译目标（**唯一架构源**）、CK FMHA `opt_dim` 档位、是否省略 bwd（`CK_FMHA_DISABLE_BWD`） |
 | `wheel` | `wheel_local_version` | wheel 的 `+local` 标签（env `WHEEL_LOCAL_VERSION`；wheel 时映射 upstream `FLASH_ATTN_LOCAL_VERSION`） |
 | `wheel` | `wheel_artifact_name` | GitHub Actions artifact 名称 |
 | `release` | `release_tag_prefix` | Release tag 前缀（`{prefix}-{variant}-build{run_number}`） |
@@ -43,10 +43,10 @@
 
 ## 编译配置
 
-ComfyUI **推理专用** wheel：
+ComfyUI **推理专用** wheel（lock `compile.ck_disable_bwd=true`）：
 
-- CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（无 bwd）
-- **`-DFLASHATTENTION_DISABLE_BACKWARD`**
+- CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（`CK_FMHA_DISABLE_BWD=1` 时无 bwd）
+- **`-DFLASHATTENTION_DISABLE_BACKWARD`**（`CK_FMHA_DISABLE_BWD=1` 时启用）
 - **C++11 ABI `cxx11.abi`**（与 pin 的 PyTorch 一致；local tag 见 `wheel.wheel_local_version`）
 - **`GPU_ARCHS`** = lock `compile.gpu_archs`（Windows 分号分隔）
 - **`CK_OPT_DIM`** = lock `compile.ck_opt_dim`（当前 `32,64,128,256`）；`init-build-env.ts` 映射为 upstream `OPT_DIM` env

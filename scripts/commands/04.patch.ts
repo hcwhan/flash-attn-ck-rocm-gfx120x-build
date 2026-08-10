@@ -1,7 +1,24 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { requireLockEnv } from "../lib/require-env.js";
 
-const patchPoints = [
+type StringPatchPoint = {
+  name: string;
+  before: string;
+  after: string;
+  regex: false;
+};
+
+type RegexPatchPoint = {
+  name: string;
+  before: RegExp;
+  after: string;
+  regex: true;
+};
+
+type PatchPoint = StringPatchPoint | RegexPatchPoint;
+
+const bwdPatchPoints: PatchPoint[] = [
   {
     name: "generate-loop-skip-bwd",
     before:
@@ -16,17 +33,18 @@ const patchPoints = [
     after: '$1"-DFLASHATTENTION_DISABLE_BACKWARD",',
     regex: true,
   },
-  {
-    name: "link-spawn-brepro",
-    before: `                cmd = [str(arg) for arg in cmd]
+];
+
+const breproPatchPoint: StringPatchPoint = {
+  name: "link-spawn-brepro",
+  before: `                cmd = [str(arg) for arg in cmd]
                 if len(subprocess.list2cmdline(cmd)) <= 32767:`,
-    after: `                cmd = [str(arg) for arg in cmd]
+  after: `                cmd = [str(arg) for arg in cmd]
                 if "/Brepro" not in cmd and "-Brepro" not in cmd:
                     cmd.append("/Brepro")
                 if len(subprocess.list2cmdline(cmd)) <= 32767:`,
-    regex: false,
-  },
-] as const;
+  regex: false,
+};
 
 function readNormalized(filePath: string): { content: string; eol: "\n" | "\r\n" } {
   const raw = readFileSync(filePath, "utf8");
@@ -50,7 +68,35 @@ function spawnBreproAlreadyPatched(content: string): boolean {
   );
 }
 
+function applyPatchPoint(content: string, point: PatchPoint): string {
+  if (point.name === "link-spawn-brepro" && spawnBreproAlreadyPatched(content)) {
+    return content;
+  }
+  return point.regex
+    ? content.replace(point.before, point.after)
+    : content.replace(point.before, point.after);
+}
+
+function validatePatchPoint(content: string, point: PatchPoint): void {
+  if (point.name === "link-spawn-brepro" && spawnBreproAlreadyPatched(content)) {
+    console.log(`  OK ${point.name}: already patched`);
+    return;
+  }
+  const matched = point.regex
+    ? point.before.test(content)
+    : content.includes(point.before);
+  if (!matched) {
+    throw new Error(`patch: before-state not found for '${point.name}'`);
+  }
+  console.log(`  OK ${point.name}: before-state found`);
+}
+
 export function runPatch(options: { faSrc: string }): void {
+  const disableBwd = requireLockEnv("CK_FMHA_DISABLE_BWD") === "1";
+  const patchPoints: PatchPoint[] = disableBwd
+    ? [...bwdPatchPoints, breproPatchPoint]
+    : [breproPatchPoint];
+
   const setup = path.join(path.resolve(options.faSrc), "setup.py");
   let content: string;
   let setupEol: "\n" | "\r\n";
@@ -61,31 +107,25 @@ export function runPatch(options: { faSrc: string }): void {
   }
 
   for (const point of patchPoints) {
-    if (point.name === "link-spawn-brepro" && spawnBreproAlreadyPatched(content)) {
-      console.log(`  OK ${point.name}: already patched`);
-      continue;
-    }
-    const matched = point.regex
-      ? point.before.test(content)
-      : content.includes(point.before);
-    if (!matched) {
-      throw new Error(`patch: before-state not found for '${point.name}'`);
-    }
-    console.log(`  OK ${point.name}: before-state found`);
+    validatePatchPoint(content, point);
   }
 
   for (const point of patchPoints) {
-    if (point.name === "link-spawn-brepro" && spawnBreproAlreadyPatched(content)) {
-      continue;
+    const next = applyPatchPoint(content, point);
+    if (next !== content) {
+      content = next;
+      console.log(`  OK ${point.name}: patched`);
     }
-    content = point.regex
-      ? content.replace(point.before, point.after)
-      : content.replace(point.before, point.after);
-    console.log(`  OK ${point.name}: patched`);
   }
 
   writeNormalized(setup, content, setupEol);
-  console.log(`Patched ${setup} for inference-only CK build`);
+  console.log(
+    `Patched ${setup} (CK_FMHA_DISABLE_BWD=${disableBwd ? "1" : "0"})`,
+  );
+
+  if (!disableBwd) {
+    return;
+  }
 
   const ckSrcDir = path.join(
     path.resolve(options.faSrc),

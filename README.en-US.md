@@ -24,7 +24,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx
 | `toolchain` | `python`, `pytorch`, `torch_device_extra`, `rocm_index`, `rocm` | pip toolchain pins |
 | `flash_attention` | `repo`, `build_commit`, `build_commit_date` | Exact FA source cloned each build; **bump `build_commit` and `build_commit_date` when upgrading FA** |
 | `flash_attention` | `min_commit` | Minimum RDNA4 gfx12x commit ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); **human-readable reference only** |
-| `compile` | `gpu_archs`, `ck_opt_dim` | HIP compile targets (**sole arch source**) and CK FMHA `opt_dim` tiers |
+| `compile` | `gpu_archs`, `ck_opt_dim`, `ck_disable_bwd` | HIP compile targets (**sole arch source**), CK FMHA `opt_dim` tiers, and whether bwd is omitted (`CK_FMHA_DISABLE_BWD`) |
 | `wheel` | `wheel_local_version` | Wheel `+local` tag (env `WHEEL_LOCAL_VERSION`; mapped to upstream `FLASH_ATTN_LOCAL_VERSION` at wheel time) |
 | `wheel` | `wheel_artifact_name` | GitHub Actions artifact name |
 | `release` | `release_tag_prefix` | Release tag prefix (`{prefix}-{variant}-build{run_number}`) |
@@ -43,7 +43,7 @@ Prep clones **`flash_attention.build_commit`** (`fetch` + `checkout FETCH_HEAD`)
 
 ## Build profile
 
-**Inference-only** wheel for ComfyUI: fwd + fwd_appendkv + fwd_splitkv (no bwd), `-DFLASHATTENTION_DISABLE_BACKWARD`, `cxx11.abi` local tag (see `wheel.wheel_local_version`), **`GPU_ARCHS`** from lock `compile.gpu_archs`, **`CK_OPT_DIM`** from lock `compile.ck_opt_dim` (mapped to upstream `OPT_DIM` env at compile time).
+**Inference-only** wheel for ComfyUI (lock `compile.ck_disable_bwd=true`): fwd + fwd_appendkv + fwd_splitkv (no bwd when `CK_FMHA_DISABLE_BWD=1`), `-DFLASHATTENTION_DISABLE_BACKWARD` when bwd disabled, `cxx11.abi` local tag (see `wheel.wheel_local_version`), **`GPU_ARCHS`** from lock `compile.gpu_archs`, **`CK_OPT_DIM`** from lock `compile.ck_opt_dim` (mapped to upstream `OPT_DIM` env at compile time).
 
 | Scope | Approx. ninja targets |
 |-------|----------------------|

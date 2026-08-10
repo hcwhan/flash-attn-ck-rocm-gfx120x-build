@@ -27,6 +27,7 @@ from pathlib import Path
 wheel = sys.argv[1]
 ck_opt_dim = sys.argv[2]
 expected_local = sys.argv[3]
+ck_disable_bwd = sys.argv[4]
 min_pyd_bytes = 1024 * 1024
 
 opt_dims = [int(part) for part in ck_opt_dim.split(',') if part.strip()]
@@ -59,6 +60,24 @@ with zipfile.ZipFile(wheel) as zf:
             raise SystemExit(f'ERROR: {name} missing CK FMHA opt_dim kernels {missing}')
         dims_str = ','.join(str(d) for d in opt_dims)
         print(f'OK {name} size={info.file_size} dims={dims_str}')
+
+    if ck_disable_bwd == '1':
+        bwd_tokens = [
+            b'fmha_bwd.hpp',
+            b'_bwd_d32_',
+            b'_bwd_d64_',
+            b'_bwd_d128_',
+            b'_bwd_d256_',
+        ]
+        for name in pyds:
+            data = zf.read(name)
+            for token in bwd_tokens:
+                if token in data:
+                    raise SystemExit(
+                        f'ERROR: CK FMHA bwd marker {token!r} found in {name} '
+                        f'(ck_disable_bwd=1)'
+                    )
+        print('OK CK FMHA bwd markers absent (inference-only build)')
 
     meta_paths = [name for name in names if name.endswith('.dist-info/METADATA')]
     if not meta_paths:
@@ -125,6 +144,7 @@ export function runVerify(options: {
 }): void {
   const expectedWheelPattern = requireLockEnv("EXPECTED_WHEEL_PATTERN");
   const ckOptDim = requireLockEnv("CK_OPT_DIM");
+  const ckFmhaDisableBwd = requireLockEnv("CK_FMHA_DISABLE_BWD");
   const flashAttentionBuildCommit = requireLockEnv("FLASH_ATTENTION_BUILD_COMMIT");
   const wheelLocalVersion = requireLockEnv("WHEEL_LOCAL_VERSION");
   const pytorchVersion = requireLockEnv("PYTORCH_VERSION");
@@ -189,6 +209,7 @@ export function runVerify(options: {
     whlPath,
     ckOptDim,
     wheelLocalVersion,
+    ckFmhaDisableBwd,
   ]);
 
   const whlStat = statSync(whlPath);
@@ -205,6 +226,7 @@ export function runVerify(options: {
     rocm: rocmVersion,
     gpu_archs: gpuArchs,
     ck_opt_dim: ckOptDim,
+    ck_disable_bwd: ckFmhaDisableBwd === "1",
     wheel_local_version: wheelLocalVersion,
     source_date_epoch: Number(sourceDateEpoch),
     build_variant: buildVariant,
