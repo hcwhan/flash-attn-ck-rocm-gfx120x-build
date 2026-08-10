@@ -73,7 +73,7 @@
 | `03.fa-build-with-cache` | 02+编译+04 带缓存构建 |
 | `04.fa-ninja-cache-save` | 保存 ninja 增量缓存 |
 
-每个 job：`actions/setup-node@v4`（Node 26）+ `npm ci`，然后**必须**跑 `01.config --export-github-env`（`GITHUB_ENV` 已设时不得省略 `--export-github-env`）；随后步骤缺 env / 缺产物直接 throw。
+每个 job：`actions/setup-node@v7`（Node 26）+ `npm ci`，然后**必须**跑 `01.config --export-github-env`（`GITHUB_ENV` 已设时不得省略 `--export-github-env`）；随后步骤缺 env / 缺产物直接 throw。
 
 **有意不合并：** compile 阶段 `shard` dim 校验 vs link 阶段 `validate_staging`；四 shard 重复编 shared obj（link 只用 d32）；parallel link-wheel 无 ninja cache；obj artifact 名 `d{dim}` 即 staging 子目录名（勿 normalize）。
 
