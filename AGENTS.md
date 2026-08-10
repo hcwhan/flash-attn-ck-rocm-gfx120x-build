@@ -1,4 +1,4 @@
-# flash-attn-rocm-gfx1201-build
+# flash-attn-ck-rocm-gfx1201-build
 
 **Windows / gfx1201 / PyTorch 2.12.0+rocm7.14.0 / Python 3.12** 推理专用 FlashAttention 2 CK wheel。版本 pin 见 **`VERSION.lock.json`**。仅 **CI**（`windows-2022` 干净 runner），无本地编译入口。编排脚本为 **TypeScript**（Node 26 + `tsx`；亦可 `npm run fa -- <cmd>`）。
 
@@ -34,7 +34,7 @@
 
 **lock → GITHUB_ENV 映射：** `toolchain.python`→`PYTHON_VERSION`，`toolchain.pytorch`→`PYTORCH_VERSION`，`toolchain.torch_device_extra`→`TORCH_DEVICE_EXTRA`，`toolchain.rocm`→`ROCM_VERSION`，`toolchain.rocm_index`→`ROCM_INDEX`，`compile.opt_dim`→`LOCK_OPT_DIM`（首档另导出 `PRIMARY_DIM`），`compile.gpu_archs`→`GPU_ARCHS`，`flash_attention.repo`→`FLASH_ATTENTION_REPO`，`flash_attention.build_commit`→`FLASH_ATTENTION_BUILD_COMMIT`，`flash_attention.build_commit_date`→`FLASH_ATTENTION_BUILD_COMMIT_DATE`（另导出 `SOURCE_DATE_EPOCH`），`wheel.wheel_local_version`→`WHEEL_LOCAL_VERSION`，`wheel.wheel_artifact_name`→`WHEEL_ARTIFACT_NAME`，`release.release_tag_prefix`→`RELEASE_TAG_PREFIX`，`release.release_title_prefix`→`RELEASE_TITLE_PREFIX`；`EXPECTED_WHEEL_PATTERN` / `PIP_TOOLCHAIN_CACHE_KEY` 由 `version-lock.ts` 推导。
 
-**缩写对照：** 仓库 `flash-attn-rocm-gfx1201-build`；cache/release 前缀 `fa2-ck-gfx1201`；wheel artifact 见 lock `wheel_artifact_name`。
+**缩写对照：** 仓库 `flash-attn-ck-rocm-gfx1201-build`；cache/release 前缀 `fa2-ck-gfx1201`；wheel artifact 见 lock `wheel_artifact_name`。
 
 ## 复用入口
 

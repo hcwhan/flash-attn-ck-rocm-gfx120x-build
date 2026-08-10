@@ -1,5 +1,5 @@
 {
-  "name": "flash-attn-rocm-gfx1201-build",
+  "name": "flash-attn-ck-rocm-gfx1201-build",
   "private": true,
   "type": "module",
   "engines": {

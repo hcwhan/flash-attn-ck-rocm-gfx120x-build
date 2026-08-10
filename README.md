@@ -1,4 +1,4 @@
-# flash-attn-rocm-gfx1201-build
+# flash-attn-ck-rocm-gfx1201-build
 
 [English](README.en-US.md)
 
