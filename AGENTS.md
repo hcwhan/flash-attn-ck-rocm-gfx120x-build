@@ -6,8 +6,8 @@
 
 | Workflow | 链路 |
 |----------|------|
-| **serial** | prep → 全量 build_ext → 原地 `bdist_wheel`（同 job 同目录，stamp 跳过重编）→ smoke test |
-| **parallel** | prep → compile-d32\|d64\|d128\|d256 → link-wheel → smoke test |
+| **serial** | `compile-full-and-link`（clone+patch → 全量 build_ext → 原地 `bdist_wheel`）→ smoke test |
+| **parallel** | `plan-opt-dim` → compile-d32\|d64\|d128\|d256（各 job 内 clone+patch）→ link-wheel → smoke test |
 
 手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Cache 前缀：`serial-v5-{lockHash8}` / `parallel-v5-{lockHash8}-d{dim}`（`lockHash8` = `VERSION.lock.json` SHA256 前 8 位；精确 key，无 `restore-keys`；key 含 `msvc` + `rocmClang` + `pipToolchain` 三段指纹）。
 
@@ -20,8 +20,9 @@
 | 第一档 OPT_DIM | `PRIMARY_DIM` / `--primary-dim` / job output `primary-dim` | parallel link 用 |
 | 单 shard OPT_DIM | matrix `opt-dim` / CLI `--opt-dim` | parallel compile 单值 |
 | 构建模式 | `--build-variant serial\|parallel` | verify / publish / fingerprint 共用 |
-| Ninja cache key | `cache-key` | output / CLI `--cache-key` / manifest `build_caches[].key` |
-| Ninja cache hit | `cache-hit` | 03.fa-build-with-cache output / CLI `--cache-hit` / manifest `build_caches[].hit` |
+| Ninja cache key | `cache-key` | 05.toolchain-fingerprint output / 03.fa-build-with-cache input / manifest `build_caches[].key` |
+| Ninja cache hit | `cache-hit` | 03.fa-build-with-cache output / manifest `build_caches[].hit` |
+| Compile cache metadata | `--build-caches` | workflow 写入 JSON（serial 单文件 / parallel 目录）→ 09.verify → manifest `build_caches` |
 | shard 产物目录 | `SHARD_RELEASE_DIR` | 07.shard 写入；非 GitHub Release |
 | wheel local tag | `WHEEL_LOCAL_VERSION` | lock `wheel.wheel_local_version`；wheel 时映射为 upstream `FLASH_ATTN_LOCAL_VERSION` |
 | wheel artifact 名 | `WHEEL_ARTIFACT_NAME` | lock `wheel.wheel_artifact_name` |
@@ -32,7 +33,7 @@
 
 **lock → GITHUB_ENV 映射：** `toolchain.python`→`PYTHON_VERSION`，`toolchain.pytorch`→`PYTORCH_VERSION`，`toolchain.torch_device_extra`→`TORCH_DEVICE_EXTRA`，`toolchain.rocm`→`ROCM_VERSION`，`toolchain.rocm_index`→`ROCM_INDEX`，`compile.opt_dim`→`LOCK_OPT_DIM`（首档另导出 `PRIMARY_DIM`），`compile.gpu_archs`→`GPU_ARCHS`，`flash_attention.repo`→`FLASH_ATTENTION_REPO`，`flash_attention.build_commit`→`FLASH_ATTENTION_BUILD_COMMIT`，`flash_attention.build_commit_date`→`FLASH_ATTENTION_BUILD_COMMIT_DATE`（另导出 `SOURCE_DATE_EPOCH`），`wheel.wheel_local_version`→`WHEEL_LOCAL_VERSION`，`wheel.wheel_artifact_name`→`WHEEL_ARTIFACT_NAME`，`release.release_tag_prefix`→`RELEASE_TAG_PREFIX`，`release.release_title_prefix`→`RELEASE_TITLE_PREFIX`；`EXPECTED_WHEEL_PATTERN` / `PIP_TOOLCHAIN_CACHE_KEY` 由 `version-lock.ts` 推导。
 
-**缩写对照：** 仓库 `flash-attn-rocm-gfx1201-build`；cache/release 前缀 `fa2-ck-gfx1201`；源码 artifact `fa-src-patched-gfx1201`；wheel artifact 见 lock `wheel_artifact_name`。
+**缩写对照：** 仓库 `flash-attn-rocm-gfx1201-build`；cache/release 前缀 `fa2-ck-gfx1201`；wheel artifact 见 lock `wheel_artifact_name`。
 
 ## 复用入口
 
@@ -55,7 +56,7 @@
 | `06.compile` | 任意 `--opt-dim` 编译入口（serial 全量 / parallel 单 dim） |
 | `07.shard` | 校验 compile 产物 .obj；写 `SHARD_RELEASE_DIR` 到 `GITHUB_ENV` |
 | `08.wheel` | 设 `FLASH_ATTENTION_FORCE_BUILD`，调 link 脚本 |
-| `09.verify` | CI CPU smoke test |
+| `09.verify` | CI CPU smoke test；读 `--build-caches` 写入 manifest `build_caches` |
 | `10.publish` | 准备 Release 元数据（workflow 内联 + `softprops/action-gh-release`） |
 | `build/build-fa-steps.py` | `--step compile` / `--step wheel` / `--step merge-and-wheel` |
 | `test/gpu-smoke-test.py` | 部署前 GPU 校验（gfx1201 真机；CI 不跑） |
@@ -83,7 +84,7 @@
 |----------|------------|
 | `flash_attention.build_commit`、`flash_attention.build_commit_date`、`flash_attention.repo`、`compile.opt_dim`、`compile.gpu_archs`、`wheel.wheel_artifact_name`、`toolchain.*`、`release.*`… | `flash_attention.min_commit` |
 
-prep clone `flash_attention.build_commit` 并校验 author date 与 `flash_attention.build_commit_date` 一致；`SOURCE_DATE_EPOCH` 固定 wheel zip；PE TimeDateStamp 由 patch 注入 link `/Brepro`（内容哈希，serial/parallel 一致）。
+各 compile/link job 内 `03.prep` clone `flash_attention.build_commit` 并校验 author date 与 `flash_attention.build_commit_date` 一致；`SOURCE_DATE_EPOCH` 固定 wheel zip；PE TimeDateStamp 由 patch 注入 link `/Brepro`（内容哈希，serial/parallel 一致）。
 
 ## 设计决策
 
@@ -91,7 +92,7 @@ prep clone `flash_attention.build_commit` 并校验 author date 与 `flash_atten
 
 - **不为不可能场景加诊断**
 - **干净 runner**：compile 后仅一棵 `temp.win-*`；不为脏 workspace / 人工改目录加兜底。
-- **连续 CI 链**：prep → compile/link → smoke 自动跑完；staging/shard 齐全等流水线检查保留。
+- **连续 CI 链**：各 compile/link job 内 clone+patch → compile/link → smoke 自动跑完；staging/shard 齐全等流水线检查保留。
 - **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=TRUE` + prebuilt `.obj` 时间戳 merge；`/Brepro` + `SOURCE_DATE_EPOCH` 使 serial / parallel wheel **byte-identical**。
 - **`PRIMARY_DIM`** = lock `opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
 - **`ninja_workers` 默认 4**（OOM 改 2）；**`skip_cache_restore` 默认 false**（命中时构建成功后先删旧缓存再重存刷新，构建失败保留旧缓存；设为 true 时 lookup-only 探测）。

@@ -29,15 +29,14 @@ permissions:
 env:
   MAX_JOBS: ${{ github.event.inputs.ninja_workers }}
   FA_SRC: C:\fa\flash-attention
-  FA_ARTIFACT: fa-src-patched-gfx1201
   FA_STAGING: C:\fa-staging
   SKIP_CACHE_RESTORE: ${{ github.event.inputs.skip_cache_restore != 'false' && 'true' || 'false' }}
 
 jobs:
-  prep:
-    name: prep-fa-src
+  plan-opt-dim:
+    name: plan-opt-dim
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 15
     outputs:
       opt-dims-json: ${{ steps.plan-opt-dim-matrix.outputs.opt-dims-json }}
       primary-dim: ${{ steps.plan-opt-dim-matrix.outputs.primary-dim }}
@@ -65,32 +64,15 @@ jobs:
         shell: pwsh
         run: npx tsx scripts/cli.ts 02.plan-opt-dim-matrix
 
-      - name: Clone flash-attention source
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 03.prep --fa-src $env:FA_SRC
-
-      - name: Patch flash-attention for inference-only build
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 04.patch --fa-src $env:FA_SRC
-
-      - name: Upload patched source artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.FA_ARTIFACT }}
-          path: ${{ env.FA_SRC }}
-          retention-days: 7
-          if-no-files-found: error
-          compression-level: 9
-
   compile:
     name: compile-d${{ matrix.opt-dim }}
-    needs: prep
+    needs: plan-opt-dim
     runs-on: windows-2022
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        opt-dim: ${{ fromJson(needs.prep.outputs.opt-dims-json) }}
+        opt-dim: ${{ fromJson(needs.plan-opt-dim.outputs.opt-dims-json) }}
 
     steps:
       - name: Checkout build repo
@@ -110,6 +92,12 @@ jobs:
         shell: pwsh
         run: npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env
 
+      - name: Clone and patch flash-attention source
+        shell: pwsh
+        run: |
+          npx tsx scripts/cli.ts 03.prep --fa-src $env:FA_SRC
+          npx tsx scripts/cli.ts 04.patch --fa-src $env:FA_SRC
+
       - name: Setup ROCm toolchain
         uses: "./.github/actions/01.fa-rocm-toolchain"
         with:
@@ -119,12 +107,6 @@ jobs:
           rocm-index: ${{ env.ROCM_INDEX }}
           rocm-version: ${{ env.ROCM_VERSION }}
           pip-cache-key: ${{ env.PIP_TOOLCHAIN_CACHE_KEY }}
-
-      - name: Download patched flash-attention source
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ env.FA_ARTIFACT }}
-          path: ${{ env.FA_SRC }}
 
       - name: Fingerprint toolchain for cache key
         id: toolchain-fingerprint
@@ -175,7 +157,7 @@ jobs:
 
   link:
     name: link-wheel
-    needs: [prep, compile]
+    needs: [plan-opt-dim, compile]
     runs-on: windows-2022
     timeout-minutes: 360
 
@@ -197,6 +179,12 @@ jobs:
         shell: pwsh
         run: npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env
 
+      - name: Clone and patch flash-attention source
+        shell: pwsh
+        run: |
+          npx tsx scripts/cli.ts 03.prep --fa-src $env:FA_SRC
+          npx tsx scripts/cli.ts 04.patch --fa-src $env:FA_SRC
+
       - name: Setup ROCm toolchain
         uses: "./.github/actions/01.fa-rocm-toolchain"
         with:
@@ -206,12 +194,6 @@ jobs:
           rocm-index: ${{ env.ROCM_INDEX }}
           rocm-version: ${{ env.ROCM_VERSION }}
           pip-cache-key: ${{ env.PIP_TOOLCHAIN_CACHE_KEY }}
-
-      - name: Download patched flash-attention source
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ env.FA_ARTIFACT }}
-          path: ${{ env.FA_SRC }}
 
       - name: Download OPT_DIM object artifacts
         uses: actions/download-artifact@v8
@@ -229,7 +211,7 @@ jobs:
 
       - name: Link and package wheel from merged objects
         shell: pwsh
-        run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist --staging-root $env:FA_STAGING --primary-dim "${{ needs.prep.outputs.primary-dim }}"
+        run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist --staging-root $env:FA_STAGING --primary-dim "${{ needs.plan-opt-dim.outputs.primary-dim }}"
 
       - name: Smoke test (CPU)
         shell: pwsh

@@ -184,7 +184,7 @@ def _newest_mtime_under(root: Path) -> int:
 def compute_stamp(fa_src: Path) -> int:
     """One stamp value (integer nanoseconds) >= every input ninja may compare
     against: the regenerated build/fmha_*.cu and headers under csrc (freshly
-    extracted from the prep artifact on the runner).  Applied to obj mtimes and
+    cloned and patched fa-src on the runner).  Applied to obj mtimes and
     .ninja_log entry mtimes in one consistent value; computed once per ninja
     run.  The value is int ns so os.utime(ns=...) and log records agree
     bit-exactly (a float seconds stamp drifts enough to trip dirty checks)."""

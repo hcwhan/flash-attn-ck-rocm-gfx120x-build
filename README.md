@@ -78,16 +78,15 @@ ComfyUI **推理专用** wheel：
 
 | Job | 作用 | 超时 |
 |-----|------|------|
-| `prep-fa-src` | clone + patch，上传源码 artifact | 45 min |
-| `compile-full` | toolchain、cache、`npx tsx scripts/cli.ts 06.compile` + `08.wheel`（全量） | 6 h |
+| `compile-full-and-link` | clone+patch、toolchain、cache、`06.compile` + `08.wheel`、smoke test | 6 h |
 
 ### 并行（`build-fa2-ck-gfx1201-parallel.yml`）
 
 | Job | 作用 | 超时 |
 |-----|------|------|
-| `prep-fa-src` | 同上 | 45 min |
-| `compile-d32` … `d256` | 各编一个 OPT_DIM shard，上传 `.obj` | 各 6 h |
-| `link-wheel` | 合并 obj + link + 打 wheel + CPU smoke test | 6 h |
+| `plan-opt-dim` | 导出 parallel OPT_DIM matrix | 15 min |
+| `compile-d32` … `d256` | 各 job 内 clone+patch，编一个 OPT_DIM shard，上传 `.obj` | 各 6 h |
+| `link-wheel` | clone+patch、合并 obj + link + 打 wheel + CPU smoke test | 6 h |
 
 - Cache key 含 `VERSION.lock.json` SHA256 前 8 位（`-v5-{lockHash8}-`）及三段工具链指纹（MSVC 工具集 / ROCm clang / pip 工具链）；**仅精确匹配**（无 `restore-keys`）。串行 `fa2-ck-gfx1201-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，并行 `fa2-ck-gfx1201-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，互不共用。
 - 四 shard 各编 shared obj；link 仅使用 **lock `opt_dim` 第一档**（当前 `32`）的 shared obj。
@@ -145,7 +144,8 @@ flash_attn-*+torch2.12.0.rocm7.14.0.cxx11.abi-cp312-cp312-win_amd64.whl
 
 | 检查 | 脚本 |
 |------|------|
-| CI smoke test（CPU） | `npx tsx scripts/cli.ts 09.verify ... --build-variant serial --cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"` |
+| CI smoke test serial（CPU） | `npx tsx scripts/cli.ts 09.verify --dist-dir dist --build-variant serial --build-caches dist\build-caches.json` |
+| CI smoke test parallel（CPU） | `npx tsx scripts/cli.ts 09.verify --dist-dir dist --build-variant parallel --build-caches cache-meta` |
 | parallel link API dispatch 重编校验 | `build/build-fa-steps.py`（merge skip + ninja 前后断言） |
 | 部署前 GPU smoke test（gfx1201 真机） | `python test/gpu-smoke-test.py -w .` |
 

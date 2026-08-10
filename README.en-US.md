@@ -63,16 +63,15 @@ Push to `main` does **not** auto-trigger builds.
 
 | Job | Role | Timeout |
 |-----|------|---------|
-| `prep-fa-src` | clone + patch, upload source | 45 min |
-| `compile-full` | toolchain, cache, full `npx tsx scripts/cli.ts 06.compile` + `08.wheel` | 6 h |
+| `compile-full-and-link` | clone+patch, toolchain, cache, `06.compile` + `08.wheel`, smoke test | 6 h |
 
 ### Parallel (`build-fa2-ck-gfx1201-parallel.yml`)
 
 | Job | Role | Timeout |
 |-----|------|---------|
-| `prep-fa-src` | same prep | 45 min |
-| `compile-d32` … `d256` | one OPT_DIM shard each, upload `.obj` | 6 h each |
-| `link-wheel` | merge objs + link + wheel + CPU smoke test | 6 h |
+| `plan-opt-dim` | export parallel OPT_DIM matrix | 15 min |
+| `compile-d32` … `d256` | clone+patch per job, one OPT_DIM shard each, upload `.obj` | 6 h each |
+| `link-wheel` | clone+patch, merge objs + link + wheel + CPU smoke test | 6 h |
 
 Cache keys include `VERSION.lock.json` SHA256 prefix (`-v5-{lockHash8}-`) and three toolchain fingerprints (MSVC toolset / ROCm clang / pip toolchain); **exact match only** (no `restore-keys`). Serial: `fa2-ck-gfx1201-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`; parallel: `fa2-ck-gfx1201-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`. Link uses **first lock `opt_dim` tier** (`32`) for shared objs only.
 
@@ -112,7 +111,8 @@ flash_attn-*+torch2.12.0.rocm7.14.0.cxx11.abi-cp312-cp312-win_amd64.whl
 
 | Check | Script |
 |-------|--------|
-| CI smoke test (CPU) | `npx tsx scripts/cli.ts 09.verify ... --build-variant serial --cache-key "${{ steps.toolchain-fingerprint.outputs.cache-key }}"` |
+| CI smoke test serial (CPU) | `npx tsx scripts/cli.ts 09.verify --dist-dir dist --build-variant serial --build-caches dist\build-caches.json` |
+| CI smoke test parallel (CPU) | `npx tsx scripts/cli.ts 09.verify --dist-dir dist --build-variant parallel --build-caches cache-meta` |
 | Parallel link API dispatch recompile checks | `build/build-fa-steps.py` (merge skip + pre/post ninja asserts) |
 | Pre-deploy GPU smoke test (gfx1201 hardware) | `python test/gpu-smoke-test.py -w .` |
 

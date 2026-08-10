@@ -31,53 +31,11 @@ permissions:
 env:
   MAX_JOBS: ${{ github.event.inputs.ninja_workers }}
   FA_SRC: C:\fa\flash-attention
-  FA_ARTIFACT: fa-src-patched-gfx1201
   SKIP_CACHE_RESTORE: ${{ github.event.inputs.skip_cache_restore != 'false' && 'true' || 'false' }}
 
 jobs:
-  prep:
-    name: prep-fa-src
-    runs-on: windows-2022
-    timeout-minutes: 45
-
-    steps:
-      - name: Checkout build repo
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: "26"
-          cache: npm
-
-      - name: Install npm dependencies
-        shell: pwsh
-        run: npm ci
-
-      - name: Load VERSION.lock.json
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env
-
-      - name: Clone flash-attention source
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 03.prep --fa-src $env:FA_SRC
-
-      - name: Patch flash-attention for inference-only build
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 04.patch --fa-src $env:FA_SRC
-
-      - name: Upload patched source artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.FA_ARTIFACT }}
-          path: ${{ env.FA_SRC }}
-          retention-days: 7
-          if-no-files-found: error
-          compression-level: 9
-
-  compile-full:
-    name: compile-full
-    needs: prep
+  compile-full-and-link:
+    name: compile-full-and-link
     runs-on: windows-2022
     timeout-minutes: 360
 
@@ -99,6 +57,12 @@ jobs:
         shell: pwsh
         run: npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env
 
+      - name: Clone and patch flash-attention source
+        shell: pwsh
+        run: |
+          npx tsx scripts/cli.ts 03.prep --fa-src $env:FA_SRC
+          npx tsx scripts/cli.ts 04.patch --fa-src $env:FA_SRC
+
       - name: Setup ROCm toolchain
         uses: "./.github/actions/01.fa-rocm-toolchain"
         with:
@@ -108,12 +72,6 @@ jobs:
           rocm-index: ${{ env.ROCM_INDEX }}
           rocm-version: ${{ env.ROCM_VERSION }}
           pip-cache-key: ${{ env.PIP_TOOLCHAIN_CACHE_KEY }}
-
-      - name: Download patched flash-attention source
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ env.FA_ARTIFACT }}
-          path: ${{ env.FA_SRC }}
 
       - name: Fingerprint toolchain for cache key
         id: toolchain-fingerprint
