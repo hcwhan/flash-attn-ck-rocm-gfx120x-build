@@ -118,6 +118,7 @@ jobs:
           torch-device-extra: ${{ env.TORCH_DEVICE_EXTRA }}
           rocm-index: ${{ env.ROCM_INDEX }}
           rocm-version: ${{ env.ROCM_VERSION }}
+          pip-cache-key: ${{ env.PIP_TOOLCHAIN_CACHE_KEY }}
 
       - name: Download patched flash-attention source
         uses: actions/download-artifact@v8
@@ -183,6 +184,7 @@ jobs:
           torch-device-extra: ${{ env.TORCH_DEVICE_EXTRA }}
           rocm-index: ${{ env.ROCM_INDEX }}
           rocm-version: ${{ env.ROCM_VERSION }}
+          pip-cache-key: ${{ env.PIP_TOOLCHAIN_CACHE_KEY }}
 
       - name: Download patched flash-attention source
         uses: actions/download-artifact@v8
