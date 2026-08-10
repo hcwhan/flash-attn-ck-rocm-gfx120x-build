@@ -23,8 +23,6 @@ inputs:
 
 runs:
   using: composite
-  env:
-    PIP_CACHE_DIR: ${{ runner.temp }}/pip-toolchain-cache
   steps:
     - name: Restore pip toolchain cache
       uses: actions/cache/restore@v6
@@ -32,6 +30,10 @@ runs:
       with:
         path: ${{ runner.temp }}/pip-toolchain-cache
         key: ${{ inputs.pip-cache-key }}
+
+    - name: Export pip cache directory
+      shell: pwsh
+      run: echo "PIP_CACHE_DIR=$env:RUNNER_TEMP/pip-toolchain-cache" >> $env:GITHUB_ENV
 
     - name: Setup Python
       uses: actions/setup-python@v7
