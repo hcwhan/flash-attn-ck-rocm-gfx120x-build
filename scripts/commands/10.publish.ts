@@ -6,6 +6,24 @@ import {
   requireLockEnv,
 } from "../lib/require-env.js";
 
+const RELEASE_TITLE_TIME_ZONE = "Asia/Shanghai";
+
+function formatReleaseTitleTimestamp(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: RELEASE_TITLE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? "00";
+  return `${get("year")}.${get("month")}.${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
+}
+
 export function runPublish(options: {
   distDir: string;
   workflowName: string;
@@ -40,8 +58,8 @@ export function runPublish(options: {
 
   const whlName = path.basename(whls[0]!);
   const releaseTag = `${releaseTagPrefix}-${variantSlug}-build${runNumber}`;
-  const displayName = `${releaseTitlePrefix} (${options.buildVariant})`;
-  const releaseTitle = `${displayName} (build ${runNumber})`;
+  const releaseTimestamp = formatReleaseTitleTimestamp(new Date());
+  const releaseTitle = `${releaseTitlePrefix} ${releaseTimestamp}`;
   const bodyPath = path.join(runnerTemp, "release-body.md");
 
   const manifestPath = path.join(distDir, "wheel.manifest.json");
@@ -55,6 +73,7 @@ export function runPublish(options: {
     "|-------|-------|",
     `| Workflow | ${options.workflowName} |`,
     `| Build variant | ${options.buildVariant} |`,
+    `| Release time | ${releaseTimestamp} (${RELEASE_TITLE_TIME_ZONE}) |`,
     `| Run | ${runNumber} |`,
     `| Repository commit | ${githubSha} |`,
     `| Wheel | ${whlName} |`,
@@ -70,5 +89,6 @@ export function runPublish(options: {
   });
 
   console.log(`Release tag: ${releaseTag}`);
+  console.log(`Release title: ${releaseTitle}`);
   console.log(`Release body: ${bodyPath}`);
 }
