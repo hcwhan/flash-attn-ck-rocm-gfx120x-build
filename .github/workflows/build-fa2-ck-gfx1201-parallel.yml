@@ -244,5 +244,5 @@ jobs:
             dist/*.whl
             dist/*.sha256
             dist/wheel.manifest.json
-          prerelease: true
+          prerelease: false
           make_latest: false
