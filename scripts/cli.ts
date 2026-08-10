@@ -2,14 +2,14 @@
 import { Command } from "commander";
 import { runConfig } from "./commands/01.config.js";
 import { runPlanOptDimMatrix } from "./commands/02.plan-opt-dim-matrix.js";
-import { runCompile } from "./commands/06.compile.js";
-import { runPatch } from "./commands/04.patch.js";
 import { runPrep } from "./commands/03.prep.js";
-import { runPublish } from "./commands/10.publish.js";
-import { runShard } from "./commands/07.shard.js";
+import { runPatch } from "./commands/04.patch.js";
 import { runToolchainFingerprint } from "./commands/05.toolchain-fingerprint.js";
-import { runVerify } from "./commands/09.verify.js";
+import { runCompile } from "./commands/06.compile.js";
+import { runShard } from "./commands/07.shard.js";
 import { runWheel } from "./commands/08.wheel.js";
+import { runVerify } from "./commands/09.verify.js";
+import { runPublish } from "./commands/10.publish.js";
 
 const program = new Command();
 
