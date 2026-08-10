@@ -42,22 +42,11 @@ jobs:
       primary-dim: ${{ steps.plan-opt-dim-matrix.outputs.primary-dim }}
 
     steps:
-      - name: Checkout build repo
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
+      - name: Bootstrap build job
+        uses: "./.github/actions/00.fa-job-bootstrap"
         with:
-          node-version: "26"
-          cache: npm
-
-      - name: Install npm dependencies
-        shell: pwsh
-        run: npm ci
-
-      - name: Load VERSION.lock.json
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env
+          prep-source: false
+          setup-toolchain: false
 
       - name: Plan OPT_DIM matrix
         id: plan-opt-dim-matrix
@@ -75,38 +64,8 @@ jobs:
         opt-dim: ${{ fromJson(needs.plan-opt-dim.outputs.opt-dims-json) }}
 
     steps:
-      - name: Checkout build repo
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: "26"
-          cache: npm
-
-      - name: Install npm dependencies
-        shell: pwsh
-        run: npm ci
-
-      - name: Load VERSION.lock.json
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env
-
-      - name: Clone and patch flash-attention source
-        shell: pwsh
-        run: |
-          npx tsx scripts/cli.ts 03.prep --fa-src $env:FA_SRC
-          npx tsx scripts/cli.ts 04.patch --fa-src $env:FA_SRC
-
-      - name: Setup ROCm toolchain
-        uses: "./.github/actions/01.fa-rocm-toolchain"
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          pytorch-version: ${{ env.PYTORCH_VERSION }}
-          torch-device-extra: ${{ env.TORCH_DEVICE_EXTRA }}
-          rocm-index: ${{ env.ROCM_INDEX }}
-          rocm-version: ${{ env.ROCM_VERSION }}
-          pip-cache-key: ${{ env.PIP_TOOLCHAIN_CACHE_KEY }}
+      - name: Bootstrap build job
+        uses: "./.github/actions/00.fa-job-bootstrap"
 
       - name: Fingerprint toolchain for cache key
         id: toolchain-fingerprint
@@ -161,38 +120,8 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Checkout build repo
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: "26"
-          cache: npm
-
-      - name: Install npm dependencies
-        shell: pwsh
-        run: npm ci
-
-      - name: Load VERSION.lock.json
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env
-
-      - name: Clone and patch flash-attention source
-        shell: pwsh
-        run: |
-          npx tsx scripts/cli.ts 03.prep --fa-src $env:FA_SRC
-          npx tsx scripts/cli.ts 04.patch --fa-src $env:FA_SRC
-
-      - name: Setup ROCm toolchain
-        uses: "./.github/actions/01.fa-rocm-toolchain"
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          pytorch-version: ${{ env.PYTORCH_VERSION }}
-          torch-device-extra: ${{ env.TORCH_DEVICE_EXTRA }}
-          rocm-index: ${{ env.ROCM_INDEX }}
-          rocm-version: ${{ env.ROCM_VERSION }}
-          pip-cache-key: ${{ env.PIP_TOOLCHAIN_CACHE_KEY }}
+      - name: Bootstrap build job
+        uses: "./.github/actions/00.fa-job-bootstrap"
 
       - name: Download OPT_DIM object artifacts
         uses: actions/download-artifact@v8
