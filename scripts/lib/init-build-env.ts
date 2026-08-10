@@ -55,7 +55,7 @@ export function initBuildEnv(options: { optDim: string }): void {
 
   run(PYTHON, [
     "-c",
-    "import torch; print('torch', torch.__version__); print('rocm', torch.version.hip); print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)",
+    "import torch; print('torch', torch.__version__); print('rocm', torch.version.rocm); print('hip', torch.version.hip); print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)",
   ]);
 
   console.log(
