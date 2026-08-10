@@ -59,7 +59,7 @@
 | `07.shard` | 校验 compile 产物 .obj；写 `SHARD_RELEASE_DIR` 到 `GITHUB_ENV` |
 | `08.wheel` | parallel link staging 校验 + `FLASH_ATTENTION_FORCE_BUILD` + link 脚本 |
 | `09.verify` | CI CPU smoke test；读 `--build-caches` 写入 manifest `build_caches` 与 `dispatch` |
-| `10.publish` | 准备 Release 元数据（workflow 内联 + `softprops/action-gh-release`） |
+| `10.publish` | 准备 Release 元数据（由 `99.fa-verify-publish` 调用 + `softprops/action-gh-release`） |
 | `build/build-fa-steps.py` | `--step compile` / `--step wheel` / `--step merge-and-wheel` |
 | `test/gpu-smoke-test.py` | 部署前 GPU 校验（gfx1201 真机；CI 不跑） |
 
@@ -76,6 +76,7 @@
 | `02.fa-ninja-cache-restore` | 恢复 ninja 增量缓存 |
 | `03.fa-build-with-cache` | 02+编译+04 带缓存构建 |
 | `04.fa-ninja-cache-save` | 保存 ninja 增量缓存 |
+| `99.fa-verify-publish` | `09.verify` + upload wheel artifact + 可选 `10.publish` / GitHub Release（读 `workflow_dispatch.publish_release`）；inputs `build-variant` / `build-caches`（相对 workspace） |
 
 每个 job：**必须**经 `00.fa-job-bootstrap`（或等价地 checkout + Node/npm + `01.config --export-github-env`）；compile/link/serial 另开 prep/toolchain/fingerprint。随后步骤缺 env / 缺产物直接 throw。
 

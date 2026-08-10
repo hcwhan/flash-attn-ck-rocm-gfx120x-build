@@ -72,36 +72,8 @@ jobs:
         shell: pwsh
         run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist
 
-      - name: Smoke test (CPU)
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 09.verify --dist-dir $env:GITHUB_WORKSPACE\dist --build-variant serial --build-caches $env:GITHUB_WORKSPACE\dist\build-caches.json
-
-      - name: Upload wheel artifact
-        uses: actions/upload-artifact@v7
+      - name: Verify wheel and publish
+        uses: "./.github/actions/99.fa-verify-publish"
         with:
-          name: ${{ env.WHEEL_ARTIFACT_NAME }}
-          path: |
-            dist/*.whl
-            dist/*.sha256
-            dist/wheel.manifest.json
-          retention-days: 7
-
-      - name: Prepare release metadata
-        if: ${{ github.event.inputs.publish_release != 'false' }}
-        id: publish
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 10.publish --dist-dir $env:GITHUB_WORKSPACE\dist --workflow-name "${{ github.workflow }}" --build-variant serial
-
-      - name: Publish GitHub Release
-        if: ${{ github.event.inputs.publish_release != 'false' }}
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ steps.publish.outputs.release-tag }}
-          name: ${{ steps.publish.outputs.release-title }}
-          body_path: ${{ steps.publish.outputs.body-path }}
-          files: |
-            dist/*.whl
-            dist/*.sha256
-            dist/wheel.manifest.json
-          prerelease: false
-          make_latest: false
+          build-variant: serial
+          build-caches: dist/build-caches.json
