@@ -72,7 +72,7 @@ Push to `main` does **not** auto-trigger builds.
 
 | Job | Role | Timeout |
 |-----|------|---------|
-| `compile-full-and-link` | clone+patch, toolchain, cache, `06.compile` + `08.wheel`, smoke test | 6 h |
+| `compile-full-and-link-wheel` | clone+patch, toolchain, cache, `06.compile` + `08.wheel`, smoke test | 6 h |
 
 ### Parallel (`build-fa2-ck-gfx120x-parallel.yml`)
 

@@ -32,8 +32,8 @@ env:
   USE_CACHE: ${{ github.event.inputs.use_cache != 'false' && 'true' || 'false' }}
 
 jobs:
-  compile-full-and-link:
-    name: compile-full-and-link
+  compile-full-and-link-wheel:
+    name: compile-full-and-link-wheel
     runs-on: windows-2022
 
     steps:

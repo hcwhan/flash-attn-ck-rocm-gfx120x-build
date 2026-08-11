@@ -79,7 +79,7 @@ ComfyUI **推理专用** wheel（lock `compile.ck_disable_bwd=true`）：
 
 | Job | 作用 | 超时 |
 |-----|------|------|
-| `compile-full-and-link` | clone+patch、toolchain、cache、`06.compile` + `08.wheel`、smoke test | 6 h |
+| `compile-full-and-link-wheel` | clone+patch、toolchain、cache、`06.compile` + `08.wheel`、smoke test | 6 h |
 
 ### 并行（`build-fa2-ck-gfx120x-parallel.yml`）
 
