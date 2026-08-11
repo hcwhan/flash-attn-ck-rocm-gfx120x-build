@@ -18,11 +18,11 @@
     "ck_disable_bwd": true
   },
   "wheel": {
-    "wheel_local_version": "torch2.12.0.rocm7.14.0.cxx11.abi",
-    "wheel_artifact_name": "flash-attn-ck-gfx120x-cp312-torch2.12.0-rocm7.14.0"
+    "wheel_local_version": "ck-torch2.12.0-rocm7.14.0-gfx120x-cxx11.abi",
+    "wheel_artifact_name": "flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x"
   },
   "release": {
-    "release_tag_prefix": "fa2-ck-gfx120x-cp312-torch2.12.0-rocm7.14.0",
+    "release_tag_prefix": "fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x",
     "release_title_prefix": "FlashAttention 2 CK gfx120x Windows"
   }
 }

@@ -6,7 +6,7 @@ GitHub Actions workflow to build **FlashAttention 2 CK backend** for **Windows /
 
 Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env` in each workflow job.
 
-## Target
+## Target environment
 
 | Item | Value |
 |------|-------|
@@ -43,7 +43,13 @@ Prep clones **`flash_attention.build_commit`** (`fetch` + `checkout FETCH_HEAD`)
 
 ## Build profile
 
-**Inference-only** wheel for ComfyUI (lock `compile.ck_disable_bwd=true`): fwd + fwd_appendkv + fwd_splitkv (no bwd when `CK_FMHA_DISABLE_BWD=1`), `-DFLASHATTENTION_DISABLE_BACKWARD` when bwd disabled, `cxx11.abi` local tag (see `wheel.wheel_local_version`), **`GPU_ARCHS`** from lock `compile.gpu_archs`, **`CK_OPT_DIM`** from lock `compile.ck_opt_dim` (mapped to upstream `OPT_DIM` env at compile time).
+ComfyUI **inference-only** wheel (lock `compile.ck_disable_bwd=true`):
+
+- CK kernels: **fwd + fwd_appendkv + fwd_splitkv** (no bwd when `CK_FMHA_DISABLE_BWD=1`)
+- **`-DFLASHATTENTION_DISABLE_BACKWARD`** (enabled when `CK_FMHA_DISABLE_BWD=1`)
+- **C++11 ABI `cxx11.abi`** (matches pinned PyTorch; local tag see `wheel.wheel_local_version`)
+- **`GPU_ARCHS`** = lock `compile.gpu_archs` (semicolon-separated on Windows)
+- **`CK_OPT_DIM`** = lock `compile.ck_opt_dim` (currently `32,64,128,256`); `init-build-env.ts` maps to upstream `OPT_DIM` env
 
 | Scope | Approx. ninja targets |
 |-------|----------------------|
@@ -59,7 +65,7 @@ Prep clones **`flash_attention.build_commit`** (`fetch` + `checkout FETCH_HEAD`)
 | **Build FlashAttention CK serial (Windows gfx120x)** | Single-job full build + cache (`serial-v5`) | **Manual only** |
 | **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM shard compile + link (`parallel-v5-d{dim}`) | **Manual only** |
 
-Push to `main` does **not** auto-trigger builds.
+> Push to `main` does **not** auto-trigger builds.
 
 **Manual inputs (both workflows):**
 
@@ -67,6 +73,7 @@ Push to `main` does **not** auto-trigger builds.
 |-------|---------|-------------|
 | `ninja_workers` | `4` | Ninja parallel workers (use `2` if OOM) |
 | `use_cache` | `true` | Set `false` to skip restore (still probes `exists`; `used=false`; cache still saved after a successful compile) |
+| `publish_release` | `true` | Set `false` to skip GitHub Release upload |
 
 ### Serial (`build-fa2-ck-gfx120x-serial.yml`)
 
@@ -82,9 +89,9 @@ Push to `main` does **not** auto-trigger builds.
 | `compile-d32` … `d256` | clone+patch per job, one OPT_DIM shard each, upload `.obj` | 6 h each |
 | `link-wheel` | clone+patch, merge objs + link + wheel + CPU smoke test | 6 h |
 
-Cache keys include `VERSION.lock.json` SHA256 prefix (`-v5-{lockHash8}-`) and three toolchain fingerprints (MSVC toolset / ROCm clang / pip toolchain); **exact match only** (no `restore-keys`). Serial: `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`; parallel: `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`. Link uses **first lock `ck_opt_dim` tier** (`32`) for shared objs only.
-
-Ninja cache is **saved only after a successful `06.compile`**; failed compiles never write cache (job timeout/cancellation likewise skips save). When a remote entry exists (`exists`) and compile succeeds, the stale entry is deleted before save refreshes it. `use_cache=false` skips restore (`used=false`); a successful compile still saves cache.
+- Cache keys include `VERSION.lock.json` SHA256 prefix (`-v5-{lockHash8}-`) and three toolchain fingerprints (MSVC toolset / ROCm clang / pip toolchain); **exact match only** (no `restore-keys`). Serial: `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`; parallel: `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`. Keys are not shared across modes.
+- Ninja cache is **saved only after a successful `06.compile`**; failed compiles never write cache (job timeout/cancellation likewise skips save). When a remote entry exists (`exists`) and compile succeeds, the stale entry is deleted before save refreshes it. `use_cache=false` skips restore (`used=false`); a successful compile still saves cache.
+- All four shards compile shared objs; link uses only the **first lock `ck_opt_dim` tier** (currently `32`) for shared objs.
 
 ### Build stages
 
@@ -108,14 +115,31 @@ Env is set uniformly via `scripts/lib/init-build-env.ts` (includes `SOURCE_DATE_
 
 ## Output
 
-Artifact: **`wheel_artifact_name`** — `.whl`, `.sha256`, `wheel.manifest.json`.
+Artifact: **`wheel_artifact_name`** (short-term Actions download)
 
 Under the same `VERSION.lock.json`, **serial and parallel should produce byte-identical wheels** (matching SHA256); `/Brepro` fixes PE TimeDateStamp, `SOURCE_DATE_EPOCH` fixes wheel zip metadata.
+
+GitHub Release (uploaded automatically after a successful build; serial / parallel use different tags and titles):
+
+| Workflow | Tag example | Release title example |
+|----------|-------------|----------------------|
+| serial | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123` | FlashAttention 2 CK gfx120x Windows (serial) (build 123) |
+| parallel | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123` | FlashAttention 2 CK gfx120x Windows (parallel) (build 123) |
+
+- `flash_attn-*.whl`
+- `flash_attn-*.whl.sha256`
+- `wheel.manifest.json`
+
+```powershell
+gh release list
+gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123 -D .\dist
+gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123 -D .\dist
+```
 
 Expected wheel name (derived from `wheel.wheel_local_version` + `toolchain.python`):
 
 ```text
-flash_attn-*+torch2.12.0.rocm7.14.0.cxx11.abi-cp312-cp312-win_amd64.whl
+flash_attn-*+ck-torch2.12.0-rocm7.14.0-gfx120x-cxx11.abi-cp312-cp312-win_amd64.whl
 ```
 
 ## Verification
@@ -127,14 +151,15 @@ flash_attn-*+torch2.12.0.rocm7.14.0.cxx11.abi-cp312-cp312-win_amd64.whl
 | Parallel link API dispatch recompile checks | `build/build-fa-steps.py` (merge skip + pre/post ninja asserts) |
 | Pre-deploy GPU smoke test (gfx120x hardware) | `python test/gpu-smoke-test.py -w .` |
 
-Smoke test covers wheel structure, pip install, and extension import. Parallel link additionally asserts the three `fmha_*_api.obj` dispatch objects are skipped during merge and recompiled by ninja. GPU fwd + kvcache smoke is in `test/gpu-smoke-test.py` (run manually on gfx1200/gfx1201 hardware before deploy).
+Smoke test: wheel filename/structure (.pyd size, OPT_DIM kernel symbols, METADATA) → pip install → import flash_attn_2_cuda; parallel link additionally asserts the three `fmha_*_api.obj` dispatch objects are skipped during merge and recompiled by ninja. GPU fwd + kvcache see `test/gpu-smoke-test.py` (run manually on gfx1200/gfx1201 hardware before deploy).
 
 ## ComfyUI install
 
 ```powershell
-& "<ComfyUI>\python_embeded\python.exe" -m pip install .\downloaded.whl
+$PY = "<ComfyUI>\python_embeded\python.exe"
+& $PY -m pip install .\downloaded.whl
 ```
 
-Use launch arg `--use-flash-attention`.
+Launch arg: `--use-flash-attention` (instead of `--use-pytorch-cross-attention`).
 
 See [AGENTS.md](AGENTS.md) for maintainer conventions.

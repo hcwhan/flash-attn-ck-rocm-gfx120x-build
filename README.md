@@ -123,8 +123,8 @@ GitHub Release（构建成功后自动上传；serial / parallel 使用不同 ta
 
 | Workflow | Tag 示例 | Release 标题示例 |
 |----------|----------|------------------|
-| serial | `fa2-ck-gfx120x-cp312-torch2.12.0-rocm7.14.0-serial-build123` | FlashAttention 2 CK gfx120x Windows (serial) (build 123) |
-| parallel | `fa2-ck-gfx120x-cp312-torch2.12.0-rocm7.14.0-parallel-build123` | FlashAttention 2 CK gfx120x Windows (parallel) (build 123) |
+| serial | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123` | FlashAttention 2 CK gfx120x Windows (serial) (build 123) |
+| parallel | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123` | FlashAttention 2 CK gfx120x Windows (parallel) (build 123) |
 
 - `flash_attn-*.whl`
 - `flash_attn-*.whl.sha256`
@@ -132,14 +132,14 @@ GitHub Release（构建成功后自动上传；serial / parallel 使用不同 ta
 
 ```powershell
 gh release list
-gh release download fa2-ck-gfx120x-cp312-torch2.12.0-rocm7.14.0-serial-build123 -D .\dist
-gh release download fa2-ck-gfx120x-cp312-torch2.12.0-rocm7.14.0-parallel-build123 -D .\dist
+gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123 -D .\dist
+gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123 -D .\dist
 ```
 
 预期 wheel 文件名（由 `wheel.wheel_local_version` + `toolchain.python` 推导）：
 
 ```text
-flash_attn-*+torch2.12.0.rocm7.14.0.cxx11.abi-cp312-cp312-win_amd64.whl
+flash_attn-*+ck-torch2.12.0-rocm7.14.0-gfx120x-cxx11.abi-cp312-cp312-win_amd64.whl
 ```
 
 ## 验证
