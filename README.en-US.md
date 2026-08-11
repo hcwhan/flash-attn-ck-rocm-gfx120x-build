@@ -28,7 +28,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx
 | `wheel` | `wheel_local_version` | Wheel `+local` tag (env `WHEEL_LOCAL_VERSION`; mapped to upstream `FLASH_ATTN_LOCAL_VERSION` at wheel time) |
 | `wheel` | `wheel_artifact_name` | GitHub Actions artifact name |
 | `release` | `release_tag_prefix` | Release tag prefix (`{prefix}-{variant}-build{run_number}`) |
-| `release` | `release_title_prefix` | Release title prefix (env `RELEASE_TITLE_PREFIX`) |
+| `release` | `release_title_prefix` | Release title prefix (env `RELEASE_TITLE_PREFIX`; GitHub Release name = `{prefix} YYYY.MM.DD HH:mm:ss`, Asia/Shanghai) |
 
 `EXPECTED_WHEEL_PATTERN` is derived in `version-lock.ts` from `wheel.wheel_local_version` + `toolchain.python`, not stored in the lock file.
 
@@ -119,12 +119,12 @@ Artifact: **`wheel_artifact_name`** (short-term Actions download)
 
 Under the same `VERSION.lock.json`, **serial and parallel should produce byte-identical wheels** (matching SHA256); `/Brepro` fixes PE TimeDateStamp, `SOURCE_DATE_EPOCH` fixes wheel zip metadata.
 
-GitHub Release (uploaded automatically after a successful build; serial / parallel use different tags and titles):
+GitHub Release (uploaded automatically after a successful build; serial / parallel use different tags; title format `{prefix} YYYY.MM.DD HH:mm:ss`, Asia/Shanghai):
 
 | Workflow | Tag example | Release title example |
 |----------|-------------|----------------------|
-| serial | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123` | FlashAttention 2 CK gfx120x Windows (serial) (build 123) |
-| parallel | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123` | FlashAttention 2 CK gfx120x Windows (parallel) (build 123) |
+| serial | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123` | FlashAttention 2 CK gfx120x Windows 2026.08.10 19:00:00 |
+| parallel | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123` | FlashAttention 2 CK gfx120x Windows 2026.08.10 19:00:00 |
 
 - `flash_attn-*.whl`
 - `flash_attn-*.whl.sha256`
