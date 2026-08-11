@@ -22,7 +22,7 @@
     "wheel_artifact_name": "flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x"
   },
   "release": {
-    "release_tag_prefix": "fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x",
+    "release_tag_prefix": "flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x",
     "release_title_prefix": "FlashAttention 2 CK gfx120x Windows"
   }
 }
