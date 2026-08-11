@@ -36,7 +36,7 @@ jobs:
   plan-opt-dim:
     name: plan-opt-dim
     runs-on: windows-2022
-    timeout-minutes: 15
+    timeout-minutes: 5
     outputs:
       opt-dims-json: ${{ steps.plan-opt-dim-matrix.outputs.opt-dims-json }}
       primary-dim: ${{ steps.plan-opt-dim-matrix.outputs.primary-dim }}
@@ -60,7 +60,6 @@ jobs:
     name: compile-d${{ matrix.opt-dim }}
     needs: plan-opt-dim
     runs-on: windows-2022
-    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
@@ -123,7 +122,6 @@ jobs:
     name: link-wheel
     needs: [plan-opt-dim, compile]
     runs-on: windows-2022
-    timeout-minutes: 360
 
     steps:
       - name: Checkout build repo

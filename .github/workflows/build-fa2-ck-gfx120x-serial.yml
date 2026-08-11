@@ -35,7 +35,6 @@ jobs:
   compile-full-and-link:
     name: compile-full-and-link
     runs-on: windows-2022
-    timeout-minutes: 360
 
     steps:
       - name: Checkout build repo
