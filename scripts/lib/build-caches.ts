@@ -9,7 +9,7 @@ const buildCacheEntrySchema = z.object({
   used: z.boolean(),
 });
 
-export type BuildCacheEntry = z.infer<typeof buildCacheEntrySchema>;
+type BuildCacheEntry = z.infer<typeof buildCacheEntrySchema>;
 
 const buildCachesSchema = z.array(buildCacheEntrySchema).min(1);
 

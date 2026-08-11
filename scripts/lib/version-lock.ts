@@ -62,7 +62,7 @@ const versionLockSchema = z.object({
   }),
 });
 
-export type VersionLockVars = {
+type VersionLockVars = {
   PYTHON_VERSION: string;
   PYTORCH_VERSION: string;
   TORCH_DEVICE_EXTRA: string;
@@ -96,11 +96,11 @@ function pythonWheelTag(python: string): string {
 }
 
 /** PEP 440: wheel 文件名中 local version 的 `-`/`_` 规范化为 `.`。 */
-export function wheelFilenameLocalVersion(localVersion: string): string {
+function wheelFilenameLocalVersion(localVersion: string): string {
   return localVersion.replace(/[-_]/g, ".");
 }
 
-export function expectedWheelPattern(
+function expectedWheelPattern(
   localVersion: string,
   python: string,
 ): string {

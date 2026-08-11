@@ -22,7 +22,7 @@ print(f'CORE_ROOT={core_root}')
 print(f'DEVEL_ROOT={devel_root}')
 `.trim();
 
-export type RocmSdkPaths = {
+type RocmSdkPaths = {
   coreRoot: string;
   develRoot: string;
 };

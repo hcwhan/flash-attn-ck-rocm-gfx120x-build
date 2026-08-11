@@ -18,7 +18,7 @@ function walkObjFiles(dir: string): string[] {
 export function runShard(options: {
   faSrc: string;
   optDim: string;
-}): string {
+}): void {
   const faSrc = path.resolve(options.faSrc);
   const buildDir = path.join(faSrc, "build");
   try {
@@ -74,6 +74,4 @@ export function runShard(options: {
 
   appendGithubEnv({ SHARD_RELEASE_DIR: releaseDir });
   console.log(`Uploading object files from ${releaseDir}`);
-
-  return releaseDir;
 }
