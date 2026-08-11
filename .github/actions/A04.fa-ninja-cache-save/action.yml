@@ -1,5 +1,5 @@
 name: Save FA ninja build cache
-description: Save flash-attention build/ incremental cache (runs on success or step failure; a job timeout/cancellation stops all steps, so no save happens then)
+description: Save flash-attention build/ incremental cache after a successful compile step (job timeout/cancellation skips all later steps, so no save happens then)
 
 inputs:
   fa-src:

@@ -76,7 +76,7 @@
 | `A01.fa-rocm-toolchain` | 安装 Python / MSVC / PyTorch / ROCm（pip toolchain cache：`PIP_TOOLCHAIN_CACHE_KEY`） |
 | `A02.fa-ninja-cache-restore` | 恢复 ninja 增量缓存 |
 | `A03.fa-build-with-cache` | A02+编译+A04 带缓存构建 |
-| `A04.fa-ninja-cache-save` | 保存 ninja 增量缓存 |
+| `A04.fa-ninja-cache-save` | compile 成功后保存 ninja 增量缓存 |
 | `A99.fa-verify-publish` | `09.verify` + upload wheel artifact + 可选 `10.publish` / GitHub Release（读 `workflow_dispatch.publish_release`）；inputs `build-variant` / `build-caches`（相对 workspace） |
 
 每个 job：**须先** `actions/checkout`，再经 `A00.fa-job-bootstrap`（或等价地 Node/npm + `01.config --export-github-env`）；compile/link/serial 另开 prep/toolchain/fingerprint。随后步骤缺 env / 缺产物直接 throw。
@@ -100,7 +100,7 @@
 - **连续 CI 链**：各 compile/link job 内 clone+patch → compile/link → smoke 自动跑完；staging/shard 齐全等流水线检查保留。
 - **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=TRUE` + prebuilt `.obj` 时间戳 merge；`/Brepro` + `SOURCE_DATE_EPOCH` 使 serial / parallel wheel **byte-identical**。
 - **`PRIMARY_DIM`** = lock `ck_opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
-- **`ninja_workers` 默认 4**（OOM 改 2）；**`skip_cache_restore` 默认 false**（命中时构建成功后先删旧缓存再重存刷新，构建失败保留旧缓存；设为 true 时 lookup-only 探测）。
+- **`ninja_workers` 默认 4**（OOM 改 2）；**ninja cache save 仅 compile 成功时写入**（命中且成功时先删旧条目再 save 刷新；构建失败不写，含冷启动 partial）；**`skip_cache_restore` 默认 false**（仅跳过 restore，lookup 仍探测 cache-hit；compile 成功后仍 save）。
 - **全模式 prebuilt obj 两向 stamp** / **link 排除 `fmha_*_api.obj`**：见 `build/build-fa-steps.py` 注释。
 - **patch 程序化**（`04.patch.ts`）；`CK_OPT_DIM` / `GPU_ARCHS` / `CK_FMHA_DISABLE_BWD` 只从 env 取
 - **ComfyUI 推理 wheel 默认 `compile.ck_disable_bwd=true`**（fwd-only CK FMHA；调用 backward 运行时 `TORCH_CHECK`）

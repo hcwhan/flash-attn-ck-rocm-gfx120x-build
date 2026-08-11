@@ -9,7 +9,7 @@ inputs:
     description: Primary cache key from 05.toolchain-fingerprint (serial-v5 / parallel-v5-d{dim} + toolchain fingerprint)
     required: true
   skip-cache-restore:
-    description: When true, skip cache restore (save still gated on cache existence lookup)
+    description: When true, skip cache restore (lookup-only probe for cache-hit metadata)
     required: false
     default: "false"
   run:
@@ -55,10 +55,9 @@ runs:
         }
 
     - name: Save ninja incremental build cache
-      # Save after a successful build (fresh entry, or refresh after the delete
-      # above); on a failed build only save partial objects when no entry exists
-      # yet (incremental resume). Never save when the build step never ran.
-      if: always() && steps.run-build.conclusion != 'skipped' && (steps.run-build.conclusion == 'success' || steps.fa-build-cache.outputs.cache-hit != 'true')
+      # Save only after a successful compile (fresh entry, or refresh after the
+      # delete above). Failed builds never save, including cold starts.
+      if: always() && steps.run-build.conclusion == 'success'
       uses: "./.github/actions/A04.fa-ninja-cache-save"
       with:
         fa-src: ${{ inputs.fa-src }}
