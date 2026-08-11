@@ -138,7 +138,9 @@ export function runToolchainFingerprint(options?: {
     }
 
     const lockHash = versionLockFileHash8(workspaceRoot);
-    console.log(`VERSION.lock.json fingerprint: ${lockHash}`);
+    console.log(
+      `VERSION.lock compile fingerprint (toolchain+flash_attention+compile): ${lockHash}`,
+    );
 
     const cacheKey = buildNinjaCacheKey({
       buildVariant,

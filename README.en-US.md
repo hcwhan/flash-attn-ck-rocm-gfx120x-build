@@ -89,7 +89,7 @@ ComfyUI **inference-only** wheel (lock `compile.ck_disable_bwd=true`):
 | `compile-d32` … `d256` | clone+patch per job, one OPT_DIM shard each, upload `.obj` | 6 h each |
 | `link-wheel` | clone+patch, merge objs + link + wheel + CPU smoke test | 6 h |
 
-- Cache keys include `VERSION.lock.json` SHA256 prefix (`-v5-{lockHash8}-`) and three toolchain fingerprints (MSVC toolset / ROCm clang / pip toolchain); **exact match only** (no `restore-keys`). Serial: `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`; parallel: `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`. Keys are not shared across modes.
+- Cache keys include lock `toolchain`+`flash_attention`+`compile` JSON SHA256 prefix (`-v5-{lockHash8}-`; excludes `wheel`/`release`) and three toolchain fingerprints (MSVC toolset / ROCm clang / pip toolchain); **exact match only** (no `restore-keys`). Serial: `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`; parallel: `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`. Keys are not shared across modes.
 - Ninja cache is **saved only after a successful `06.compile`**; failed compiles never write cache (job timeout/cancellation likewise skips save). When a remote entry exists (`exists`) and compile succeeds, the stale entry is deleted before save refreshes it. `use_cache=false` skips restore (`used=false`); a successful compile still saves cache.
 - All four shards compile shared objs; link uses only the **first lock `ck_opt_dim` tier** (currently `32`) for shared objs.
 

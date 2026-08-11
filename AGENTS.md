@@ -9,7 +9,7 @@
 | **serial** | `compile-full-and-link-wheel`（clone+patch → 全量 build_ext → 原地 `bdist_wheel`）→ smoke test |
 | **parallel** | `plan-opt-dim` → compile-d32\|d64\|d128\|d256（各 job 内 clone+patch）→ link-wheel → smoke test |
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Cache 前缀：`serial-v5-{lockHash8}` / `parallel-v5-{lockHash8}-d{dim}`（`lockHash8` = `VERSION.lock.json` SHA256 前 8 位；精确 key，无 `restore-keys`；key 含 `msvc` + `rocmClang` + `pipToolchain` 三段指纹）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Cache 前缀：`serial-v5-{lockHash8}` / `parallel-v5-{lockHash8}-d{dim}`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` JSON SHA256 前 8 位；不含 `wheel`/`release`；精确 key，无 `restore-keys`；key 含 `msvc` + `rocmClang` + `pipToolchain` 三段指纹）。
 
 ## 命名约定
 
