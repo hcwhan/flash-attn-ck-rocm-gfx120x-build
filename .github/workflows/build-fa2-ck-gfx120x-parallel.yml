@@ -7,11 +7,11 @@ on:
         description: "Ninja parallel compile workers per OPT_DIM shard (use 2 if OOM)"
         required: false
         default: "4"
-      skip_cache:
-        description: "Skip ninja cache restore and save (cache-primary-key still computed; cache-hit=false)"
+      use_cache:
+        description: "Restore ninja cache into build/ when a matching entry exists (lookup-only when false)"
         type: boolean
         required: false
-        default: false
+        default: true
       publish_release:
         description: "Upload wheel to GitHub Releases after successful build"
         type: boolean
@@ -30,7 +30,7 @@ env:
   MAX_JOBS: ${{ github.event.inputs.ninja_workers }}
   FA_SRC: C:\fa\flash-attention
   FA_STAGING: C:\fa-staging
-  SKIP_CACHE: ${{ github.event.inputs.skip_cache != 'false' && 'true' || 'false' }}
+  USE_CACHE: ${{ github.event.inputs.use_cache != 'false' && 'true' || 'false' }}
 
 jobs:
   plan-opt-dim:
@@ -83,7 +83,7 @@ jobs:
         with:
           fa-src: ${{ env.FA_SRC }}
           cache-key: ${{ steps.toolchain-fingerprint.outputs.cache-key }}
-          skip-cache: ${{ env.SKIP_CACHE }}
+          use-cache: ${{ env.USE_CACHE }}
           run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ matrix.opt-dim }}" --fa-src $env:FA_SRC
 
       - name: Validate shard and emit SHARD_RELEASE_DIR
@@ -97,7 +97,8 @@ jobs:
           $entry = [ordered]@{
             opt_dim = '${{ matrix.opt-dim }}'
             key = '${{ steps.toolchain-fingerprint.outputs.cache-key }}'
-            hit = '${{ steps.compile-shard.outputs.cache-hit }}' -eq 'true'
+            exists = '${{ steps.compile-shard.outputs.cache-exists }}' -eq 'true'
+            used = '${{ steps.compile-shard.outputs.cache-used }}' -eq 'true'
           }
           $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath cache-meta/d${{ matrix.opt-dim }}.json -Encoding utf8
 

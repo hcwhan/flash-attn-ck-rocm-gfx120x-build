@@ -8,18 +8,21 @@ inputs:
   cache-key:
     description: Primary cache key from 05.toolchain-fingerprint (serial-v5 / parallel-v5-d{dim} + toolchain fingerprint)
     required: true
-  skip-cache:
-    description: When true, skip cache restore and save (cache-primary-key still computed; cache-hit=false)
+  use-cache:
+    description: When true, restore build/ from cache when it exists; when false, lookup-only
     required: false
-    default: "false"
+    default: "true"
   run:
     description: Shell script executed between cache restore and save
     required: true
 
 outputs:
-  cache-hit:
-    description: Exact cache key match from restore (false when skip-cache is true)
-    value: ${{ steps.fa-build-cache.outputs.cache-hit }}
+  cache-exists:
+    description: Remote cache entry exists for cache-primary-key
+    value: ${{ steps.fa-build-cache.outputs.cache-exists }}
+  cache-used:
+    description: Cache was restored into build/
+    value: ${{ steps.fa-build-cache.outputs.cache-used }}
 
 runs:
   using: composite
@@ -30,7 +33,7 @@ runs:
       with:
         fa-src: ${{ inputs.fa-src }}
         cache-key: ${{ inputs.cache-key }}
-        skip-cache: ${{ inputs.skip-cache }}
+        use-cache: ${{ inputs.use-cache }}
 
     - name: Run build CLI step
       id: run-build
@@ -38,10 +41,9 @@ runs:
       run: ${{ inputs.run }}
 
     - name: Delete stale ninja cache entry
-      # On a cache hit after a successful build, remove the old entry so the
-      # subsequent save refreshes it (actions/cache/save fails hard on an
-      # existing key). On a failed build the old entry is kept untouched.
-      if: always() && steps.run-build.conclusion == 'success' && steps.fa-build-cache.outputs.cache-hit == 'true'
+      # When a remote entry exists and compile succeeds, delete it so save can
+      # refresh (actions/cache/save fails hard on an existing key).
+      if: always() && steps.run-build.conclusion == 'success' && steps.fa-build-cache.outputs.cache-exists == 'true'
       shell: pwsh
       env:
         GH_TOKEN: ${{ github.token }}
@@ -55,9 +57,7 @@ runs:
         }
 
     - name: Save ninja incremental build cache
-      # Save only after a successful compile (fresh entry, or refresh after the
-      # delete above). Failed builds and skip-cache runs never save.
-      if: always() && steps.run-build.conclusion == 'success' && inputs.skip-cache != 'true'
+      if: always() && steps.run-build.conclusion == 'success'
       uses: "./.github/actions/A04.fa-ninja-cache-save"
       with:
         fa-src: ${{ inputs.fa-src }}

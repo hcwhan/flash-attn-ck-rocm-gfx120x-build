@@ -72,7 +72,7 @@ ComfyUI **推理专用** wheel（lock `compile.ck_disable_bwd=true`）：
 | 输入 | 默认 | 说明 |
 |------|------|------|
 | `ninja_workers` | `4` | Ninja 并行 worker 数（OOM 时可改为 `2`） |
-| `skip_cache` | `false` | 设为 `true` 时跳过 cache restore 与 save（仍计算 `cache-primary-key`，`cache-hit=false`） |
+| `use_cache` | `true` | 设为 `false` 时不 restore（仍 lookup 探测 `exists`；`used=false`；compile 成功后仍 save） |
 | `publish_release` | `true` | 设为 `false` 时跳过 GitHub Release 上传 |
 
 ### 串行（`build-fa2-ck-gfx120x-serial.yml`）
@@ -90,7 +90,7 @@ ComfyUI **推理专用** wheel（lock `compile.ck_disable_bwd=true`）：
 | `link-wheel` | clone+patch、合并 obj + link + 打 wheel + CPU smoke test | 6 h |
 
 - Cache key 含 `VERSION.lock.json` SHA256 前 8 位（`-v5-{lockHash8}-`）及三段工具链指纹（MSVC 工具集 / ROCm clang / pip 工具链）；**仅精确匹配**（无 `restore-keys`）。串行 `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，并行 `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，互不共用。
-- Ninja cache **仅在 `06.compile` 成功时 save**；编译失败不写入（job 超时/取消同样不写）。cache 命中且 compile 成功时，save 前先删除旧条目再刷新。`skip_cache=true` 时不 restore 也不 save。
+- Ninja cache **仅在 `06.compile` 成功时 save**；编译失败不写入（job 超时/取消同样不写）。远端已有条目（`exists`）且 compile 成功时，save 前先删除旧条目再刷新。`use_cache=false` 时不 restore（`used=false`），compile 成功后仍 save。
 - 四 shard 各编 shared obj；link 仅使用 **lock `ck_opt_dim` 第一档**（当前 `32`）的 shared obj。
 
 ### 构建阶段

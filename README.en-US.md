@@ -66,7 +66,7 @@ Push to `main` does **not** auto-trigger builds.
 | Input | Default | Description |
 |-------|---------|-------------|
 | `ninja_workers` | `4` | Ninja parallel workers (use `2` if OOM) |
-| `skip_cache` | `false` | Set `true` to skip cache restore and save (`cache-primary-key` still computed; `cache-hit=false`) |
+| `use_cache` | `true` | Set `false` to skip restore (still probes `exists`; `used=false`; cache still saved after a successful compile) |
 
 ### Serial (`build-fa2-ck-gfx120x-serial.yml`)
 
@@ -84,7 +84,7 @@ Push to `main` does **not** auto-trigger builds.
 
 Cache keys include `VERSION.lock.json` SHA256 prefix (`-v5-{lockHash8}-`) and three toolchain fingerprints (MSVC toolset / ROCm clang / pip toolchain); **exact match only** (no `restore-keys`). Serial: `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`; parallel: `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`. Link uses **first lock `ck_opt_dim` tier** (`32`) for shared objs only.
 
-Ninja cache is **saved only after a successful `06.compile`**; failed compiles never write cache (job timeout/cancellation likewise skips save). On cache hit plus successful compile, the stale entry is deleted before save refreshes it. `skip_cache=true` skips both restore and save.
+Ninja cache is **saved only after a successful `06.compile`**; failed compiles never write cache (job timeout/cancellation likewise skips save). When a remote entry exists (`exists`) and compile succeeds, the stale entry is deleted before save refreshes it. `use_cache=false` skips restore (`used=false`); a successful compile still saves cache.
 
 ### Build stages
 
