@@ -1,12 +1,12 @@
 name: FA verify and publish
-description: CPU smoke test (09.verify), upload wheel artifact, optional GitHub Release (10.publish + softprops)
+description: CPU smoke test（09.verify）、上传 wheel artifact、可选 GitHub Release（10.publish + softprops）
 
 inputs:
   build-variant:
-    description: serial or parallel (09.verify / 10.publish --build-variant)
+    description: serial 或 parallel（09.verify / 10.publish --build-variant）
     required: true
   build-caches:
-    description: Path relative to GITHUB_WORKSPACE for 09.verify --build-caches (serial dist/build-caches.json / parallel cache-meta)
+    description: 09.verify --build-caches 相对 GITHUB_WORKSPACE 的路径（serial dist/build-caches.json / parallel cache-meta）
     required: true
 
 runs:

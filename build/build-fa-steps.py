@@ -1,4 +1,4 @@
-"""Build flash-attn via in-process setuptools (compile / wheel / merge-and-wheel)."""
+"""同进程 setuptools 构建 flash-attn（compile / wheel / merge-and-wheel）。"""
 from __future__ import annotations
 
 import argparse
@@ -13,11 +13,10 @@ from pathlib import Path
 _ORIGINAL_RUN_NINJA = None
 
 DIM_PATTERN = re.compile(r"_d(\d+)_")
-# Generated API dispatch objects (Windows HIP: fmha_fwd_api.obj, …) are per-shard
-# partial: each shard only renders the hdim cases for its own OPT_DIM. Merging the
-# primary shard's copy would silently drop the other dims' dispatch, so these must
-# always be recompiled in the link job from the regenerated all-dim sources.
-# (csrc/flash_attn_ck/flash_api.obj is dim-independent and must still be merged.)
+# 生成的 API dispatch 对象（Windows HIP：fmha_fwd_api.obj 等）按 shard 分片：
+# 每个 shard 仅渲染自身 OPT_DIM 的 hdim 分支。若合并 primary shard 的副本会
+# 静默丢失其他 dim 的 dispatch，因此 link job 必须基于重新生成的全 dim 源码重编。
+# （csrc/flash_attn_ck/flash_api.obj 与 dim 无关，仍需合并。）
 REQUIRED_API_OBJS = frozenset(
     {
         "fmha_fwd_api.obj",
@@ -31,19 +30,16 @@ API_OBJ_PATTERN = re.compile(r"^fmha_.*_api\.obj$")
 def is_api_dispatch_obj(name: str) -> bool:
     return bool(API_OBJ_PATTERN.match(name))
 
-# Ninja's dirty check on Windows HIP (PyTorch cpp_extension) is NOT obj-mtime-only.
-# build.ninja rules use neither deps=gcc nor deps=msvc (no .ninja_deps); reuse
-# depends on:
-#   1. obj.mtime >= newest input (regenerated fmha_*.cu, csrc headers)
-#   2. a .ninja_log entry exists, its command hash matches, and
-#      entry.mtime >= newest input
-# A single stamp value applied to obj mtimes AND .ninja_log entry mtimes satisfies
-# both; stamping only the .obj violates 2 and makes ninja rebuild every prebuilt
-# object.
+# Windows HIP（PyTorch cpp_extension）下 Ninja 的 dirty 判定并非仅看 obj mtime。
+# build.ninja 规则既无 deps=gcc 也无 deps=msvc（无 .ninja_deps）；复用需同时满足：
+#   1. obj.mtime >= 最新输入（重新生成的 fmha_*.cu、csrc 头文件）
+#   2. .ninja_log 存在对应条目、命令 hash 匹配，且 entry.mtime >= 最新输入
+# 同一 stamp 值同时写入 obj mtime 与 .ninja_log entry mtime 可满足二者；仅 stamp
+# .obj 会违反 2，导致 ninja 重编所有预构建对象。
 #
-# .ninja_log: v5+ text lines "start<TAB>end<TAB>mtime<TAB>output<TAB>hash",
-# mtime in nanoseconds since log v7 (ninja >= 1.13); the header version must be
-# preserved, an unknown version makes ninja unlink the log and rebuild all.
+# .ninja_log：v5+ 文本行 "start<TAB>end<TAB>mtime<TAB>output<TAB>hash"，
+# log v7 起（ninja >= 1.13）mtime 为纳秒；须保留 header 版本，未知版本会使
+# ninja 删除 log 并重编全部。
 _LOG_HEADER_RE = re.compile(r"^# ninja log v(\d+)$")
 
 
@@ -70,7 +66,7 @@ def build_ext_only(fa_src: Path, *, verbose: bool = False) -> None:
 
 
 def _newest_mtime_under(root: Path) -> int:
-    """Newest file mtime (ns) under root (csrc headers included in stamp)."""
+    """root 下最新文件 mtime（纳秒；stamp 含 csrc 头文件）。"""
     latest = 0
     stack = [root]
     while stack:
@@ -91,12 +87,11 @@ def _newest_mtime_under(root: Path) -> int:
 
 
 def compute_stamp(fa_src: Path) -> int:
-    """One stamp value (integer nanoseconds) >= every input ninja may compare
-    against: the regenerated build/fmha_*.cu and headers under csrc (freshly
-    cloned and patched fa-src on the runner).  Applied to obj mtimes and
-    .ninja_log entry mtimes in one consistent value; computed once per ninja
-    run.  The value is int ns so os.utime(ns=...) and log records agree
-    bit-exactly (a float seconds stamp drifts enough to trip dirty checks)."""
+    """单一 stamp 值（整数纳秒）>= ninja 可能比较的所有输入：重新生成的
+    build/fmha_*.cu 与 csrc 下头文件（runner 上 freshly clone+patch 的 fa-src）。
+    以同一值写入 obj mtime 与 .ninja_log entry mtime；每次 ninja 运行计算一次。
+    使用 int 纳秒使 os.utime(ns=...) 与 log 记录 bit-exact 一致（float 秒级
+    stamp 漂移足以触发 dirty 判定）。"""
     latest = time.time_ns()
     build_dir = fa_src / "build"
     if build_dir.is_dir():
@@ -107,15 +102,12 @@ def compute_stamp(fa_src: Path) -> int:
 
 
 def _merge_ninja_log(sources: list[Path], dest: Path, stamp: float) -> int:
-    """Merge .ninja_log files, rewriting every entry's mtime to the single
-    stamp value so ninja's recorded-mtime check (entry.mtime < input) cannot
-    fire.  Command hashes are kept verbatim: shard and link compile the same
-    sources with the same flags, so the hashes already match the link job's
-    build.ninja commands; a drift degrades to a per-edge rebuild, which the
-    post-build verification then fails loudly on.  Duplicate outputs: last
-    source wins (matches ninja's loader, which overwrites entry fields per
-    line).  The header version is preserved (v7 = ns mtimes, ninja >= 1.13;
-    v5/v6 = seconds)."""
+    """合并 .ninja_log，将每条 entry 的 mtime 重写为单一 stamp，使 ninja 的
+    recorded-mtime 检查（entry.mtime < input）不触发。命令 hash 原样保留：shard
+    与 link 以相同 flags 编译相同源码，hash 已与 link job 的 build.ninja 匹配；
+    漂移会退化为逐边重编，由构建后校验 loudly fail。重复 output：后者覆盖（与
+    ninja loader 按行覆盖 entry 字段一致）。保留 header 版本（v7 = 纳秒 mtime，
+    ninja >= 1.13；v5/v6 = 秒）。"""
     version = 0
     by_output: dict[str, str] = {}
     for src in sources:
@@ -155,11 +147,10 @@ def stamp_prebuilt_objects(
     fa_src: Path,
     log_sources: list[Path] | None = None,
 ) -> float:
-    """Two-way stamp: .obj mtimes and .ninja_log entry mtimes get ONE future
-    value (>= newest .cu and csrc header), so ninja's dirty checks pass for
-    prebuilt objects on Windows HIP.  Sources default to the file already in
-    the build dir (cache-restore / plain rebuild); the link job passes shard
-    logs, which are merged into the build dir.  Returns the stamp value used."""
+    """双向 stamp：.obj mtime 与 .ninja_log entry mtime 设为同一未来值（>= 最新
+    .cu 与 csrc 头文件），使 Windows HIP 上预构建对象通过 ninja dirty 检查。
+    默认源为 build 目录已有文件（cache-restore / 普通重编）；link job 传入 shard
+    log 并合并进 build 目录。返回所用 stamp 值。"""
     if not temp_release.is_dir():
         return 0
     stamp = compute_stamp(fa_src)
@@ -191,16 +182,14 @@ def merge_prebuilt_objects(
     fa_src: Path,
     primary_dim: str,
 ) -> tuple[list[Path], list[Path], list[Path]]:
-    """Merge shard .obj files and .ninja_log into the ninja build dir before link.
+    """link 前将 shard .obj 与 .ninja_log 合并进 ninja build 目录。
 
-    - Primary shard: every .obj except the generated API dispatch objects
-      (fmha_*_api.obj) -- those are per-shard partial and must be recompiled in
-      the link job from the regenerated all-dim sources.
-    - Other shards: dim-specific kernel objects only (build/*_d<N>_*).
-    - Ninja logs: every shard's .ninja_log (the link build dir is fresh, so
-      without it ninja would rebuild all kernels).
+    - Primary shard：除生成的 API dispatch 对象（fmha_*_api.obj）外的全部 .obj——
+      后者为 per-shard 分片，须在 link job 基于全 dim 源码重编。
+    - 其他 shard：仅 dim 特定 kernel 对象（build/*_d<N>_*）。
+    - Ninja log：各 shard 的 .ninja_log（link build 目录为全新，无 log 会重编全部 kernel）。
 
-    Returns (merged obj paths, ninja log sources, skipped API dispatch sources).
+    返回 (merged obj 路径, ninja log 源, 跳过的 API dispatch 源)。
     """
     primary_dir = staging_root / f"d{primary_dim}"
     if not primary_dir.is_dir():
@@ -321,15 +310,11 @@ def verify_api_objs_recompiled(build_dir: Path, stamp: int) -> None:
 def precheck_merged_objects_clean(
     temp_release: Path, merged_objs: list[Path]
 ) -> None:
-    """Dry-run ninja before the real link build: if any merged prebuilt object
-    would be recompiled, fail immediately instead of burning hours on a
-    from-scratch compile.  The dry run uses ninja's own dirty logic (log and
-    mtime state), so it sees exactly what the real run would do, and it writes
-    nothing.  Matching is on the object basename followed by a boundary that
-    excludes further path characters, so the `-o <obj>` target matches but the
-    source .cu does not; works for torch's description-less command lines and
-    for rules that do set a description ending in $out.  The post-build verify
-    stays as the second line of defense."""
+    """真实 link 构建前 dry-run ninja：若任一已合并预构建对象将被重编，立即
+    fail，避免数小时从零编译。dry-run 使用 ninja 自身 dirty 逻辑（log 与 mtime
+    状态），所见即真实运行，且不写入任何内容。匹配 obj 基名加边界（排除后续路径
+    字符），使 `-o <obj>` 目标命中而源 .cu 不命中；适用于 torch 无 description
+    的命令行及 description 以 $out 结尾的规则。构建后校验为第二道防线。"""
     patterns = [
         re.compile(re.escape(obj.name) + r"(?![.\w])") for obj in merged_objs
     ]
@@ -361,14 +346,11 @@ def precheck_merged_objects_clean(
 def verify_merged_objects_reused(
     temp_release: Path, merged_objs: list[Path], stamp: int
 ) -> None:
-    """Fail hard if ninja rebuilt any merged prebuilt object: a rebuild means
-    the merge fast path silently degraded to a from-scratch compile (missing
-    .ninja_log entries, command hash drift between shard and link, or
-    inconsistent stamping) and the link job's whole point is lost.  A reused
-    object keeps the stamped mtime bit-exactly (os.utime ns precision); a
-    rebuilt one was rewritten by the compiler, so any mtime drift from the
-    stamp means the object was recompiled (comparing `> stamp` would miss
-    compiles that finish inside the +1s future-stamp window)."""
+    """若 ninja 重编了任一已合并预构建对象则 hard fail：重编表示 merge 快路径
+    静默退化为从零编译（缺 .ninja_log entry、shard/link 命令 hash 漂移或 stamp
+    不一致），link job 意义丧失。复用对象保持 stamp mtime bit-exact（os.utime
+    纳秒精度）；重编对象被编译器重写，mtime 偏离 stamp 即表示已重编（比较 `> stamp`
+    会漏掉在 +1s future-stamp 窗口内完成的编译）。"""
     rebuilt = [
         p for p in merged_objs if p.is_file() and p.stat().st_mtime_ns != stamp
     ]
@@ -444,8 +426,8 @@ def main() -> None:
         "--step",
         choices=["compile", "merge-and-wheel", "wheel"],
         required=True,
-        help="compile: build_ext only; wheel: stamp + bdist_wheel; "
-        "merge-and-wheel: merge prebuilt objs + bdist_wheel",
+        help="compile：仅 build_ext；wheel：stamp + bdist_wheel；"
+        "merge-and-wheel：合并预构建 obj + bdist_wheel",
     )
     parser.add_argument("--fa-src", type=Path, required=True)
     parser.add_argument("--dist-dir", type=Path)
@@ -457,8 +439,8 @@ def main() -> None:
     if not args.fa_src.is_dir():
         raise SystemExit(f"FA source missing: {args.fa_src}")
 
-    # Stamp restored prebuilt objects in every mode so the ninja cache actually
-    # pays off (setup.py refreshes all fmha_*.cu mtimes on each build_ext).
+    # 各模式均 stamp 恢复的预构建对象，使 ninja cache 真正生效
+    # （setup.py 每次 build_ext 会刷新全部 fmha_*.cu mtime）。
     if args.step == "compile":
         install_patch(None, args.fa_src, primary_dim="")
         build_ext_only(args.fa_src, verbose=args.verbose)

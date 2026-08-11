@@ -4,16 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       ninja_workers:
-        description: "Ninja parallel compile workers per OPT_DIM shard (use 2 if OOM)"
+        description: "每个 OPT_DIM shard 的 Ninja 并行 worker 数（OOM 时可改为 2）"
         required: false
         default: "4"
       use_cache:
-        description: "Restore ninja cache into build/ when a matching entry exists (lookup-only when false)"
+        description: "存在匹配条目时恢复 ninja cache 到 build/（false 时仅 lookup）"
         type: boolean
         required: false
         default: true
       publish_release:
-        description: "Upload wheel to GitHub Releases after successful build"
+        description: "构建成功后上传到 GitHub Releases"
         type: boolean
         required: false
         default: true

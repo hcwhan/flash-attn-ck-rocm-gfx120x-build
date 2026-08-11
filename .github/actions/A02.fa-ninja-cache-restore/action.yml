@@ -1,27 +1,27 @@
 name: Restore FA ninja build cache
-description: Restore flash-attention build/ incremental cache (exact cache-key match only; no restore-keys fallback)
+description: 恢复 flash-attention build/ 增量 cache（仅精确 cache-key 匹配；无 restore-keys 回退）
 
 inputs:
   fa-src:
-    description: flash-attention source root
+    description: flash-attention 源码根目录
     required: true
   cache-key:
-    description: Primary cache key from 05.toolchain-fingerprint
+    description: 05.toolchain-fingerprint 输出的主 cache key
     required: true
   use-cache:
-    description: When true, restore build/ from cache when it exists; when false, lookup-only (cache-exists still reported)
+    description: true 时在条目存在时从 cache 恢复 build/；false 时仅 lookup（仍报告 cache-exists）
     required: false
     default: "true"
 
 outputs:
   cache-exists:
-    description: Remote cache entry exists for cache-primary-key
+    description: 远端存在 cache-primary-key 对应 cache 条目
     value: ${{ steps.fa-build-cache.outputs.cache-exists }}
   cache-used:
-    description: Cache was restored into build/ (use-cache and cache-exists)
+    description: 已将 cache 恢复到 build/（use-cache 且 cache-exists）
     value: ${{ steps.fa-build-cache.outputs.cache-used }}
   cache-primary-key:
-    description: Resolved primary cache key
+    description: 解析后的主 cache key
     value: ${{ steps.fa-build-cache.outputs.cache-primary-key }}
 
 runs:

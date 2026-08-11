@@ -1,12 +1,12 @@
 name: Save FA ninja build cache
-description: Save flash-attention build/ incremental cache after a successful compile step (job timeout/cancellation skips all later steps, so no save happens then)
+description: compile 步骤成功后保存 flash-attention build/ 增量 cache（job 超时/取消会跳过后续步骤，故不会 save）
 
 inputs:
   fa-src:
-    description: flash-attention source root
+    description: flash-attention 源码根目录
     required: true
   cache-primary-key:
-    description: cache-primary-key from A02.fa-ninja-cache-restore
+    description: A02.fa-ninja-cache-restore 的 cache-primary-key
     required: true
 
 runs:

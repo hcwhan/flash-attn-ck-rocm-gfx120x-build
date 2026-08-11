@@ -34,7 +34,7 @@ export function runWheel(options: {
   }
 
   process.env.FLASH_ATTENTION_FORCE_BUILD = "TRUE";
-  // Upstream flash-attention setup.py reads FLASH_ATTN_LOCAL_VERSION at wheel time.
+  // upstream flash-attention setup.py 在 wheel 时读取 FLASH_ATTN_LOCAL_VERSION。
   process.env.FLASH_ATTN_LOCAL_VERSION = requireLockEnv("WHEEL_LOCAL_VERSION");
 
   initBuildEnv({

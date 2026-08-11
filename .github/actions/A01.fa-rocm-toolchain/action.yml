@@ -1,24 +1,24 @@
 name: FA ROCm toolchain
-description: Python, MSVC, PyTorch ROCm, and rocm[devel] for flash-attn Windows builds
+description: flash-attn Windows 构建用的 Python、MSVC、PyTorch ROCm 与 rocm[devel]
 
 inputs:
   python-version:
-    description: Python version (VERSION.lock.json toolchain.python)
+    description: Python 版本（VERSION.lock.json toolchain.python）
     required: true
   pytorch-version:
-    description: PyTorch version string (VERSION.lock.json toolchain.pytorch)
+    description: PyTorch 版本字符串（VERSION.lock.json toolchain.pytorch）
     required: true
   torch-device-extra:
-    description: torch[device-*] extra name (VERSION.lock.json toolchain.torch_device_extra)
+    description: torch[device-*] extra 名（VERSION.lock.json toolchain.torch_device_extra）
     required: true
   rocm-index:
-    description: pip index URL for ROCm wheels (VERSION.lock.json toolchain.rocm_index)
+    description: ROCm wheel 的 pip index URL（VERSION.lock.json toolchain.rocm_index）
     required: true
   rocm-version:
-    description: rocm[devel] package version (VERSION.lock.json toolchain.rocm)
+    description: rocm[devel] 包版本（VERSION.lock.json toolchain.rocm）
     required: true
   pip-cache-key:
-    description: Pip toolchain cache key (VERSION.lock.json → PIP_TOOLCHAIN_CACHE_KEY)
+    description: Pip 工具链 cache key（VERSION.lock.json → PIP_TOOLCHAIN_CACHE_KEY）
     required: true
 
 runs:

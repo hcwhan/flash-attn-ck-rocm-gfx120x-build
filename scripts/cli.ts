@@ -13,13 +13,13 @@ import { runPublish } from "./commands/10.publish.js";
 
 const program = new Command();
 
-program.name("fa-build").description("FlashAttention gfx120x build CLI");
+program.name("fa-build").description("FlashAttention gfx120x 构建 CLI");
 
 program
   .command("01.config")
-  .description("Read VERSION.lock.json")
+  .description("读取 VERSION.lock.json")
   .requiredOption("-w, --workspace-root <path>")
-  .option("--export-github-env", "Append lock vars to GITHUB_ENV")
+  .option("--export-github-env", "将 lock 变量追加到 GITHUB_ENV")
   .action((opts) => {
     runConfig({
       workspaceRoot: opts.workspaceRoot,
@@ -29,14 +29,14 @@ program
 
 program
   .command("02.plan-opt-dim-matrix")
-  .description("Export OPT_DIM matrix outputs for parallel compile")
+  .description("导出 parallel compile 用的 OPT_DIM matrix 输出")
   .action(() => {
     runPlanOptDimMatrix();
   });
 
 program
   .command("03.prep")
-  .description("Clone flash-attention at pinned commit")
+  .description("clone pin 的 flash-attention commit")
   .requiredOption("--fa-src <path>")
   .action((opts) => {
     runPrep({ faSrc: opts.faSrc });
@@ -44,7 +44,7 @@ program
 
 program
   .command("04.patch")
-  .description("Patch flash-attention for inference-only CK build")
+  .description("为推理专用 CK 构建 patch flash-attention")
   .requiredOption("--fa-src <path>")
   .action((opts) => {
     runPatch({ faSrc: opts.faSrc });
@@ -52,10 +52,10 @@ program
 
 program
   .command("05.toolchain-fingerprint")
-  .description("Emit MSVC/clang and pip toolchain cache fingerprints")
-  .option("-w, --workspace-root <path>", "repo root (required with --build-variant)")
-  .option("--build-variant <mode>", "serial or parallel (emit cache-key output)")
-  .option("--opt-dim <value>", "OPT_DIM shard when --build-variant parallel")
+  .description("输出 MSVC/clang 与 pip 工具链 cache 指纹")
+  .option("-w, --workspace-root <path>", "仓库根目录（与 --build-variant 联用必填）")
+  .option("--build-variant <mode>", "serial 或 parallel（输出 cache-key）")
+  .option("--opt-dim <value>", "--build-variant parallel 时的 OPT_DIM shard")
   .action((opts) => {
     runToolchainFingerprint({
       workspaceRoot: opts.workspaceRoot,
@@ -66,7 +66,7 @@ program
 
 program
   .command("06.compile")
-  .description("Compile one OPT_DIM shard or full lock ck_opt_dim")
+  .description("编译单个 OPT_DIM shard 或 lock 全量 ck_opt_dim")
   .requiredOption("--opt-dim <value>")
   .requiredOption("--fa-src <path>")
   .action((opts) => {
@@ -78,7 +78,7 @@ program
 
 program
   .command("07.shard")
-  .description("Validate compile shard and emit SHARD_RELEASE_DIR to GITHUB_ENV")
+  .description("校验 compile shard 并将 SHARD_RELEASE_DIR 写入 GITHUB_ENV")
   .requiredOption("--fa-src <path>")
   .requiredOption("--opt-dim <value>")
   .action((opts) => {
@@ -90,7 +90,7 @@ program
 
 program
   .command("08.wheel")
-  .description("Link and package wheel")
+  .description("link 并打 wheel")
   .requiredOption("--fa-src <path>")
   .requiredOption("--dist-dir <path>")
   .option("--staging-root <path>")
@@ -108,10 +108,10 @@ program
   .command("09.verify")
   .description("CPU wheel smoke test")
   .requiredOption("--dist-dir <path>")
-  .requiredOption("--build-variant <name>", "serial or parallel")
+  .requiredOption("--build-variant <name>", "serial 或 parallel")
   .requiredOption(
     "--build-caches <path>",
-    "JSON array file or directory of per-shard compile cache metadata",
+    "各 shard compile cache 元数据的 JSON 数组文件或目录",
   )
   .action((opts) => {
     runVerify({
@@ -123,7 +123,7 @@ program
 
 program
   .command("10.publish")
-  .description("Prepare GitHub Release metadata")
+  .description("准备 GitHub Release 元数据")
   .requiredOption("--dist-dir <path>")
   .requiredOption("--workflow-name <name>")
   .requiredOption("--build-variant <name>")
