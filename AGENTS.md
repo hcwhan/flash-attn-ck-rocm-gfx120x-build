@@ -21,9 +21,9 @@
 | 第一档 OPT_DIM | `PRIMARY_DIM` / `--primary-dim` / job output `primary-dim` | parallel link 用 |
 | 单 shard OPT_DIM | matrix `opt-dim` / CLI `--opt-dim` | parallel compile 单值 |
 | 构建模式 | `--build-variant serial\|parallel` | verify / publish / fingerprint 共用 |
-| Ninja cache key | `cache-key` | 05.toolchain-fingerprint output → A03.fa-build-with-cache input / manifest `build_caches[].key` |
-| Ninja cache exists | `cache-exists` | A02/A03 output / manifest `build_caches[].exists`（lookup 或 restore 探测远端是否有条目） |
-| Ninja cache used | `cache-used` | A02/A03 output / manifest `build_caches[].used`（`use_cache=true` 且 restore 命中） |
+| Ninja cache key | `cache-key` | 05.toolchain-fingerprint output → A02 input / manifest `build_caches[].key` |
+| Ninja cache exists | `cache-exists` | A02 output / manifest `build_caches[].exists`（lookup 或 restore 探测远端是否有条目） |
+| Ninja cache used | `cache-used` | A02 output / manifest `build_caches[].used`（`use_cache=true` 且 restore 命中） |
 | Compile cache metadata | `--build-caches` | workflow 写入 JSON（serial 单文件 / parallel 目录）→ 09.verify → manifest `build_caches`（`opt_dim/key/exists/used`） |
 | workflow_dispatch 快照 | `dispatch` | manifest 顶层；`09.verify` 从 `MAX_JOBS` / `USE_CACHE` 写入 `ninja_workers` / `use_cache` |
 | shard 产物目录 | `SHARD_RELEASE_DIR` | 07.shard 写入；非 GitHub Release |
@@ -75,9 +75,9 @@
 |--------|------|
 | `A00.fa-job-bootstrap` | Node/npm + `01.config`；inputs `prep-source` / `setup-toolchain`（默认 true）；toolchain 读 `01.config` env；**job 须先 `actions/checkout`** |
 | `A01.fa-rocm-toolchain` | 安装 Python / MSVC / PyTorch / ROCm（pip toolchain cache：`PIP_TOOLCHAIN_CACHE_KEY`） |
-| `A02.fa-ninja-cache-restore` | 恢复 ninja 增量缓存 |
-| `A03.fa-build-with-cache` | A02+编译+A04 带缓存构建 |
-| `A04.fa-ninja-cache-save` | compile 成功后保存 ninja 增量缓存 |
+| `A02.fa-ninja-cache-restore` | 恢复 ninja 增量缓存（workflow：fingerprint 之后） |
+| `A03.fa-build-with-cache` | 编译 CLI + delete stale + A04 save |
+| `A04.fa-ninja-cache-save` | 保存 ninja 增量缓存（由 A03 调用） |
 | `A99.fa-verify-publish` | `09.verify` + upload wheel artifact + 可选 `10.publish` / GitHub Release（读 `workflow_dispatch.publish_release`）；inputs `build-variant` / `build-caches`（相对 workspace） |
 
 每个 job：**须先** `actions/checkout`，再经 `A00.fa-job-bootstrap`（或等价地 Node/npm + `01.config --export-github-env`）；compile/link/serial 另开 prep/toolchain/fingerprint。随后步骤缺 env / 缺产物直接 throw。

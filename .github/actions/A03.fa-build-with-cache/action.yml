@@ -1,40 +1,28 @@
 name: FA build with ninja cache
-description: 恢复 ninja cache、运行构建 CLI 步骤、再保存 cache
+description: 运行构建 CLI 步骤，并在结束后保存 ninja cache
 
 inputs:
   fa-src:
     description: flash-attention 源码根目录
     required: true
-  cache-key:
-    description: 05.toolchain-fingerprint 主 cache key（serial-v5 / parallel-v5-d{dim} + 工具链指纹）
+  cache-primary-key:
+    description: A02.fa-ninja-cache-restore 的 cache-primary-key
     required: true
+  cache-exists:
+    description: A02.fa-ninja-cache-restore 的 cache-exists
+    required: false
+    default: "false"
   use-cache:
-    description: true 时在条目存在时从 cache 恢复 build/；false 时仅 lookup
+    description: true 时在 build 非 skipped 时 save；false 时仅 compile 成功时 save
     required: false
     default: "true"
   run:
-    description: cache 恢复与保存之间执行的 shell 脚本
+    description: 构建 shell 脚本
     required: true
-
-outputs:
-  cache-exists:
-    description: 远端存在 cache-primary-key 对应 cache 条目
-    value: ${{ steps.fa-build-cache.outputs.cache-exists }}
-  cache-used:
-    description: 已将 cache 恢复到 build/
-    value: ${{ steps.fa-build-cache.outputs.cache-used }}
 
 runs:
   using: composite
   steps:
-    - name: Restore ninja incremental build cache
-      id: fa-build-cache
-      uses: "./.github/actions/A02.fa-ninja-cache-restore"
-      with:
-        fa-src: ${{ inputs.fa-src }}
-        cache-key: ${{ inputs.cache-key }}
-        use-cache: ${{ inputs.use-cache }}
-
     - name: Run build CLI step
       id: run-build
       shell: pwsh
@@ -44,12 +32,12 @@ runs:
       # cache-exists 时先 delete，以便 save 刷新（actions/cache/save 对已存在 key 会失败）。
       # use-cache=true：成功或失败均 delete（允许部分 save）。
       # use-cache=false：仅成功时 delete（仅 lookup 冷构建刷新路径）。
-      if: always() && steps.run-build.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-build.conclusion == 'success') && steps.fa-build-cache.outputs.cache-exists == 'true'
+      if: always() && steps.run-build.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-build.conclusion == 'success') && inputs.cache-exists == 'true' && inputs.cache-primary-key != ''
       shell: pwsh
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        $key = [uri]::EscapeDataString('${{ steps.fa-build-cache.outputs.cache-primary-key }}')
+        $key = [uri]::EscapeDataString('${{ inputs.cache-primary-key }}')
         $ref = [uri]::EscapeDataString('${{ github.ref }}')
         gh api --method DELETE "/repos/${{ github.repository }}/actions/caches?key=$key&ref=$ref"
         if ($LASTEXITCODE -ne 0) {
@@ -58,8 +46,8 @@ runs:
         }
 
     - name: Save ninja incremental build cache
-      if: always() && steps.run-build.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-build.conclusion == 'success')
+      if: always() && steps.run-build.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-build.conclusion == 'success') && inputs.cache-primary-key != ''
       uses: "./.github/actions/A04.fa-ninja-cache-save"
       with:
         fa-src: ${{ inputs.fa-src }}
-        cache-primary-key: ${{ steps.fa-build-cache.outputs.cache-primary-key }}
+        cache-primary-key: ${{ inputs.cache-primary-key }}

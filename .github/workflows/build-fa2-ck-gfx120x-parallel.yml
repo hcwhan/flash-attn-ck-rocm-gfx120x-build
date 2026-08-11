@@ -77,12 +77,20 @@ jobs:
         shell: pwsh
         run: npx tsx scripts/cli.ts 05.toolchain-fingerprint -w $env:GITHUB_WORKSPACE --build-variant parallel --opt-dim "${{ matrix.opt-dim }}"
 
-      - name: Compile OPT_DIM shard with ninja cache
-        id: compile-shard
-        uses: "./.github/actions/A03.fa-build-with-cache"
+      - name: Restore ninja incremental build cache
+        id: ninja-cache-restore
+        uses: "./.github/actions/A02.fa-ninja-cache-restore"
         with:
           fa-src: ${{ env.FA_SRC }}
           cache-key: ${{ steps.toolchain-fingerprint.outputs.cache-key }}
+          use-cache: ${{ env.USE_CACHE }}
+
+      - name: Compile OPT_DIM shard with ninja cache
+        uses: "./.github/actions/A03.fa-build-with-cache"
+        with:
+          fa-src: ${{ env.FA_SRC }}
+          cache-primary-key: ${{ steps.ninja-cache-restore.outputs.cache-primary-key }}
+          cache-exists: ${{ steps.ninja-cache-restore.outputs.cache-exists }}
           use-cache: ${{ env.USE_CACHE }}
           run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ matrix.opt-dim }}" --fa-src $env:FA_SRC
 
@@ -97,8 +105,8 @@ jobs:
           $entry = [ordered]@{
             opt_dim = '${{ matrix.opt-dim }}'
             key = '${{ steps.toolchain-fingerprint.outputs.cache-key }}'
-            exists = '${{ steps.compile-shard.outputs.cache-exists }}' -eq 'true'
-            used = '${{ steps.compile-shard.outputs.cache-used }}' -eq 'true'
+            exists = '${{ steps.ninja-cache-restore.outputs.cache-exists }}' -eq 'true'
+            used = '${{ steps.ninja-cache-restore.outputs.cache-used }}' -eq 'true'
           }
           $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath cache-meta/d${{ matrix.opt-dim }}.json -Encoding utf8
 
