@@ -24,7 +24,7 @@
 | Ninja cache key | `cache-key` | 05.toolchain-fingerprint output → A03.fa-build-with-cache input / manifest `build_caches[].key` |
 | Ninja cache hit | `cache-hit` | A03.fa-build-with-cache output / manifest `build_caches[].hit` |
 | Compile cache metadata | `--build-caches` | workflow 写入 JSON（serial 单文件 / parallel 目录）→ 09.verify → manifest `build_caches`（仅 `opt_dim/key/hit`） |
-| workflow_dispatch 快照 | `dispatch` | manifest 顶层；`09.verify` 从 `MAX_JOBS` / `SKIP_CACHE_RESTORE` 写入 `ninja_workers` / `skip_cache_restore` |
+| workflow_dispatch 快照 | `dispatch` | manifest 顶层；`09.verify` 从 `MAX_JOBS` / `SKIP_CACHE` 写入 `ninja_workers` / `skip_cache` |
 | shard 产物目录 | `SHARD_RELEASE_DIR` | 07.shard 写入；非 GitHub Release |
 | wheel local tag | `WHEEL_LOCAL_VERSION` | lock `wheel.wheel_local_version`；wheel 时映射为 upstream `FLASH_ATTN_LOCAL_VERSION` |
 | wheel artifact 名 | `WHEEL_ARTIFACT_NAME` | lock `wheel.wheel_artifact_name` |
@@ -100,7 +100,7 @@
 - **连续 CI 链**：各 compile/link job 内 clone+patch → compile/link → smoke 自动跑完；staging/shard 齐全等流水线检查保留。
 - **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=TRUE` + prebuilt `.obj` 时间戳 merge；`/Brepro` + `SOURCE_DATE_EPOCH` 使 serial / parallel wheel **byte-identical**。
 - **`PRIMARY_DIM`** = lock `ck_opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
-- **`ninja_workers` 默认 4**（OOM 改 2）；**ninja cache save 仅 compile 成功时写入**（命中且成功时先删旧条目再 save 刷新；构建失败不写，含冷启动 partial）；**`skip_cache_restore` 默认 false**（仅跳过 restore，lookup 仍探测 cache-hit；compile 成功后仍 save）。
+- **`ninja_workers` 默认 4**（OOM 改 2）；**ninja cache save 仅 compile 成功时写入**（命中且成功时先删旧条目再 save 刷新；构建失败不写）；**`skip_cache` 默认 false**（设为 true 时不 restore 也不 save；仍计算 `cache-primary-key`，`cache-hit=false`）。
 - **全模式 prebuilt obj 两向 stamp** / **link 排除 `fmha_*_api.obj`**：见 `build/build-fa-steps.py` 注释。
 - **patch 程序化**（`04.patch.ts`）；`CK_OPT_DIM` / `GPU_ARCHS` / `CK_FMHA_DISABLE_BWD` 只从 env 取
 - **ComfyUI 推理 wheel 默认 `compile.ck_disable_bwd=true`**（fwd-only CK FMHA；调用 backward 运行时 `TORCH_CHECK`）

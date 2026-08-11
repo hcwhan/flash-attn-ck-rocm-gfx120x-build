@@ -8,8 +8,8 @@ inputs:
   cache-key:
     description: Primary cache key from 05.toolchain-fingerprint (serial-v5 / parallel-v5-d{dim} + toolchain fingerprint)
     required: true
-  skip-cache-restore:
-    description: When true, skip cache restore (lookup-only probe for cache-hit metadata)
+  skip-cache:
+    description: When true, skip cache restore and save (cache-primary-key still computed; cache-hit=false)
     required: false
     default: "false"
   run:
@@ -18,7 +18,7 @@ inputs:
 
 outputs:
   cache-hit:
-    description: Exact cache key match from restore or lookup-only probe
+    description: Exact cache key match from restore (false when skip-cache is true)
     value: ${{ steps.fa-build-cache.outputs.cache-hit }}
 
 runs:
@@ -30,7 +30,7 @@ runs:
       with:
         fa-src: ${{ inputs.fa-src }}
         cache-key: ${{ inputs.cache-key }}
-        skip-cache-restore: ${{ inputs.skip-cache-restore }}
+        skip-cache: ${{ inputs.skip-cache }}
 
     - name: Run build CLI step
       id: run-build
@@ -56,8 +56,8 @@ runs:
 
     - name: Save ninja incremental build cache
       # Save only after a successful compile (fresh entry, or refresh after the
-      # delete above). Failed builds never save, including cold starts.
-      if: always() && steps.run-build.conclusion == 'success'
+      # delete above). Failed builds and skip-cache runs never save.
+      if: always() && steps.run-build.conclusion == 'success' && inputs.skip-cache != 'true'
       uses: "./.github/actions/A04.fa-ninja-cache-save"
       with:
         fa-src: ${{ inputs.fa-src }}
