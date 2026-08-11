@@ -1,5 +1,5 @@
 name: Save FA ninja build cache
-description: compile 步骤成功后保存 flash-attention build/ 增量 cache（job 超时/取消会跳过后续步骤，故不会 save）
+description: 保存 flash-attention build/ 增量 cache
 
 inputs:
   fa-src:

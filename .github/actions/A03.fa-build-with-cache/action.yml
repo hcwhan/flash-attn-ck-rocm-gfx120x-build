@@ -41,9 +41,10 @@ runs:
       run: ${{ inputs.run }}
 
     - name: Delete stale ninja cache entry
-      # 远端条目存在且 compile 成功时先删除，以便 save 刷新
-      # （actions/cache/save 在 key 已存在时会 hard fail）。
-      if: always() && steps.run-build.conclusion == 'success' && steps.fa-build-cache.outputs.cache-exists == 'true'
+      # cache-exists 时先 delete，以便 save 刷新（actions/cache/save 对已存在 key 会失败）。
+      # use-cache=true：成功或失败均 delete（允许部分 save）。
+      # use-cache=false：仅成功时 delete（仅 lookup 冷构建刷新路径）。
+      if: always() && steps.run-build.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-build.conclusion == 'success') && steps.fa-build-cache.outputs.cache-exists == 'true'
       shell: pwsh
       env:
         GH_TOKEN: ${{ github.token }}
@@ -57,7 +58,7 @@ runs:
         }
 
     - name: Save ninja incremental build cache
-      if: always() && steps.run-build.conclusion == 'success'
+      if: always() && steps.run-build.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-build.conclusion == 'success')
       uses: "./.github/actions/A04.fa-ninja-cache-save"
       with:
         fa-src: ${{ inputs.fa-src }}
