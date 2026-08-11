@@ -22,7 +22,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx
 | Section | Field | Role |
 |---------|-------|------|
 | `toolchain` | `python`, `pytorch`, `torch_device_extra`, `rocm_index`, `rocm` | pip toolchain pins |
-| `flash_attention` | `repo`, `build_commit`, `build_commit_date` | Exact FA source cloned each build; **bump `build_commit` and `build_commit_date` when upgrading FA** |
+| `flash_attention` | `repo`, `build_commit`, `build_commit_date` | Exact FA source cloned each build (`build_commit` may be a 40-char SHA or tag such as `v2.7.4.post1`); **bump `build_commit` and `build_commit_date` when upgrading FA** |
 | `flash_attention` | `min_commit` | Minimum RDNA4 gfx12x commit ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); **human-readable reference only** |
 | `compile` | `gpu_archs`, `ck_opt_dim`, `ck_disable_bwd` | HIP compile targets (**sole arch source**), CK FMHA `opt_dim` tiers, and whether bwd is omitted (`CK_FMHA_DISABLE_BWD`) |
 | `wheel` | `wheel_local_version` | Wheel `+local` tag (env `WHEEL_LOCAL_VERSION`; mapped to upstream `FLASH_ATTN_LOCAL_VERSION` at wheel time) |
@@ -32,7 +32,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx
 
 `EXPECTED_WHEEL_PATTERN` is derived in `version-lock.ts` from `wheel.wheel_local_version` + `toolchain.python`, not stored in the lock file.
 
-Prep clones **`flash_attention.build_commit`** (`fetch` + `checkout FETCH_HEAD`). `GPU_ARCHS` is read only from lock `compile.gpu_archs` (semicolon-separated on Windows).
+Prep clones **`flash_attention.build_commit`** (SHA or tag; `fetch origin <ref>` + `checkout FETCH_HEAD`). `GPU_ARCHS` is read only from lock `compile.gpu_archs` (semicolon-separated on Windows).
 
 ### Supported GPUs (gfx120x / RDNA4)
 

@@ -36,7 +36,7 @@ program
 
 program
   .command("03.prep")
-  .description("clone pin 的 flash-attention commit")
+  .description("按 pin 的 SHA 或 tag clone flash-attention 源码")
   .requiredOption("--fa-src <path>")
   .action((opts) => {
     runPrep({ faSrc: opts.faSrc });

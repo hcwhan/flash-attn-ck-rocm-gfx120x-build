@@ -22,7 +22,7 @@
 | 分组 | 字段 | 作用 |
 |------|------|------|
 | `toolchain` | `python`、`pytorch`、`torch_device_extra`、`rocm_index`、`rocm` | pip 工具链 pin |
-| `flash_attention` | `repo`、`build_commit`、`build_commit_date` | 每次构建精确 clone 的 FA 源码；**升级 FA 时改 `build_commit` 与 `build_commit_date`** |
+| `flash_attention` | `repo`、`build_commit`、`build_commit_date` | 每次构建精确 clone 的 FA 源码（`build_commit` 可为 40 位 SHA 或 tag，如 `v2.7.4.post1`）；**升级 FA 时改 `build_commit` 与 `build_commit_date`** |
 | `flash_attention` | `min_commit` | RDNA4 gfx12x 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**仅人类可读参考** |
 | `compile` | `gpu_archs`、`ck_opt_dim`、`ck_disable_bwd` | HIP 编译目标（**唯一架构源**）、CK FMHA `opt_dim` 档位、是否省略 bwd（`CK_FMHA_DISABLE_BWD`） |
 | `wheel` | `wheel_local_version` | wheel 的 `+local` 标签（env `WHEEL_LOCAL_VERSION`；wheel 时映射 upstream `FLASH_ATTN_LOCAL_VERSION`） |
@@ -32,7 +32,7 @@
 
 `EXPECTED_WHEEL_PATTERN` 由 `wheel.wheel_local_version` + `toolchain.python` 在 `version-lock.ts` 推导，不在 lock 中存储。
 
-规则：CI 始终 clone **`flash_attention.build_commit`**（`fetch` + `checkout FETCH_HEAD`）；`GPU_ARCHS` 只从 lock `compile.gpu_archs` 读取（Windows 分号分隔）。
+规则：CI 始终 clone **`flash_attention.build_commit`**（SHA 或 tag；`fetch origin <ref>` + `checkout FETCH_HEAD`）；`GPU_ARCHS` 只从 lock `compile.gpu_archs` 读取（Windows 分号分隔）。
 
 ### 适用显卡（gfx120x / RDNA4）
 

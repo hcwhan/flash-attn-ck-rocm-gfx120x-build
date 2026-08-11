@@ -12,16 +12,14 @@ export function runPrep(options: { faSrc: string }): void {
   const root = path.resolve(options.faSrc);
 
   console.log(`Using flash-attention repo: ${flashAttentionRepo}`);
-  console.log(
-    `Using flash-attention build commit: ${flashAttentionBuildCommit}`,
-  );
+  console.log(`Using flash-attention build ref: ${flashAttentionBuildCommit}`);
 
   const parent = path.dirname(root);
   mkdirSync(parent, { recursive: true });
   rmSync(root, { recursive: true, force: true });
 
   console.log(
-    `Cloning flash-attention at commit ${flashAttentionBuildCommit}`,
+    `Cloning flash-attention at ref ${flashAttentionBuildCommit}`,
   );
   run("git", [
     "-c",
@@ -59,6 +57,18 @@ export function runPrep(options: { faSrc: string }): void {
     "csrc/cutlass",
   ]);
 
+  const resolvedCommit = runCapture("git", [
+    "-C",
+    root,
+    "rev-parse",
+    "HEAD",
+  ]).trim();
+  if (!resolvedCommit) {
+    throw new Error(
+      `prep: failed to resolve HEAD after checkout of ${flashAttentionBuildCommit}`,
+    );
+  }
+
   const gitAuthorDate = runCapture("git", [
     "-C",
     root,
@@ -68,7 +78,7 @@ export function runPrep(options: { faSrc: string }): void {
   ]).trim();
   if (!gitAuthorDate) {
     throw new Error(
-      `prep: failed to read author date for commit ${flashAttentionBuildCommit}`,
+      `prep: failed to read author date for ref ${flashAttentionBuildCommit} (${resolvedCommit})`,
     );
   }
 
@@ -82,7 +92,7 @@ export function runPrep(options: { faSrc: string }): void {
   if (gitAuthorMs !== lockCommitMs) {
     throw new Error(
       [
-        `flash_attention.build_commit_date mismatch for commit ${flashAttentionBuildCommit}.`,
+        `flash_attention.build_commit_date mismatch for ref ${flashAttentionBuildCommit} (${resolvedCommit}).`,
         ` lock=${flashAttentionBuildCommitDate} git author=${gitAuthorDate}`,
         " Update VERSION.lock.json when bumping flash_attention.build_commit.",
       ].join(""),
@@ -96,6 +106,6 @@ export function runPrep(options: { faSrc: string }): void {
   rmSync(path.join(root, ".git"), { recursive: true, force: true });
 
   console.log(
-    `Prepared flash-attention at ${root} (commit=${flashAttentionBuildCommit})`,
+    `Prepared flash-attention at ${root} (ref=${flashAttentionBuildCommit}, commit=${resolvedCommit})`,
   );
 }
