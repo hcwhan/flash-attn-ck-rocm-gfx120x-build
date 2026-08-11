@@ -95,12 +95,18 @@ function pythonWheelTag(python: string): string {
   return `cp${major}${minor}`;
 }
 
+/** PEP 440: wheel 文件名中 local version 的 `-`/`_` 规范化为 `.`。 */
+export function wheelFilenameLocalVersion(localVersion: string): string {
+  return localVersion.replace(/[-_]/g, ".");
+}
+
 export function expectedWheelPattern(
   localVersion: string,
   python: string,
 ): string {
   const tag = pythonWheelTag(python);
-  return `flash_attn-*+${localVersion}-${tag}-${tag}-win_amd64.whl`;
+  const filenameLocal = wheelFilenameLocalVersion(localVersion);
+  return `flash_attn-*+${filenameLocal}-${tag}-${tag}-win_amd64.whl`;
 }
 
 /** Ninja cache lockHash8：仅 toolchain + flash_attention + compile（不含 wheel/release）。 */

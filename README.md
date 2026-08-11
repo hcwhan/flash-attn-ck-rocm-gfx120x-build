@@ -136,10 +136,10 @@ gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123 
 gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123 -D .\dist
 ```
 
-预期 wheel 文件名（由 `wheel.wheel_local_version` + `toolchain.python` 推导）：
+预期 wheel 文件名（由 `wheel.wheel_local_version` + `toolchain.python` 推导；PEP 440 将 local tag 中的 `-` 规范化为 `.`）：
 
 ```text
-flash_attn-*+ck-torch2.12.0-rocm7.14.0-gfx120x-cxx11.abi-cp312-cp312-win_amd64.whl
+flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.whl
 ```
 
 ## 验证

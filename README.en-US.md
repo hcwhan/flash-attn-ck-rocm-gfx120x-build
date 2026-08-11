@@ -136,10 +136,10 @@ gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123 
 gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123 -D .\dist
 ```
 
-Expected wheel name (derived from `wheel.wheel_local_version` + `toolchain.python`):
+Expected wheel name (derived from `wheel.wheel_local_version` + `toolchain.python`; PEP 440 normalizes `-` to `.` in the local tag):
 
 ```text
-flash_attn-*+ck-torch2.12.0-rocm7.14.0-gfx120x-cxx11.abi-cp312-cp312-win_amd64.whl
+flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.whl
 ```
 
 ## Verification

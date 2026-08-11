@@ -30,17 +30,21 @@ expected_local = sys.argv[3]
 ck_disable_bwd = sys.argv[4]
 min_pyd_bytes = 1024 * 1024
 
+def wheel_filename_local(local: str) -> str:
+    return local.replace('-', '.').replace('_', '.')
+
 opt_dims = [int(part) for part in ck_opt_dim.split(',') if part.strip()]
 if not opt_dims:
     raise SystemExit('ERROR: CK_OPT_DIM is missing or empty')
 
 wheel_name = Path(wheel).name
-local_tag = f'+{expected_local}'
+filename_local = wheel_filename_local(expected_local)
+local_tag = f'+{filename_local}'
 if local_tag not in wheel_name:
     raise SystemExit(
         f'ERROR: wheel filename missing local version tag {local_tag!r}: {wheel_name}'
     )
-print(f'OK wheel local tag {expected_local}')
+print(f'OK wheel local tag {filename_local}')
 
 with zipfile.ZipFile(wheel) as zf:
     names = zf.namelist()
@@ -274,6 +278,8 @@ export function runVerify(options: {
       "import flash_attn",
       "import flash_attn_2_cuda",
       "from flash_attn import flash_attn_func",
+      "def wheel_filename_local(local: str) -> str:",
+      "    return local.replace('-', '.').replace('_', '.')",
       "spec = importlib.util.find_spec('flash_attn_2_cuda')",
       "if spec is None or not spec.origin:",
       "    raise SystemExit('ERROR: flash_attn_2_cuda spec/origin missing')",
@@ -284,7 +290,8 @@ export function runVerify(options: {
       "expected_local = sys.argv[1]",
       "if not installed_version:",
       "    raise SystemExit('ERROR: flash_attn package version is empty')",
-      "local_tag = f'+{expected_local}'",
+      "filename_local = wheel_filename_local(expected_local)",
+      "local_tag = f'+{filename_local}'",
       "if local_tag not in installed_version:",
       "    raise SystemExit(",
       "        'ERROR: flash_attn metadata missing local version tag '",
