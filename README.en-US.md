@@ -62,8 +62,8 @@ ComfyUI **inference-only** wheel (lock `compile.ck_disable_bwd=true`):
 
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
-| **Build FlashAttention CK serial (Windows gfx120x)** | Single-job full build + cache (`serial-v5`) | **Manual only** |
-| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM shard compile + link (`parallel-v5-d{dim}`) | **Manual only** |
+| **Build FlashAttention CK serial (Windows gfx120x)** | Single-job full build + cache (`serial-v6`) | **Manual only** |
+| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM shard compile + link (`parallel-v6-d{dim}`) | **Manual only** |
 
 > Push to `main` does **not** auto-trigger builds.
 
@@ -89,7 +89,15 @@ ComfyUI **inference-only** wheel (lock `compile.ck_disable_bwd=true`):
 | `compile-d32` … `d256` | clone+patch per job, one OPT_DIM shard each, upload `.obj` | 6 h each |
 | `link-wheel` | clone+patch, merge objs + link + wheel + CPU smoke test | 6 h |
 
-- Cache keys include lock `toolchain`+`flash_attention`+`compile` JSON SHA256 prefix (`-v5-{lockHash8}-`; excludes `wheel`/`release`) and three toolchain fingerprints (MSVC toolset / ROCm clang / pip toolchain); **exact match only** (no `restore-keys`). Serial: `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`; parallel: `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`. Keys are not shared across modes. With `use_cache=true`, cache is saved whenever the build step is not skipped; with `use_cache=false`, restore is skipped (`used=false`) and cache is saved only after a successful compile. When a remote entry exists (`exists`), it is deleted before save refreshes it.
+- **Ninja cache** (`flash-attention/build/` incremental compile):
+  - Serial: `fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - Parallel: `fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - `lockHash8`: lock `toolchain`+`flash_attention`+`compile` → SHA256 prefix (8 hex chars; excludes `wheel`/`release`)
+  - `msvcVersion` / `rocmClangVersion`: full MSVC toolset version / parsed `clang --version` token (e.g. `14.42.34433`, `19.0.0git`)
+  - `ninja`: major.minor from `ninja --version`
+  - **Exact match only** (no `restore-keys`); serial / parallel keys are **not shared**
+  - With `use_cache=true`, cache is saved whenever the build step is not skipped; with `use_cache=false`, restore is skipped (`used=false`) and cache is saved only after a successful compile. When a remote entry exists (`exists`), it is deleted before save refreshes it.
+- **Pip toolchain cache** (`PIP_TOOLCHAIN_CACHE_KEY`): `fa-pip-toolchain-v2-py[{python}]-pt[{pytorch}]-dev[{torch_device_extra}]-rocm[{rocm}]-idx[{indexHash8}]` (`01.config`; `indexHash8` = lock `toolchain.rocm_index` → SHA256 prefix)
 - All four shards compile shared objs; link uses only the **first lock `ck_opt_dim` tier** (currently `32`) for shared objs.
 
 ### Build stages

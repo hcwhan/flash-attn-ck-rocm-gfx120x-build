@@ -1,13 +1,14 @@
-import { createHash } from "node:crypto";
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { runCapture } from "../lib/exec.js";
 import { appendGithubOutput } from "../lib/github.js";
 import { buildNinjaCacheKey } from "../lib/ninja-cache-key.js";
+import {
+  parseRocmClangFullVersion,
+  resolveNinjaMinorVersion,
+} from "../lib/build-tool-minor.js";
 import { getRocmSdkPaths } from "../lib/rocm-sdk-paths.js";
 import { versionLockFileHash8 } from "../lib/version-lock.js";
-
-const PYTHON = "python";
 
 function resolveMsvcToolset(): string {
   const programFilesX86 = process.env["ProgramFiles(x86)"];
@@ -67,7 +68,7 @@ function resolveMsvcToolset(): string {
   return toolset;
 }
 
-function resolveRocmClangVersion(coreRoot: string): string {
+function resolveRocmClangVersionLine(coreRoot: string): string {
   const clangExe = path.join(coreRoot, "lib", "llvm", "bin", "clang.exe");
   if (!existsSync(clangExe)) {
     throw new Error(`ROCm clang not found: ${clangExe}`);
@@ -83,40 +84,22 @@ function resolveRocmClangVersion(coreRoot: string): string {
   return firstLine;
 }
 
-function fingerprintHash(payload: string): string {
-  return createHash("sha256").update(payload, "utf8").digest("hex").slice(0, 12);
-}
-
 export function runToolchainFingerprint(options?: {
   workspaceRoot?: string;
   buildVariant?: string;
   optDim?: string;
 }): void {
-  const toolset = resolveMsvcToolset();
+  const msvcVersion = resolveMsvcToolset();
   const { coreRoot } = getRocmSdkPaths();
-  const rocmClangVersion = resolveRocmClangVersion(coreRoot);
+  const rocmClangLine = resolveRocmClangVersionLine(coreRoot);
+  const rocmClangVersion = parseRocmClangFullVersion(rocmClangLine);
 
-  const msvcHash = fingerprintHash(toolset);
-  const rocmClangHash = fingerprintHash(rocmClangVersion);
-  console.log(`MSVC toolset: ${toolset} (fingerprint ${msvcHash})`);
-  console.log(`ROCm clang: ${rocmClangVersion} (fingerprint ${rocmClangHash})`);
+  console.log(`MSVC toolset (cache key): ${msvcVersion}`);
+  console.log(`ROCm clang: ${rocmClangLine}`);
+  console.log(`ROCm clang (cache key): ${rocmClangVersion}`);
 
-  const pipPkgs = ["pip", "setuptools", "wheel", "ninja", "packaging", "psutil"];
-  const pipFreeze = runCapture(PYTHON, ["-m", "pip", "list", "--format=freeze"]);
-  const pipVersions = pipPkgs.map((pkg) => {
-    const line = pipFreeze
-      .split(/\r?\n/)
-      .find((entry) => entry.startsWith(`${pkg}==`));
-    if (!line) {
-      throw new Error(`pip toolchain package not found: ${pkg}`);
-    }
-    return line;
-  });
-
-  const pipToolchainHash = fingerprintHash(pipVersions.sort().join(";"));
-  console.log(
-    `pip toolchain: ${pipVersions.join(";")} (fingerprint ${pipToolchainHash})`,
-  );
+  const ninjaMinor = resolveNinjaMinorVersion();
+  console.log(`ninja minor (cache key): ${ninjaMinor}`);
 
   if (options?.buildVariant) {
     const buildVariant = options.buildVariant.trim().toLowerCase();
@@ -146,9 +129,9 @@ export function runToolchainFingerprint(options?: {
       buildVariant,
       lockHash,
       optDim: options.optDim?.trim(),
-      msvcHash,
-      rocmClangHash,
-      pipToolchainHash,
+      msvcVersion,
+      rocmClangVersion,
+      ninjaMinor,
     });
     console.log(`Ninja cache key: ${cacheKey}`);
     appendGithubOutput({ "cache-key": cacheKey });

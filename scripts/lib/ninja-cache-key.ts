@@ -1,21 +1,32 @@
+import { cacheKeyToken } from "./cache-key-token.js";
+
 export function buildNinjaCacheKey(options: {
   buildVariant: "serial" | "parallel";
   lockHash: string;
   optDim?: string;
-  msvcHash: string;
-  rocmClangHash: string;
-  pipToolchainHash: string;
+  msvcVersion: string;
+  rocmClangVersion: string;
+  ninjaMinor: string;
 }): string {
-  const lockSegment = options.lockHash;
-  const toolchain = `msvc${options.msvcHash}-rocmClang${options.rocmClangHash}-pipToolchain${options.pipToolchainHash}`;
+  const segments = [
+    options.buildVariant === "serial"
+      ? "fa2-ck-gfx120x-serial-v6"
+      : "fa2-ck-gfx120x-parallel-v6",
+    `lock[${options.lockHash}]`,
+  ];
 
-  if (options.buildVariant === "serial") {
-    return `fa2-ck-gfx120x-serial-v5-${lockSegment}-${toolchain}`;
+  if (options.buildVariant === "parallel") {
+    if (!options.optDim) {
+      throw new Error("optDim is required for parallel ninja cache key");
+    }
+    segments.push(`dim[${options.optDim}]`);
   }
 
-  if (!options.optDim) {
-    throw new Error("optDim is required for parallel ninja cache key");
-  }
+  segments.push(
+    `msvc[${cacheKeyToken(options.msvcVersion)}]`,
+    `rocmClang[${cacheKeyToken(options.rocmClangVersion)}]`,
+    `ninja[${options.ninjaMinor}]`,
+  );
 
-  return `fa2-ck-gfx120x-parallel-v5-${lockSegment}-d${options.optDim}-${toolchain}`;
+  return segments.join("-");
 }

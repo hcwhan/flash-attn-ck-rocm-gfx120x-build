@@ -62,8 +62,8 @@ ComfyUI **推理专用** wheel（lock `compile.ck_disable_bwd=true`）：
 
 | Workflow | 用途 | 触发 |
 |----------|------|------|
-| **Build FlashAttention CK serial (Windows gfx120x)** | 单 job 全量编译 + cache（`serial-v5`） | **仅手动** |
-| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM 分片 compile + link（`parallel-v5-d{dim}`） | **仅手动** |
+| **Build FlashAttention CK serial (Windows gfx120x)** | 单 job 全量编译 + cache（`serial-v6`） | **仅手动** |
+| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM 分片 compile + link（`parallel-v6-d{dim}`） | **仅手动** |
 
 > 推送到 `main` **不会**自动触发编译。
 
@@ -89,7 +89,15 @@ ComfyUI **推理专用** wheel（lock `compile.ck_disable_bwd=true`）：
 | `compile-d32` … `d256` | 各 job 内 clone+patch，编一个 OPT_DIM shard，上传 `.obj` | 各 6 h |
 | `link-wheel` | clone+patch、合并 obj + link + 打 wheel + CPU smoke test | 6 h |
 
-- Cache key 含 lock `toolchain`+`flash_attention`+`compile` JSON SHA256 前 8 位（`-v5-{lockHash8}-`，不含 `wheel`/`release`）及三段工具链指纹（MSVC 工具集 / ROCm clang / pip 工具链）；**仅精确匹配**（无 `restore-keys`）。串行 `fa2-ck-gfx120x-serial-v5-{lockHash8}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，并行 `fa2-ck-gfx120x-parallel-v5-{lockHash8}-d{dim}-msvc{hash}-rocmClang{hash}-pipToolchain{hash}`，互不共用。`use_cache=true` 时 build 非 skipped 即 save；`use_cache=false` 时不 restore（`used=false`），仅 compile 成功时 save；远端已有条目（`exists`）时 save 前先 delete 再刷新。
+- **Ninja cache**（`flash-attention/build/` 增量编译）：
+  - 串行：`fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - 并行：`fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - `lockHash8`：lock `toolchain`+`flash_attention`+`compile` → SHA256 前 8 位（不含 `wheel`/`release`）
+  - `msvcVersion` / `rocmClangVersion`：MSVC 工具集完整版本 / `clang --version` 解析完整版本（如 `14.42.34433`、`19.0.0git`）
+  - `ninja`：`ninja --version` 的 major.minor
+  - **仅精确匹配**（无 `restore-keys`）；serial / parallel **互不共用**
+  - `use_cache=true` 时 build 非 skipped 即 save；`use_cache=false` 时不 restore（`used=false`），仅 compile 成功时 save；远端已有条目（`exists`）时 save 前先 delete 再刷新
+- **Pip toolchain cache**（`PIP_TOOLCHAIN_CACHE_KEY`）：`fa-pip-toolchain-v2-py[{python}]-pt[{pytorch}]-dev[{torch_device_extra}]-rocm[{rocm}]-idx[{indexHash8}]`（`01.config`；`indexHash8` = lock `toolchain.rocm_index` → SHA256 前 8 位）
 - 四 shard 各编 shared obj；link 仅使用 **lock `ck_opt_dim` 第一档**（当前 `32`）的 shared obj。
 
 ### 构建阶段
