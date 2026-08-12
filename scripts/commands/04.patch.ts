@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { requireLockEnv } from "../lib/require-env.js";
+import { requireGithubActionsEnv } from "../lib/require-env.js";
 
 type StringPatchPoint = {
   name: string;
@@ -92,7 +92,7 @@ function validatePatchPoint(content: string, point: PatchPoint): void {
 }
 
 export function runPatch(options: { faSrc: string }): void {
-  const disableBwd = requireLockEnv("CK_FMHA_DISABLE_BWD") === "1";
+  const disableBwd = requireGithubActionsEnv("CK_FMHA_DISABLE_BWD") === "1";
   const patchPoints: PatchPoint[] = disableBwd
     ? [...bwdPatchPoints, breproPatchPoint]
     : [breproPatchPoint];

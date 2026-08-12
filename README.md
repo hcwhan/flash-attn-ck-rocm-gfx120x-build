@@ -25,7 +25,7 @@
 | `toolchain` | `python`、`pytorch`、`torch_device_extra`、`rocm_index`、`rocm` | pip 工具链 pin |
 | `flash_attention` | `repo`、`build_commit`、`build_commit_date` | 每次构建精确 clone 的 FA 源码（`build_commit` 可为 40 位 SHA 或 tag，如 `v2.7.4.post1`）；**升级 FA 时改 `build_commit` 与 `build_commit_date`** |
 | `flash_attention` | `min_commit` | RDNA4 gfx12x 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**仅人类可读参考** |
-| `compile` | `gpu_archs`、`ck_opt_dim`、`ck_disable_bwd` | HIP 编译目标（**唯一架构源**）、CK FMHA `opt_dim` 档位、是否省略 bwd（`CK_FMHA_DISABLE_BWD`） |
+| `compile` | `gpu_archs`、`ck_opt_dim` | HIP 编译目标（**唯一架构源**）、CK FMHA `opt_dim` 档位 |
 | `wheel` | `wheel_local_version` | wheel 的 `+local` 标签（env `WHEEL_LOCAL_VERSION`；wheel 时映射 upstream `FLASH_ATTN_LOCAL_VERSION`） |
 | `wheel` | `wheel_artifact_name` | GitHub Actions artifact 名称 |
 | `release` | `release_tag_prefix` | Release tag 前缀（`{prefix}-{variant}-build{run_number}`） |
@@ -44,7 +44,7 @@
 
 ## 编译配置
 
-ComfyUI **推理专用** wheel（lock `compile.ck_disable_bwd=true`）：
+ComfyUI **推理专用** wheel（workflow `ck_disable_bwd=true`，默认）：
 
 - CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（`CK_FMHA_DISABLE_BWD=1` 时无 bwd）
 - **`-DFLASHATTENTION_DISABLE_BACKWARD`**（`CK_FMHA_DISABLE_BWD=1` 时启用）
@@ -75,6 +75,7 @@ ComfyUI **推理专用** wheel（lock `compile.ck_disable_bwd=true`）：
 | `ninja_workers` | `4` | Ninja 并行 worker 数（OOM 时可改为 `2`） |
 | `use_cache` | `true` | 设为 `false` 时不 restore（仍 lookup 探测 `exists`；`used=false`；仅 compile 成功时 save） |
 | `publish_release` | `true` | 设为 `false` 时跳过 GitHub Release 上传 |
+| `ck_disable_bwd` | `true` | 省略 CK FMHA bwd codegen 并启用 `FLASHATTENTION_DISABLE_BACKWARD`（ComfyUI 推理专用）；设为 `false` 时编译含 bwd 的完整 wheel |
 
 ### 串行（`build-fa2-ck-gfx120x-serial.yml`）
 
@@ -93,9 +94,10 @@ ComfyUI **推理专用** wheel（lock `compile.ck_disable_bwd=true`）：
 > 除 `plan-opt-dim` 外 workflow 未显式设 `timeout-minutes`；「6 h（默认）」为 GitHub hosted runner 上限。CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
 
 - **Ninja cache**（`flash-attention/build/` 增量编译）：
-  - 串行：`fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
-  - 并行：`fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
-  - `lockHash8`：lock `toolchain`+`flash_attention`+`compile` → SHA256 前 8 位（不含 `wheel`/`release`）
+  - 串行：`fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - 并行：`fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - `lockHash8`：lock `toolchain`+`flash_attention`+`compile` → SHA256 前 8 位（不含 `wheel`/`release`；不含 workflow `ck_disable_bwd`）
+  - `bwd`：workflow `ck_disable_bwd`（`true` = `CK_FMHA_DISABLE_BWD=1`，推理专用省略 bwd）
   - `msvcVersion` / `rocmClangVersion`：MSVC 工具集完整版本 / `clang --version` 解析完整版本（如 `14.42.34433`、`19.0.0git`）；写入 key 前经 `cacheKeyToken` 规范化
   - `ninja`：`ninja --version` 的 major.minor
   - **仅精确匹配**（无 `restore-keys`）；serial / parallel **互不共用**

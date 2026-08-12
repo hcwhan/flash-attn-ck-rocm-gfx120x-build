@@ -9,7 +9,7 @@
 | **serial** | `compile-full-and-link-wheel`（clone+patch → 全量 build_ext → 原地 `bdist_wheel`）→ smoke test |
 | **parallel** | `plan-opt-dim` → compile-d32\|d64\|d128\|d256（各 job 内 clone+patch）→ link-wheel → smoke test |
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Ninja cache：串行 `fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`；并行 `fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-dim[{ck_opt_dim}]-msvc[…]-rocmClang[…]-ninja[…]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release`；`msvc`/`rocmClang` = 完整工具链版本号；精确 key，无 `restore-keys`；serial/parallel 互不共用）。Pip：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Ninja cache：串行 `fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`；并行 `fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[…]-rocmClang[…]-ninja[…]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = workflow `ck_disable_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；精确 key，无 `restore-keys`；serial/parallel 互不共用）。Pip：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
 
 ## 命名约定
 
@@ -18,7 +18,7 @@
 | FA 源码根 | `FA_SRC` / `--fa-src` / composite `fa-src` | 全层一致 |
 | parallel staging 根 | `FA_STAGING` / `--staging-root` | artifact `d{dim}` 下载目录；08.wheel parallel link |
 | lock CK OPT_DIM | `CK_OPT_DIM` | lock `ck_opt_dim` 逗号列表 |
-| lock CK bwd | `CK_FMHA_DISABLE_BWD` | lock `compile.ck_disable_bwd`（`true` = 推理专用，跳过 bwd codegen + `FLASHATTENTION_DISABLE_BACKWARD`） |
+| workflow CK bwd | `CK_FMHA_DISABLE_BWD` | workflow `ck_disable_bwd`（默认 `true` = 推理专用，跳过 bwd codegen + `FLASHATTENTION_DISABLE_BACKWARD`） |
 | 第一档 OPT_DIM | `PRIMARY_DIM` / `--primary-dim` / job output `primary-dim` | parallel link 用 |
 | 单 shard OPT_DIM | matrix `opt-dim` / CLI `--opt-dim` | parallel compile 单值 |
 | 构建模式 | `--build-variant serial\|parallel` | verify / publish / fingerprint 共用 |
@@ -26,7 +26,7 @@
 | Ninja cache exists | `cache-exists` | A02 output / manifest `build_caches[].exists`（lookup 或 restore 探测远端是否有条目） |
 | Ninja cache used | `cache-used` | A02 output / manifest `build_caches[].used`（`use_cache=true` 且 restore 命中） |
 | Compile cache metadata | `--build-caches` | workflow 写入 JSON（serial 单文件 / parallel 目录）→ 09.verify → manifest `build_caches`（`opt_dim/key/exists/used`） |
-| workflow_dispatch 快照 | `dispatch` | manifest 顶层；`09.verify` 从 `MAX_JOBS` / `USE_CACHE` 写入 `ninja_workers` / `use_cache` |
+| workflow_dispatch 快照 | `dispatch` | manifest 顶层；`09.verify` 从 `MAX_JOBS` / `USE_CACHE` / `CK_FMHA_DISABLE_BWD` 写入 `ninja_workers` / `use_cache` / `ck_disable_bwd` |
 | shard 产物目录 | `SHARD_RELEASE_DIR` | 07.shard 写入；非 GitHub Release |
 | wheel local tag | `WHEEL_LOCAL_VERSION` | lock `wheel.wheel_local_version`；wheel 时映射为 upstream `FLASH_ATTN_LOCAL_VERSION` |
 | wheel artifact 名 | `WHEEL_ARTIFACT_NAME` | lock `wheel.wheel_artifact_name` |
@@ -35,7 +35,7 @@
 | FA 相关 env | `FLASH_ATTENTION_*` | repo / commit / force-build 等 |
 | Python 包名 | `flash_attn` | wheel / import 名；与本仓库目录名 `flash-attn-*` 有意区分 |
 
-**lock → GITHUB_ENV 映射：** `toolchain.python`→`PYTHON_VERSION`，`toolchain.pytorch`→`PYTORCH_VERSION`，`toolchain.torch_device_extra`→`TORCH_DEVICE_EXTRA`，`toolchain.rocm`→`ROCM_VERSION`，`toolchain.rocm_index`→`ROCM_INDEX`，`compile.ck_opt_dim`→`CK_OPT_DIM`（首档另导出 `PRIMARY_DIM`），`compile.ck_disable_bwd`→`CK_FMHA_DISABLE_BWD`，`compile.gpu_archs`→`GPU_ARCHS`，`flash_attention.repo`→`FLASH_ATTENTION_REPO`，`flash_attention.build_commit`→`FLASH_ATTENTION_BUILD_COMMIT`，`flash_attention.build_commit_date`→`FLASH_ATTENTION_BUILD_COMMIT_DATE`（另导出 `SOURCE_DATE_EPOCH`），`wheel.wheel_local_version`→`WHEEL_LOCAL_VERSION`，`wheel.wheel_artifact_name`→`WHEEL_ARTIFACT_NAME`，`release.release_tag_prefix`→`RELEASE_TAG_PREFIX`，`release.release_title_prefix`→`RELEASE_TITLE_PREFIX`；`EXPECTED_WHEEL_PATTERN` / `PIP_TOOLCHAIN_CACHE_KEY` 由 `version-lock.ts` 推导。
+**lock → GITHUB_ENV 映射：** `toolchain.python`→`PYTHON_VERSION`，`toolchain.pytorch`→`PYTORCH_VERSION`，`toolchain.torch_device_extra`→`TORCH_DEVICE_EXTRA`，`toolchain.rocm`→`ROCM_VERSION`，`toolchain.rocm_index`→`ROCM_INDEX`，`compile.ck_opt_dim`→`CK_OPT_DIM`（首档另导出 `PRIMARY_DIM`），`compile.gpu_archs`→`GPU_ARCHS`，`flash_attention.repo`→`FLASH_ATTENTION_REPO`，`flash_attention.build_commit`→`FLASH_ATTENTION_BUILD_COMMIT`，`flash_attention.build_commit_date`→`FLASH_ATTENTION_BUILD_COMMIT_DATE`（另导出 `SOURCE_DATE_EPOCH`），`wheel.wheel_local_version`→`WHEEL_LOCAL_VERSION`，`wheel.wheel_artifact_name`→`WHEEL_ARTIFACT_NAME`，`release.release_tag_prefix`→`RELEASE_TAG_PREFIX`，`release.release_title_prefix`→`RELEASE_TITLE_PREFIX`；`EXPECTED_WHEEL_PATTERN` / `PIP_TOOLCHAIN_CACHE_KEY` 由 `version-lock.ts` 推导。**workflow env（非 lock）：** `ck_disable_bwd`→`CK_FMHA_DISABLE_BWD`（`1`/`0`）。
 
 **缩写对照：** 仓库 `flash-attn-ck-rocm-gfx120x-build`；Ninja cache 前缀 `fa2-ck-gfx120x-*-v6`；Release tag 前缀见 lock `release.release_tag_prefix`（当前 `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x`）；wheel artifact 见 lock `wheel_artifact_name`。HIP 编译目标仅 lock `compile.gpu_archs`（当前 `gfx1200;gfx1201`）。
 
@@ -61,10 +61,10 @@
 | `06.compile` | 任意 `--opt-dim` 编译入口（serial 全量 / parallel 单 dim） |
 | `07.shard` | 校验 compile 产物 .obj；写 `SHARD_RELEASE_DIR` 到 `GITHUB_ENV` |
 | `08.wheel` | parallel link staging 校验 + `FLASH_ATTENTION_FORCE_BUILD` + link 脚本 |
-| `09.verify` | CI CPU smoke test；wheel CK fwd dim 符号 + bwd-off 负向断言；读 `--build-caches` 写入 manifest `build_caches` 与 `dispatch`；manifest 含 `ck_disable_bwd` |
+| `09.verify` | CI CPU smoke test；wheel CK fwd dim 符号 + bwd-off 负向 / bwd-on 正向断言；读 `--build-caches` 写入 manifest `build_caches` 与 `dispatch`；manifest 顶层含 `fmha_bwd` |
 | `10.publish` | 准备 Release 元数据（输出 release-tag / release-title / body-path） |
 | `build/build-fa-steps.py` | `--step compile` / `--step wheel` / `--step merge-and-wheel` |
-| `test/gpu-smoke-test.py` | 部署前 GPU 校验（gfx120x 真机；CI 不跑） |
+| `test/gpu-smoke-test.py` | 部署前 GPU 校验（gfx120x 真机；CI 不跑；含 fmha_bwd 运行时探测） |
 
 规则：lock 文件只经 `01.config` 读一次并 `--export-github-env`；同 job 其余命令只经 `requireLockEnv` / `requireGithubActionsEnv` 消费 env，**禁止**命令内再调 `readVersionLock` 或 `??` 默认值兜底；`GPU_ARCHS` / `CK_OPT_DIM` / `CK_FMHA_DISABLE_BWD` **禁止**在 patch 内硬编码。ROCm 路径发现只经 `rocm-sdk-paths.ts`；编译/打 wheel 只经 `build-fa-steps.py`。
 
@@ -89,7 +89,7 @@
 
 | 读入逻辑 | 仅人类可读 |
 |----------|------------|
-| `flash_attention.build_commit`、`flash_attention.build_commit_date`、`flash_attention.repo`、`compile.ck_opt_dim`、`compile.ck_disable_bwd`、`compile.gpu_archs`、`wheel.wheel_artifact_name`、`toolchain.*`、`release.*`… | `flash_attention.min_commit` |
+| `flash_attention.build_commit`、`flash_attention.build_commit_date`、`flash_attention.repo`、`compile.ck_opt_dim`、`compile.gpu_archs`、`wheel.wheel_artifact_name`、`toolchain.*`、`release.*`… | `flash_attention.min_commit` |
 
 各 compile/link job 内 `03.prep` clone `flash_attention.build_commit` 并校验 author date 与 `flash_attention.build_commit_date` 一致；`SOURCE_DATE_EPOCH` 固定 wheel zip；PE TimeDateStamp 由 patch 注入 link `/Brepro`（内容哈希，serial/parallel 一致）。
 
@@ -106,7 +106,7 @@
 - **ninja cache save**：`use_cache=true` 时 build 非 skipped 即 save；**`use_cache=false` 时仅成功时 save**；`cache-exists` 时 save 前先 delete
 - **全模式 prebuilt obj 两向 stamp** / **link 排除 `fmha_*_api.obj`**：见 `build/build-fa-steps.py` 注释。
 - **patch 程序化**（`04.patch`）；`CK_OPT_DIM` / `GPU_ARCHS` / `CK_FMHA_DISABLE_BWD` 只从 env 取
-- **ComfyUI 推理 wheel 默认 `compile.ck_disable_bwd=true`**（fwd-only CK FMHA；调用 backward 运行时 `TORCH_CHECK`）
+- **ComfyUI 推理 wheel 默认 workflow `ck_disable_bwd=true`**（fwd-only CK FMHA；调用 backward 运行时 `TORCH_CHECK`）
 - **双 gfx12 架构**：`compile.gpu_archs` 为唯一源（当前 `gfx1200;gfx1201`）；经 `GPU_ARCHS` 传给 FA setup.py，无额外 patch。
 
 ## 编写规范

@@ -8,6 +8,7 @@ import {
   resolveNinjaMinorVersion,
 } from "../lib/build-tool-minor.js";
 import { getRocmSdkPaths } from "../lib/rocm-sdk-paths.js";
+import { requireGithubActionsEnv } from "../lib/require-env.js";
 import { versionLockFileHash8 } from "../lib/version-lock.js";
 
 function resolveMsvcToolset(): string {
@@ -125,9 +126,19 @@ export function runToolchainFingerprint(options?: {
       `VERSION.lock compile fingerprint (toolchain+flash_attention+compile): ${lockHash}`,
     );
 
+    const ckFmhaDisableBwd = requireGithubActionsEnv("CK_FMHA_DISABLE_BWD");
+    if (ckFmhaDisableBwd !== "1" && ckFmhaDisableBwd !== "0") {
+      throw new Error(
+        `CK_FMHA_DISABLE_BWD must be '1' or '0', got ${ckFmhaDisableBwd}`,
+      );
+    }
+    const disableBwd = ckFmhaDisableBwd === "1";
+    console.log(`CK_FMHA_DISABLE_BWD (cache key): ${disableBwd}`);
+
     const cacheKey = buildNinjaCacheKey({
       buildVariant,
       lockHash,
+      disableBwd,
       optDim: options.optDim?.trim(),
       msvcVersion,
       rocmClangVersion,

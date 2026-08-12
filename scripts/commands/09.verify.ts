@@ -82,6 +82,20 @@ with zipfile.ZipFile(wheel) as zf:
                         f'(ck_disable_bwd=1)'
                     )
         print('OK CK FMHA bwd markers absent (inference-only build)')
+    else:
+        bwd_dim_tokens = [f'_bwd_d{d}_'.encode('ascii') for d in opt_dims]
+        for name in pyds:
+            data = zf.read(name)
+            missing_bwd = [
+                tok for tok in bwd_dim_tokens if tok not in data
+            ]
+            if missing_bwd:
+                raise SystemExit(
+                    f'ERROR: {name} missing CK FMHA bwd opt_dim kernels {missing_bwd} '
+                    f'(ck_disable_bwd=0)'
+                )
+        dims_str = ','.join(str(d) for d in opt_dims)
+        print(f'OK CK FMHA bwd dim markers present dims={dims_str}')
 
     meta_paths = [name for name in names if name.endswith('.dist-info/METADATA')]
     if not meta_paths:
@@ -119,9 +133,11 @@ function matchesGlob(name: string, pattern: string): boolean {
 function readWorkflowDispatch(): {
   ninja_workers: number;
   use_cache: boolean;
+  ck_disable_bwd: boolean;
 } {
   const maxJobs = requireGithubActionsEnv("MAX_JOBS");
   const useCache = requireGithubActionsEnv("USE_CACHE");
+  const ckFmhaDisableBwd = requireGithubActionsEnv("CK_FMHA_DISABLE_BWD");
   const ninjaWorkers = Number(maxJobs);
   if (
     !Number.isFinite(ninjaWorkers) ||
@@ -135,9 +151,15 @@ function readWorkflowDispatch(): {
       `USE_CACHE must be 'true' or 'false', got ${useCache}`,
     );
   }
+  if (ckFmhaDisableBwd !== "1" && ckFmhaDisableBwd !== "0") {
+    throw new Error(
+      `CK_FMHA_DISABLE_BWD must be '1' or '0', got ${ckFmhaDisableBwd}`,
+    );
+  }
   return {
     ninja_workers: ninjaWorkers,
     use_cache: useCache === "true",
+    ck_disable_bwd: ckFmhaDisableBwd === "1",
   };
 }
 
@@ -148,7 +170,7 @@ export function runVerify(options: {
 }): void {
   const expectedWheelPattern = requireLockEnv("EXPECTED_WHEEL_PATTERN");
   const ckOptDim = requireLockEnv("CK_OPT_DIM");
-  const ckFmhaDisableBwd = requireLockEnv("CK_FMHA_DISABLE_BWD");
+  const ckFmhaDisableBwd = requireGithubActionsEnv("CK_FMHA_DISABLE_BWD");
   const flashAttentionBuildCommit = requireLockEnv("FLASH_ATTENTION_BUILD_COMMIT");
   const wheelLocalVersion = requireLockEnv("WHEEL_LOCAL_VERSION");
   const pytorchVersion = requireLockEnv("PYTORCH_VERSION");
@@ -230,7 +252,7 @@ export function runVerify(options: {
     rocm: rocmVersion,
     gpu_archs: gpuArchs,
     ck_opt_dim: ckOptDim,
-    ck_disable_bwd: ckFmhaDisableBwd === "1",
+    fmha_bwd: ckFmhaDisableBwd === "0",
     wheel_local_version: wheelLocalVersion,
     source_date_epoch: Number(sourceDateEpoch),
     build_variant: buildVariant,

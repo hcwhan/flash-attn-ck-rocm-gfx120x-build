@@ -25,7 +25,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx
 | `toolchain` | `python`, `pytorch`, `torch_device_extra`, `rocm_index`, `rocm` | pip toolchain pins |
 | `flash_attention` | `repo`, `build_commit`, `build_commit_date` | Exact FA source cloned each build (`build_commit` may be a 40-char SHA or tag such as `v2.7.4.post1`); **bump `build_commit` and `build_commit_date` when upgrading FA** |
 | `flash_attention` | `min_commit` | Minimum RDNA4 gfx12x commit ([PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)); **human-readable reference only** |
-| `compile` | `gpu_archs`, `ck_opt_dim`, `ck_disable_bwd` | HIP compile targets (**sole arch source**), CK FMHA `opt_dim` tiers, and whether bwd is omitted (`CK_FMHA_DISABLE_BWD`) |
+| `compile` | `gpu_archs`, `ck_opt_dim` | HIP compile targets (**sole arch source**), CK FMHA `opt_dim` tiers |
 | `wheel` | `wheel_local_version` | Wheel `+local` tag (env `WHEEL_LOCAL_VERSION`; mapped to upstream `FLASH_ATTN_LOCAL_VERSION` at wheel time) |
 | `wheel` | `wheel_artifact_name` | GitHub Actions artifact name |
 | `release` | `release_tag_prefix` | Release tag prefix (`{prefix}-{variant}-build{run_number}`) |
@@ -44,7 +44,7 @@ Prep clones **`flash_attention.build_commit`** (SHA or tag; `fetch origin <ref>`
 
 ## Build profile
 
-ComfyUI **inference-only** wheel (lock `compile.ck_disable_bwd=true`):
+ComfyUI **inference-only** wheel (workflow `ck_disable_bwd=true`, default):
 
 - CK kernels: **fwd + fwd_appendkv + fwd_splitkv** (no bwd when `CK_FMHA_DISABLE_BWD=1`)
 - **`-DFLASHATTENTION_DISABLE_BACKWARD`** (enabled when `CK_FMHA_DISABLE_BWD=1`)
@@ -75,6 +75,7 @@ ComfyUI **inference-only** wheel (lock `compile.ck_disable_bwd=true`):
 | `ninja_workers` | `4` | Ninja parallel workers (use `2` if OOM) |
 | `use_cache` | `true` | Set `false` to skip restore (still probes `exists`; `used=false`; save only after a successful compile) |
 | `publish_release` | `true` | Set `false` to skip GitHub Release upload |
+| `ck_disable_bwd` | `true` | Omit CK FMHA bwd codegen and enable `FLASHATTENTION_DISABLE_BACKWARD` (ComfyUI inference-only); set `false` for a full wheel including bwd |
 
 ### Serial (`build-fa2-ck-gfx120x-serial.yml`)
 
@@ -93,9 +94,10 @@ ComfyUI **inference-only** wheel (lock `compile.ck_disable_bwd=true`):
 > Except `plan-opt-dim`, workflows do not set `timeout-minutes`; “6 h (default)” is the GitHub hosted runner limit. CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
 
 - **Ninja cache** (`flash-attention/build/` incremental compile):
-  - Serial: `fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
-  - Parallel: `fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
-  - `lockHash8`: lock `toolchain`+`flash_attention`+`compile` → SHA256 prefix (8 hex chars; excludes `wheel`/`release`)
+  - Serial: `fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - Parallel: `fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - `lockHash8`: lock `toolchain`+`flash_attention`+`compile` → SHA256 prefix (8 hex chars; excludes `wheel`/`release`; excludes workflow `ck_disable_bwd`)
+  - `bwd`: workflow `ck_disable_bwd` (`true` = `CK_FMHA_DISABLE_BWD=1`, inference-only bwd omission)
   - `msvcVersion` / `rocmClangVersion`: full MSVC toolset version / parsed `clang --version` token (e.g. `14.42.34433`, `19.0.0git`); normalized via `cacheKeyToken` before entering the key
   - `ninja`: major.minor from `ninja --version`
   - **Exact match only** (no `restore-keys`); serial / parallel keys are **not shared**

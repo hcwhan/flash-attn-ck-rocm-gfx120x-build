@@ -2,6 +2,7 @@
 """部署前 GPU smoke test（gfx120x 真机；CI 不跑）。
 
 须已 pip install 本仓库 wheel；CPU/wheel 校验由 09.verify 负责。
+结束时输出 runtime `fmha_bwd`（是否支持 backward）。
 """
 from __future__ import annotations
 
@@ -37,9 +38,57 @@ def parse_gpu_archs(gpu_archs: str) -> list[str]:
     return parts
 
 
+def probe_fmha_bwd(
+    device: torch.device,
+    batch: int,
+    seqlen: int,
+    nheads: int,
+    headdim: int,
+) -> bool:
+    q = torch.randn(
+        batch,
+        seqlen,
+        nheads,
+        headdim,
+        device=device,
+        dtype=torch.float16,
+        requires_grad=True,
+    )
+    k = torch.randn(
+        batch,
+        seqlen,
+        nheads,
+        headdim,
+        device=device,
+        dtype=torch.float16,
+        requires_grad=True,
+    )
+    v = torch.randn(
+        batch,
+        seqlen,
+        nheads,
+        headdim,
+        device=device,
+        dtype=torch.float16,
+        requires_grad=True,
+    )
+    try:
+        out = flash_attn_func(q, k, v, causal=True)
+        out.sum().backward()
+        torch.cuda.synchronize()
+    except RuntimeError:
+        torch.cuda.synchronize()
+        return False
+
+    if q.grad is None or k.grad is None or v.grad is None:
+        return False
+    grads = (q.grad, k.grad, v.grad)
+    return all(torch.isfinite(grad).all() for grad in grads)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="已安装 flash_attn 包的 GPU 运行时 smoke（fwd + kvcache）",
+        description="已安装 flash_attn 包的 GPU 运行时 smoke（fwd + kvcache + fmha_bwd 探测）",
     )
     parser.add_argument(
         "-w",
@@ -133,6 +182,19 @@ def main() -> None:
             )
         torch.cuda.synchronize()
         print(f"GPU kvcache OK headdim={headdim} shape={tuple(out.shape)}")
+
+    probe_headdim = head_dims[0]
+    fmha_bwd = probe_fmha_bwd(device, batch, seqlen, nheads, probe_headdim)
+    if fmha_bwd:
+        print(
+            f"OK backward supported (fmha_bwd=True, probe headdim={probe_headdim})"
+        )
+    else:
+        print(
+            f"OK inference-only build (fmha_bwd=False, probe headdim={probe_headdim})"
+        )
+
+    print("GPU smoke test complete")
 
 
 if __name__ == "__main__":

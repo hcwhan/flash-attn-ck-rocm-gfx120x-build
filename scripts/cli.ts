@@ -49,7 +49,7 @@ program
 program
   .command("04.patch")
   .description(
-    "patch flash-attention：CK_FMHA_DISABLE_BWD=1 时跳过 bwd；始终注入 link /Brepro",
+    "patch flash-attention：workflow CK_FMHA_DISABLE_BWD=1 时跳过 bwd；始终注入 link /Brepro",
   )
   .requiredOption("--fa-src <path>")
   .action((opts) => {

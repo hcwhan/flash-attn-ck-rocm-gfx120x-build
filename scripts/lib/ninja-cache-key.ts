@@ -3,6 +3,7 @@ import { cacheKeyToken } from "./cache-key-token.js";
 export function buildNinjaCacheKey(options: {
   buildVariant: "serial" | "parallel";
   lockHash: string;
+  disableBwd: boolean;
   optDim?: string;
   msvcVersion: string;
   rocmClangVersion: string;
@@ -13,6 +14,7 @@ export function buildNinjaCacheKey(options: {
       ? "fa2-ck-gfx120x-serial-v6"
       : "fa2-ck-gfx120x-parallel-v6",
     `lock[${options.lockHash}]`,
+    `bwd[${options.disableBwd}]`,
   ];
 
   if (options.buildVariant === "parallel") {
