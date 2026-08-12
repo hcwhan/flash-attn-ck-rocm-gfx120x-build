@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""部署前 GPU smoke test（gfx120x 真机；CI 不跑）。"""
+"""部署前 GPU smoke test（gfx120x 真机；CI 不跑）。
+
+须已 pip install 本仓库 wheel；CPU/wheel 校验由 09.verify 负责。
+"""
 from __future__ import annotations
 
 import argparse
@@ -35,7 +38,9 @@ def parse_gpu_archs(gpu_archs: str) -> list[str]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="flash_attn wheel 的 GPU smoke test")
+    parser = argparse.ArgumentParser(
+        description="已安装 flash_attn 包的 GPU 运行时 smoke（fwd + kvcache）",
+    )
     parser.add_argument(
         "-w",
         "--workspace-root",

@@ -16,6 +16,7 @@ Toolchain versions are pinned in **`VERSION.lock.json`** and loaded via `npx tsx
 | PyTorch | `2.12.0+rocm7.14.0` |
 | flash-attention | `VERSION.lock.json` **`flash_attention.build_commit`** |
 | Runner | `windows-2022` (hosted) |
+| Node.js | >= 26 (CI bootstrap; locally use `npm run fa -- <cmd>`) |
 
 ### `VERSION.lock.json` sections
 
@@ -63,7 +64,7 @@ ComfyUI **inference-only** wheel (lock `compile.ck_disable_bwd=true`):
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
 | **Build FlashAttention CK serial (Windows gfx120x)** | Single-job full build + cache (`serial-v6`) | **Manual only** |
-| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM shard compile + link (`parallel-v6-d{dim}`) | **Manual only** |
+| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM shard compile + link (table shorthand `parallel-v6`; full key includes `-dim[{shard}]`) | **Manual only** |
 
 > Push to `main` does **not** auto-trigger builds.
 
@@ -79,21 +80,23 @@ ComfyUI **inference-only** wheel (lock `compile.ck_disable_bwd=true`):
 
 | Job | Role | Timeout |
 |-----|------|---------|
-| `compile-full-and-link-wheel` | clone+patch, toolchain, cache, `06.compile` + `08.wheel`, smoke test | 6 h |
+| `compile-full-and-link-wheel` | clone+patch, toolchain, cache, `06.compile` + `08.wheel`, CPU smoke test | 6 h (default) |
 
 ### Parallel (`build-fa2-ck-gfx120x-parallel.yml`)
 
 | Job | Role | Timeout |
 |-----|------|---------|
-| `plan-opt-dim` | export parallel OPT_DIM matrix | 15 min |
-| `compile-d32` … `d256` | clone+patch per job, one OPT_DIM shard each, upload `.obj` | 6 h each |
-| `link-wheel` | clone+patch, merge objs + link + wheel + CPU smoke test | 6 h |
+| `plan-opt-dim` | export parallel OPT_DIM matrix | 5 min |
+| `compile-d32` … `d256` | clone+patch per job, one OPT_DIM shard each, upload `.obj` | 6 h each (default) |
+| `link-wheel` | clone+patch, merge objs + link + wheel + CPU smoke test (**no** ninja cache) | 6 h (default) |
+
+> Except `plan-opt-dim`, workflows do not set `timeout-minutes`; “6 h (default)” is the GitHub hosted runner limit. CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
 
 - **Ninja cache** (`flash-attention/build/` incremental compile):
   - Serial: `fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - Parallel: `fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`: lock `toolchain`+`flash_attention`+`compile` → SHA256 prefix (8 hex chars; excludes `wheel`/`release`)
-  - `msvcVersion` / `rocmClangVersion`: full MSVC toolset version / parsed `clang --version` token (e.g. `14.42.34433`, `19.0.0git`)
+  - `msvcVersion` / `rocmClangVersion`: full MSVC toolset version / parsed `clang --version` token (e.g. `14.42.34433`, `19.0.0git`); normalized via `cacheKeyToken` before entering the key
   - `ninja`: major.minor from `ninja --version`
   - **Exact match only** (no `restore-keys`); serial / parallel keys are **not shared**
   - With `use_cache=true`, cache is saved whenever the build step is not skipped; with `use_cache=false`, restore is skipped (`used=false`) and cache is saved only after a successful compile. When a remote entry exists (`exists`), it is deleted before save refreshes it.
@@ -130,8 +133,8 @@ GitHub Release (uploaded automatically after a successful build; serial / parall
 
 | Workflow | Tag example | Release title example |
 |----------|-------------|----------------------|
-| serial | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123` | FlashAttention 2 CK gfx120x Windows (serial) 2026.08.10 19:00:00 |
-| parallel | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123` | FlashAttention 2 CK gfx120x Windows (parallel) 2026.08.10 19:00:00 |
+| serial | `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123` | FlashAttention 2 CK gfx120x Windows (serial) 2026.08.10 19:00:00 |
+| parallel | `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123` | FlashAttention 2 CK gfx120x Windows (parallel) 2026.08.10 19:00:00 |
 
 - `flash_attn-*.whl`
 - `flash_attn-*.whl.sha256`
@@ -139,11 +142,11 @@ GitHub Release (uploaded automatically after a successful build; serial / parall
 
 ```powershell
 gh release list
-gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123 -D .\dist
-gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123 -D .\dist
+gh release download flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123 -D .\dist
+gh release download flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123 -D .\dist
 ```
 
-Expected wheel name (derived from `wheel.wheel_local_version` + `toolchain.python`; PEP 440 normalizes `-` to `.` in the local tag):
+Expected wheel name (derived from `wheel.wheel_local_version` + `toolchain.python`; PEP 440 normalizes `-` and `_` to `.` in the local tag):
 
 ```text
 flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.whl
@@ -169,4 +172,4 @@ $PY = "<ComfyUI>\python_embeded\python.exe"
 
 Launch arg: `--use-flash-attention` (instead of `--use-pytorch-cross-attention`).
 
-See [AGENTS.md](AGENTS.md) for maintainer conventions.
+See [AGENTS.md](AGENTS.md) for maintainer conventions. License: [MIT](LICENSE).

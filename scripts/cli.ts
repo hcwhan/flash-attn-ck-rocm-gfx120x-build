@@ -17,7 +17,7 @@ program.name("fa-build").description("FlashAttention gfx120x 构建 CLI");
 
 program
   .command("01.config")
-  .description("读取 VERSION.lock.json")
+  .description("读取并校验 VERSION.lock.json；CI 须 --export-github-env")
   .requiredOption("-w, --workspace-root <path>")
   .option("--export-github-env", "将 lock 变量追加到 GITHUB_ENV")
   .action((opts) => {
@@ -29,14 +29,18 @@ program
 
 program
   .command("02.plan-opt-dim-matrix")
-  .description("导出 parallel compile 用的 OPT_DIM matrix 输出")
+  .description(
+    "导出 parallel OPT_DIM matrix 到 GITHUB_OUTPUT（opt-dims-json / primary-dim）",
+  )
   .action(() => {
     runPlanOptDimMatrix();
   });
 
 program
   .command("03.prep")
-  .description("按 pin 的 SHA 或 tag clone flash-attention 源码")
+  .description(
+    "clone flash_attention.build_commit（SHA/tag）；init 子模块；校验 build_commit_date",
+  )
   .requiredOption("--fa-src <path>")
   .action((opts) => {
     runPrep({ faSrc: opts.faSrc });
@@ -44,7 +48,9 @@ program
 
 program
   .command("04.patch")
-  .description("为推理专用 CK 构建 patch flash-attention")
+  .description(
+    "patch flash-attention：CK_FMHA_DISABLE_BWD=1 时跳过 bwd；始终注入 link /Brepro",
+  )
   .requiredOption("--fa-src <path>")
   .action((opts) => {
     runPatch({ faSrc: opts.faSrc });
@@ -52,7 +58,9 @@ program
 
 program
   .command("05.toolchain-fingerprint")
-  .description("输出 MSVC/clang 与 pip 工具链 cache 指纹")
+  .description(
+    "输出 MSVC/clang/ninja 指纹；--build-variant 时写入 Ninja cache-key",
+  )
   .option("-w, --workspace-root <path>", "仓库根目录（与 --build-variant 联用必填）")
   .option("--build-variant <mode>", "serial 或 parallel（输出 cache-key）")
   .option("--opt-dim <value>", "--build-variant parallel 时的 OPT_DIM shard")
@@ -90,11 +98,11 @@ program
 
 program
   .command("08.wheel")
-  .description("link 并打 wheel")
+  .description("link 并打 wheel（parallel 须同时传 --staging-root 与 --primary-dim）")
   .requiredOption("--fa-src <path>")
   .requiredOption("--dist-dir <path>")
-  .option("--staging-root <path>")
-  .option("--primary-dim <value>")
+  .option("--staging-root <path>", "parallel link：FA_STAGING 根目录")
+  .option("--primary-dim <value>", "parallel link：lock ck_opt_dim 首档（PRIMARY_DIM）")
   .action((opts) => {
     runWheel({
       faSrc: opts.faSrc,
@@ -106,12 +114,14 @@ program
 
 program
   .command("09.verify")
-  .description("CPU wheel smoke test")
+  .description(
+    "CPU wheel smoke test；写 .sha256 / wheel.manifest.json；校验 --build-caches",
+  )
   .requiredOption("--dist-dir <path>")
   .requiredOption("--build-variant <name>", "serial 或 parallel")
   .requiredOption(
     "--build-caches <path>",
-    "各 shard compile cache 元数据的 JSON 数组文件或目录",
+    "compile cache 元数据：JSON 数组文件（serial）或含 per-shard JSON 的目录（parallel）",
   )
   .action((opts) => {
     runVerify({

@@ -223,7 +223,7 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
   };
 
   console.log(
-    `VERSION.lock: python=${vars.PYTHON_VERSION} pytorch=${vars.PYTORCH_VERSION} gpu=${vars.GPU_ARCHS} ck_opt_dim=${vars.CK_OPT_DIM} ck_disable_bwd=${vars.CK_FMHA_DISABLE_BWD}`,
+    `VERSION.lock: python=${vars.PYTHON_VERSION} pytorch=${vars.PYTORCH_VERSION} GPU_ARCHS=${vars.GPU_ARCHS} ck_opt_dim=${vars.CK_OPT_DIM} CK_FMHA_DISABLE_BWD=${vars.CK_FMHA_DISABLE_BWD}`,
   );
 
   return vars;

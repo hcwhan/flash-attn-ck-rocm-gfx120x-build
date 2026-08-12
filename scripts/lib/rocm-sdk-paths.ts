@@ -7,7 +7,7 @@ import importlib.util, os, subprocess, sys
 
 spec = importlib.util.find_spec('_rocm_sdk_core')
 if spec is None:
-    raise SystemExit('ERROR: _rocm_sdk_core not found. Install torch[device-...] first.')
+    raise SystemExit('ERROR: _rocm_sdk_core not found. Install torch[device-...] and rocm[devel] (with rocm_sdk init) first.')
 core_root = os.path.dirname(spec.origin)
 
 proc = subprocess.run(

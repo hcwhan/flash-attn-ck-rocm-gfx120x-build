@@ -1,5 +1,5 @@
 name: FA ROCm toolchain
-description: flash-attn Windows 构建用的 Python、MSVC、PyTorch ROCm 与 rocm[devel]
+description: Python、MSVC、pip toolchain cache、rocm[devel]、rocm_sdk init、torch[device-*]
 
 inputs:
   python-version:
@@ -18,7 +18,7 @@ inputs:
     description: rocm[devel] 包版本（VERSION.lock.json toolchain.rocm）
     required: true
   pip-cache-key:
-    description: Pip 工具链 cache key（VERSION.lock.json → PIP_TOOLCHAIN_CACHE_KEY）
+    description: Pip 工具链 cache key（01.config 导出 PIP_TOOLCHAIN_CACHE_KEY）
     required: true
 
 runs:

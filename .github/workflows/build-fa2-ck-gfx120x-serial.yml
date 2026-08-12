@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       ninja_workers:
-        description: "每个 OPT_DIM 全量编译的 Ninja 并行 worker 数（OOM 时可改为 2）"
+        description: "单次全量 compile（lock CK_OPT_DIM）的 Ninja 并行 worker 数（OOM 时可改为 2）"
         required: false
         default: "4"
       use_cache:

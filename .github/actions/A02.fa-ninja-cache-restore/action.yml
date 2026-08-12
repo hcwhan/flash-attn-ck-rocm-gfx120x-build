@@ -15,19 +15,19 @@ inputs:
 
 outputs:
   cache-exists:
-    description: 远端存在 cache-primary-key 对应 cache 条目
+    description: 远端是否存在 inputs.cache-key 对应条目（lookup/restore 的 cache-hit）
     value: ${{ steps.fa-build-cache.outputs.cache-exists }}
   cache-used:
     description: 已将 cache 恢复到 build/（use-cache 且 cache-exists）
     value: ${{ steps.fa-build-cache.outputs.cache-used }}
   cache-primary-key:
-    description: 解析后的主 cache key
+    description: 写入/lookup 用的 cache key（use-cache=false 时等于 inputs.cache-key）
     value: ${{ steps.fa-build-cache.outputs.cache-primary-key }}
 
 runs:
   using: composite
   steps:
-    - name: Restore ninja incremental build cache
+    - name: Apply cached build directory
       if: inputs.use-cache == 'true'
       uses: actions/cache/restore@v6
       id: cache-restore

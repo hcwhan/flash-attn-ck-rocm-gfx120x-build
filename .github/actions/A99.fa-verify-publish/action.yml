@@ -1,5 +1,5 @@
 name: FA verify and publish
-description: CPU smoke test（09.verify）、上传 wheel artifact、可选 GitHub Release（10.publish + softprops）
+description: 09.verify（wheel 校验 + manifest）+ upload artifact；可选 10.publish / Release（workflow_dispatch.publish_release）
 
 inputs:
   build-variant:

@@ -2,8 +2,9 @@
 # Node.js
 node_modules/
 
-# Dist
+# Dist / CI metadata
 dist/
+cache-meta/
 
 # Python
 __pycache__/

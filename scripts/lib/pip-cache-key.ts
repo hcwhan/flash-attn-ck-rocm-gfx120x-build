@@ -1,8 +1,5 @@
 import { createHash } from "node:crypto";
-
-function cacheKeyToken(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, "-");
-}
+import { cacheKeyToken } from "./cache-key-token.js";
 
 function cacheKeySegment(label: string, value: string): string {
   return `${label}[${cacheKeyToken(value)}]`;

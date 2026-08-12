@@ -1,3 +1,4 @@
+/** MAX_JOBS：workflow ninja_workers → 编译 env；manifest 写入 dispatch.ninja_workers。 */
 const MAX_JOBS_MIN = 1;
 const MAX_JOBS_MAX = 32;
 

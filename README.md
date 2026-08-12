@@ -16,6 +16,7 @@
 | PyTorch | `2.12.0+rocm7.14.0` |
 | flash-attention | `VERSION.lock.json` **`flash_attention.build_commit`** |
 | Runner | `windows-2022`（GitHub 托管） |
+| Node.js | >= 26（CI bootstrap；本地可用 `npm run fa -- <cmd>`） |
 
 ### `VERSION.lock.json` 分组
 
@@ -63,7 +64,7 @@ ComfyUI **推理专用** wheel（lock `compile.ck_disable_bwd=true`）：
 | Workflow | 用途 | 触发 |
 |----------|------|------|
 | **Build FlashAttention CK serial (Windows gfx120x)** | 单 job 全量编译 + cache（`serial-v6`） | **仅手动** |
-| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM 分片 compile + link（`parallel-v6-d{dim}`） | **仅手动** |
+| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM 分片 compile + link（表格简称 `parallel-v6`；完整 key 含 `-dim[{shard}]`） | **仅手动** |
 
 > 推送到 `main` **不会**自动触发编译。
 
@@ -79,21 +80,23 @@ ComfyUI **推理专用** wheel（lock `compile.ck_disable_bwd=true`）：
 
 | Job | 作用 | 超时 |
 |-----|------|------|
-| `compile-full-and-link-wheel` | clone+patch、toolchain、cache、`06.compile` + `08.wheel`、smoke test | 6 h |
+| `compile-full-and-link-wheel` | clone+patch、toolchain、cache、`06.compile` + `08.wheel`、CPU smoke test | 6 h（默认） |
 
 ### 并行（`build-fa2-ck-gfx120x-parallel.yml`）
 
 | Job | 作用 | 超时 |
 |-----|------|------|
-| `plan-opt-dim` | 导出 parallel OPT_DIM matrix | 15 min |
-| `compile-d32` … `d256` | 各 job 内 clone+patch，编一个 OPT_DIM shard，上传 `.obj` | 各 6 h |
-| `link-wheel` | clone+patch、合并 obj + link + 打 wheel + CPU smoke test | 6 h |
+| `plan-opt-dim` | 导出 parallel OPT_DIM matrix | 5 min |
+| `compile-d32` … `d256` | 各 job 内 clone+patch，编一个 OPT_DIM shard，上传 `.obj` | 各 6 h（默认） |
+| `link-wheel` | clone+patch、合并 obj + link + 打 wheel + CPU smoke test（**无** ninja cache） | 6 h（默认） |
+
+> 除 `plan-opt-dim` 外 workflow 未显式设 `timeout-minutes`；「6 h（默认）」为 GitHub hosted runner 上限。CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
 
 - **Ninja cache**（`flash-attention/build/` 增量编译）：
   - 串行：`fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - 并行：`fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`：lock `toolchain`+`flash_attention`+`compile` → SHA256 前 8 位（不含 `wheel`/`release`）
-  - `msvcVersion` / `rocmClangVersion`：MSVC 工具集完整版本 / `clang --version` 解析完整版本（如 `14.42.34433`、`19.0.0git`）
+  - `msvcVersion` / `rocmClangVersion`：MSVC 工具集完整版本 / `clang --version` 解析完整版本（如 `14.42.34433`、`19.0.0git`）；写入 key 前经 `cacheKeyToken` 规范化
   - `ninja`：`ninja --version` 的 major.minor
   - **仅精确匹配**（无 `restore-keys`）；serial / parallel **互不共用**
   - `use_cache=true` 时 build 非 skipped 即 save；`use_cache=false` 时不 restore（`used=false`），仅 compile 成功时 save；远端已有条目（`exists`）时 save 前先 delete 再刷新
@@ -130,8 +133,8 @@ GitHub Release（构建成功后自动上传；serial / parallel 使用不同 ta
 
 | Workflow | Tag 示例 | Release 标题示例 |
 |----------|----------|------------------|
-| serial | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123` | FlashAttention 2 CK gfx120x Windows (serial) 2026.08.10 19:00:00 |
-| parallel | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123` | FlashAttention 2 CK gfx120x Windows (parallel) 2026.08.10 19:00:00 |
+| serial | `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123` | FlashAttention 2 CK gfx120x Windows (serial) 2026.08.10 19:00:00 |
+| parallel | `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123` | FlashAttention 2 CK gfx120x Windows (parallel) 2026.08.10 19:00:00 |
 
 - `flash_attn-*.whl`
 - `flash_attn-*.whl.sha256`
@@ -139,11 +142,11 @@ GitHub Release（构建成功后自动上传；serial / parallel 使用不同 ta
 
 ```powershell
 gh release list
-gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123 -D .\dist
-gh release download fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123 -D .\dist
+gh release download flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123 -D .\dist
+gh release download flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123 -D .\dist
 ```
 
-预期 wheel 文件名（由 `wheel.wheel_local_version` + `toolchain.python` 推导；PEP 440 将 local tag 中的 `-` 规范化为 `.`）：
+预期 wheel 文件名（由 `wheel.wheel_local_version` + `toolchain.python` 推导；PEP 440 将 local tag 中的 `-`、`_` 规范化为 `.`）：
 
 ```text
 flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.whl
@@ -169,4 +172,4 @@ $PY = "<ComfyUI>\python_embeded\python.exe"
 
 启动参数：`--use-flash-attention`（替代 `--use-pytorch-cross-attention`）。
 
-更多维护约定见 [AGENTS.md](AGENTS.md)。
+更多维护约定见 [AGENTS.md](AGENTS.md)。许可证：[MIT](LICENSE)。

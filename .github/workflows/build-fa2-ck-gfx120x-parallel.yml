@@ -94,7 +94,7 @@ jobs:
           use-cache: ${{ env.USE_CACHE }}
           run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ matrix.opt-dim }}" --fa-src $env:FA_SRC
 
-      - name: Validate shard and emit SHARD_RELEASE_DIR
+      - name: Validate compile shard outputs
         shell: pwsh
         run: npx tsx scripts/cli.ts 07.shard --fa-src $env:FA_SRC --opt-dim "${{ matrix.opt-dim }}"
 

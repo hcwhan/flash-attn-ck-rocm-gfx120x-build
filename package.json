@@ -1,6 +1,7 @@
 {
   "name": "flash-attn-ck-rocm-gfx120x-build",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=26"

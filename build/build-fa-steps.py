@@ -1,4 +1,7 @@
-"""同进程 setuptools 构建 flash-attn（compile / wheel / merge-and-wheel）。"""
+"""同进程 setuptools 构建 flash-attn（compile / wheel / merge-and-wheel）。
+
+由 TS CLI（06.compile / 08.wheel）调用；直接运行须自行设置 OPT_DIM、GPU_ARCHS、ROCM_* 等 env。
+"""
 from __future__ import annotations
 
 import argparse
@@ -16,7 +19,7 @@ DIM_PATTERN = re.compile(r"_d(\d+)_")
 # 生成的 API dispatch 对象（Windows HIP：fmha_fwd_api.obj 等）按 shard 分片：
 # 每个 shard 仅渲染自身 OPT_DIM 的 hdim 分支。若合并 primary shard 的副本会
 # 静默丢失其他 dim 的 dispatch，因此 link job 必须基于重新生成的全 dim 源码重编。
-# （csrc/flash_attn_ck/flash_api.obj 与 dim 无关，仍需合并。）
+# （csrc/flash_attn_ck/ 下 dim 无关 shared obj，如 flash_api.obj 等，仍需从 primary 合并。）
 REQUIRED_API_OBJS = frozenset(
     {
         "fmha_fwd_api.obj",
@@ -426,8 +429,8 @@ def main() -> None:
         "--step",
         choices=["compile", "merge-and-wheel", "wheel"],
         required=True,
-        help="compile：仅 build_ext；wheel：stamp + bdist_wheel；"
-        "merge-and-wheel：合并预构建 obj + bdist_wheel",
+        help="compile：build_ext + stamp 预构建 obj；wheel：stamp + bdist_wheel；"
+        "merge-and-wheel：merge obj + stamp + bdist_wheel（须 FLASH_ATTENTION_FORCE_BUILD=TRUE）",
     )
     parser.add_argument("--fa-src", type=Path, required=True)
     parser.add_argument("--dist-dir", type=Path)

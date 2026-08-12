@@ -73,5 +73,5 @@ export function runShard(options: {
   );
 
   appendGithubEnv({ SHARD_RELEASE_DIR: releaseDir });
-  console.log(`Uploading object files from ${releaseDir}`);
+  console.log(`SHARD_RELEASE_DIR=${releaseDir} (upload via workflow upload-artifact)`);
 }

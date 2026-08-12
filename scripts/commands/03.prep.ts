@@ -94,7 +94,7 @@ export function runPrep(options: { faSrc: string }): void {
       [
         `flash_attention.build_commit_date mismatch for ref ${flashAttentionBuildCommit} (${resolvedCommit}).`,
         ` lock=${flashAttentionBuildCommitDate} git author=${gitAuthorDate}`,
-        " Update VERSION.lock.json when bumping flash_attention.build_commit.",
+        " Update VERSION.lock.json flash_attention.build_commit and build_commit_date when bumping FA.",
       ].join(""),
     );
   }
