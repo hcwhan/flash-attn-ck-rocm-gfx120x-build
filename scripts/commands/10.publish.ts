@@ -59,7 +59,7 @@ export function runPublish(options: {
   const whlName = path.basename(whls[0]!);
   const releaseTag = `${releaseTagPrefix}-${variantSlug}-build${runNumber}`;
   const releaseTimestamp = formatReleaseTitleTimestamp(new Date());
-  const releaseTitle = `${releaseTitlePrefix} ${releaseTimestamp}`;
+  const releaseTitle = `${releaseTitlePrefix} (${options.buildVariant}) ${releaseTimestamp}`;
   const bodyPath = path.join(runnerTemp, "release-body.md");
 
   const manifestPath = path.join(distDir, "wheel.manifest.json");

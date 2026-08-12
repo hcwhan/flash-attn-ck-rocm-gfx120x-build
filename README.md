@@ -28,7 +28,7 @@
 | `wheel` | `wheel_local_version` | wheel 的 `+local` 标签（env `WHEEL_LOCAL_VERSION`；wheel 时映射 upstream `FLASH_ATTN_LOCAL_VERSION`） |
 | `wheel` | `wheel_artifact_name` | GitHub Actions artifact 名称 |
 | `release` | `release_tag_prefix` | Release tag 前缀（`{prefix}-{variant}-build{run_number}`） |
-| `release` | `release_title_prefix` | Release 标题前缀（env `RELEASE_TITLE_PREFIX`；GitHub Release name = `{prefix} YYYY.MM.DD HH:mm:ss`，Asia/Shanghai） |
+| `release` | `release_title_prefix` | Release 标题前缀（env `RELEASE_TITLE_PREFIX`；GitHub Release name = `{prefix} (serial\|parallel) YYYY.MM.DD HH:mm:ss`，Asia/Shanghai） |
 
 `EXPECTED_WHEEL_PATTERN` 由 `wheel.wheel_local_version` + `toolchain.python` 在 `version-lock.ts` 推导，不在 lock 中存储。
 
@@ -118,12 +118,12 @@ Artifact：**`wheel_artifact_name`**（Actions 短期下载）
 
 同一 `VERSION.lock.json` 下，**serial / parallel 应产出 byte-identical wheel**（SHA256 一致）；`/Brepro` 固定 PE TimeDateStamp，`SOURCE_DATE_EPOCH` 固定 wheel zip。
 
-GitHub Release（构建成功后自动上传；serial / parallel 使用不同 tag；标题格式 `{prefix} YYYY.MM.DD HH:mm:ss`，Asia/Shanghai）：
+GitHub Release（构建成功后自动上传；serial / parallel 使用不同 tag；标题格式 `{prefix} (serial|parallel) YYYY.MM.DD HH:mm:ss`，Asia/Shanghai）：
 
 | Workflow | Tag 示例 | Release 标题示例 |
 |----------|----------|------------------|
-| serial | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123` | FlashAttention 2 CK gfx120x Windows 2026.08.10 19:00:00 |
-| parallel | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123` | FlashAttention 2 CK gfx120x Windows 2026.08.10 19:00:00 |
+| serial | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123` | FlashAttention 2 CK gfx120x Windows (serial) 2026.08.10 19:00:00 |
+| parallel | `fa2-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123` | FlashAttention 2 CK gfx120x Windows (parallel) 2026.08.10 19:00:00 |
 
 - `flash_attn-*.whl`
 - `flash_attn-*.whl.sha256`
