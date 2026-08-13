@@ -163,7 +163,7 @@ flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.w
 | Parallel link API dispatch recompile checks | `build/build-fa-steps.py` (merge skip + pre/post ninja asserts) |
 | Pre-deploy GPU smoke test (gfx120x hardware) | `python test/gpu-smoke-test.py -w .` |
 
-Smoke test: wheel filename/structure (.pyd size, OPT_DIM kernel symbols, METADATA) → pip install → import flash_attn_2_cuda; parallel link additionally asserts the three `fmha_*_api.obj` dispatch objects are skipped during merge and recompiled by ninja. GPU fwd + kvcache see `test/gpu-smoke-test.py` (run manually on gfx1200/gfx1201 hardware before deploy).
+Smoke test: wheel filename/structure (.pyd size, METADATA) → pip install → import flash_attn_2_cuda; parallel link additionally asserts the API dispatch objects (3 fwd, plus `fmha_bwd_api.obj` when `CK_FMHA_DISABLE_BWD=0`) are skipped during merge and recompiled by ninja. GPU fwd + kvcache + backward probe see `test/gpu-smoke-test.py` (run manually on gfx1200/gfx1201 hardware before deploy).
 
 ## ComfyUI install
 

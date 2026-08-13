@@ -61,7 +61,7 @@
 | `06.compile` | 任意 `--opt-dim` 编译入口（serial 全量 / parallel 单 dim） |
 | `07.shard` | 校验 compile 产物 .obj；写 `SHARD_RELEASE_DIR` 到 `GITHUB_ENV` |
 | `08.wheel` | parallel link staging 校验 + `FLASH_ATTENTION_FORCE_BUILD` + link 脚本 |
-| `09.verify` | CI CPU smoke test；wheel CK fwd dim 符号 + bwd-off 负向 / bwd-on 正向断言；读 `--build-caches` 写入 manifest `build_caches` 与 `dispatch`；manifest 顶层含 `fmha_bwd` |
+| `09.verify` | CI CPU smoke test；wheel 文件名/结构（.pyd 体积 + METADATA）与 torch 运行时校验；读 `--build-caches` 写入 manifest `build_caches` 与 `dispatch`；manifest 顶层含 `fmha_bwd` |
 | `10.publish` | 准备 Release 元数据（输出 release-tag / release-title / body-path） |
 | `build/build-fa-steps.py` | `--step compile` / `--step wheel` / `--step merge-and-wheel` |
 | `test/gpu-smoke-test.py` | 部署前 GPU 校验（gfx120x 真机；CI 不跑；含 fmha_bwd 运行时探测） |

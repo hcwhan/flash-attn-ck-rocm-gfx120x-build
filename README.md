@@ -163,7 +163,7 @@ flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.w
 | parallel link API dispatch 重编校验 | `build/build-fa-steps.py`（merge skip + ninja 前后断言） |
 | 部署前 GPU smoke test（gfx120x 真机） | `python test/gpu-smoke-test.py -w .` |
 
-Smoke test：wheel 文件名/结构（.pyd 体积、OPT_DIM kernel 符号、METADATA）→ pip 安装 → import flash_attn_2_cuda；parallel link 另在 merge 阶段断言 3 个 `fmha_*_api.obj` 被 skip 并由 ninja 重编。GPU fwd + kvcache 见 `test/gpu-smoke-test.py`（部署前在 gfx1200/gfx1201 真机手动跑）。
+Smoke test：wheel 文件名/结构（.pyd 体积、METADATA）→ pip 安装 → import flash_attn_2_cuda；parallel link 另在 merge 阶段断言 API dispatch 对象（fwd 3 个，`CK_FMHA_DISABLE_BWD=0` 时再加 `fmha_bwd_api.obj`）被 skip 并由 ninja 重编。GPU fwd + kvcache + backward 探测见 `test/gpu-smoke-test.py`（部署前在 gfx1200/gfx1201 真机手动跑）。
 
 ## 安装到 ComfyUI
 

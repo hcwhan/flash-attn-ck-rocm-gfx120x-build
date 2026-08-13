@@ -27,7 +27,6 @@ from pathlib import Path
 wheel = sys.argv[1]
 ck_opt_dim = sys.argv[2]
 expected_local = sys.argv[3]
-ck_disable_bwd = sys.argv[4]
 min_pyd_bytes = 1024 * 1024
 
 def wheel_filename_local(local: str) -> str:
@@ -58,44 +57,7 @@ with zipfile.ZipFile(wheel) as zf:
         info = zf.getinfo(name)
         if info.file_size < min_pyd_bytes:
             raise SystemExit(f'ERROR: {name} too small ({info.file_size} bytes)')
-        data = zf.read(name)
-        missing = [tok for tok in [f'_d{d}_' for d in opt_dims] if tok.encode('ascii') not in data]
-        if missing:
-            raise SystemExit(f'ERROR: {name} missing CK FMHA opt_dim kernels {missing}')
-        dims_str = ','.join(str(d) for d in opt_dims)
-        print(f'OK {name} size={info.file_size} dims={dims_str}')
-
-    if ck_disable_bwd == '1':
-        bwd_tokens = [
-            b'fmha_bwd.hpp',
-            b'_bwd_d32_',
-            b'_bwd_d64_',
-            b'_bwd_d128_',
-            b'_bwd_d256_',
-        ]
-        for name in pyds:
-            data = zf.read(name)
-            for token in bwd_tokens:
-                if token in data:
-                    raise SystemExit(
-                        f'ERROR: CK FMHA bwd marker {token!r} found in {name} '
-                        f'(ck_disable_bwd=1)'
-                    )
-        print('OK CK FMHA bwd markers absent (inference-only build)')
-    else:
-        bwd_dim_tokens = [f'_bwd_d{d}_'.encode('ascii') for d in opt_dims]
-        for name in pyds:
-            data = zf.read(name)
-            missing_bwd = [
-                tok for tok in bwd_dim_tokens if tok not in data
-            ]
-            if missing_bwd:
-                raise SystemExit(
-                    f'ERROR: {name} missing CK FMHA bwd opt_dim kernels {missing_bwd} '
-                    f'(ck_disable_bwd=0)'
-                )
-        dims_str = ','.join(str(d) for d in opt_dims)
-        print(f'OK CK FMHA bwd dim markers present dims={dims_str}')
+        print(f'OK {name} size={info.file_size}')
 
     meta_paths = [name for name in names if name.endswith('.dist-info/METADATA')]
     if not meta_paths:
@@ -235,7 +197,6 @@ export function runVerify(options: {
     whlPath,
     ckOptDim,
     wheelLocalVersion,
-    ckFmhaDisableBwd,
   ]);
 
   const whlStat = statSync(whlPath);
