@@ -9,7 +9,7 @@
 | **serial** | `compile-full-and-link-wheel`（clone+patch → 全量 build_ext → 原地 `bdist_wheel`）→ smoke test |
 | **parallel** | `plan-opt-dim` → compile-d32\|d64\|d128\|d256（各 job 内 clone+patch）→ link-wheel → smoke test |
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Ninja cache：串行 `fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`；并行 `fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[…]-rocmClang[…]-ninja[…]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = workflow `ck_disable_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；精确 key，无 `restore-keys`；serial/parallel 互不共用）。Pip：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Ninja cache：串行 `fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`；并行 `fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[…]-rocmClang[…]-ninja[…]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = `fmha_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；精确 key，无 `restore-keys`；serial/parallel 互不共用）。Pip：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
 
 ## 命名约定
 

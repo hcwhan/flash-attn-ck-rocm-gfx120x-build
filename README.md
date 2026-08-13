@@ -97,7 +97,7 @@ ComfyUI **推理专用** wheel（workflow `ck_disable_bwd=true`，默认）：
   - 串行：`fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - 并行：`fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`：lock `toolchain`+`flash_attention`+`compile` → SHA256 前 8 位（不含 `wheel`/`release`；不含 workflow `ck_disable_bwd`）
-  - `bwd`：workflow `ck_disable_bwd`（`true` = `CK_FMHA_DISABLE_BWD=1`，推理专用省略 bwd）
+  - `bwd`：`fmha_bwd`（`true` = 编译 bwd 内核；`false` = 推理专用省略 bwd）
   - `msvcVersion` / `rocmClangVersion`：MSVC 工具集完整版本 / `clang --version` 解析完整版本（如 `14.42.34433`、`19.0.0git`）；写入 key 前经 `cacheKeyToken` 规范化
   - `ninja`：`ninja --version` 的 major.minor
   - **仅精确匹配**（无 `restore-keys`）；serial / parallel **互不共用**

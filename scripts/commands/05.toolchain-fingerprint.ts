@@ -132,13 +132,13 @@ export function runToolchainFingerprint(options?: {
         `CK_FMHA_DISABLE_BWD must be '1' or '0', got ${ckFmhaDisableBwd}`,
       );
     }
-    const disableBwd = ckFmhaDisableBwd === "1";
-    console.log(`CK_FMHA_DISABLE_BWD (cache key): ${disableBwd}`);
+    const fmhaBwd = ckFmhaDisableBwd === "0";
+    console.log(`fmha_bwd (cache key): ${fmhaBwd}`);
 
     const cacheKey = buildNinjaCacheKey({
       buildVariant,
       lockHash,
-      disableBwd,
+      fmhaBwd,
       optDim: options.optDim?.trim(),
       msvcVersion,
       rocmClangVersion,

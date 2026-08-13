@@ -97,7 +97,7 @@ ComfyUI **inference-only** wheel (workflow `ck_disable_bwd=true`, default):
   - Serial: `fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - Parallel: `fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`: lock `toolchain`+`flash_attention`+`compile` → SHA256 prefix (8 hex chars; excludes `wheel`/`release`; excludes workflow `ck_disable_bwd`)
-  - `bwd`: workflow `ck_disable_bwd` (`true` = `CK_FMHA_DISABLE_BWD=1`, inference-only bwd omission)
+  - `bwd`: `fmha_bwd` (`true` = bwd kernels compiled; `false` = inference-only bwd omission)
   - `msvcVersion` / `rocmClangVersion`: full MSVC toolset version / parsed `clang --version` token (e.g. `14.42.34433`, `19.0.0git`); normalized via `cacheKeyToken` before entering the key
   - `ninja`: major.minor from `ninja --version`
   - **Exact match only** (no `restore-keys`); serial / parallel keys are **not shared**
