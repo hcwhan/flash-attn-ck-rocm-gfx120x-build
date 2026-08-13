@@ -1,14 +1,13 @@
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
+import { requireGithubActionsEnv } from "./require-env.js";
+import {
+  parseCkFmhaDisableBwd,
+  requiredApiObjs,
+} from "./required-api-objs.js";
 
 const DIM_PATTERN = /_d(\d+)_/;
 const API_OBJ_PATTERN = /^fmha_.*_api\.obj$/;
-
-const REQUIRED_API_OBJS = new Set([
-  "fmha_fwd_api.obj",
-  "fmha_fwd_appendkv_api.obj",
-  "fmha_fwd_splitkv_api.obj",
-]);
 
 function isApiDispatchObj(name: string): boolean {
   return API_OBJ_PATTERN.test(name);
@@ -140,12 +139,15 @@ export function validateStaging(options: {
     );
   }
 
+  const requiredApi = requiredApiObjs(
+    parseCkFmhaDisableBwd(requireGithubActionsEnv("CK_FMHA_DISABLE_BWD")),
+  );
   const apiInPrimary = new Set(
     primaryObjs
       .map((objPath) => path.basename(objPath))
       .filter(isApiDispatchObj),
   );
-  const missingApi = [...REQUIRED_API_OBJS].filter(
+  const missingApi = [...requiredApi].filter(
     (name) => !apiInPrimary.has(name),
   );
   if (missingApi.length > 0) {
@@ -154,7 +156,7 @@ export function validateStaging(options: {
     );
   }
   const extraApi = [...apiInPrimary].filter(
-    (name) => !REQUIRED_API_OBJS.has(name),
+    (name) => !requiredApi.has(name),
   );
   if (extraApi.length > 0) {
     throw new Error(

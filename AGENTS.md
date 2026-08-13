@@ -118,7 +118,7 @@
 
 **不要添加：** 双源校验、manifest 读回自证、`FA_SKIP_*`、多候选目录排序、git 考古、薄 one-liner 包装、排障用 build-log artifact、lock 只读字段进逻辑、**命令内二次 `readVersionLock`**、**`GITHUB_ENV` 存在却不 export**、**缺 env 时用 `??` 或本地再读 lock 顶上**。
 
-**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 3 个 `fmha_*_api.obj`；link merge skip + ninja API 重编三重校验；patch before-state；smoke 产物校验；cache 精确 key（`fa2-ck-gfx120x-serial-v6-…` / `fa2-ck-gfx120x-parallel-v6-…` + `msvc`/`rocmClang` 完整版本 + `ninja` major.minor）。
+**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 fwd 3 个 `fmha_*_api.obj`（`CK_FMHA_DISABLE_BWD=0` 时再加 `fmha_bwd_api.obj`）；link merge skip + ninja API 重编三重校验；patch before-state；smoke 产物校验；cache 精确 key（`fa2-ck-gfx120x-serial-v6-…` / `fa2-ck-gfx120x-parallel-v6-…` + `msvc`/`rocmClang` 完整版本 + `ninja` major.minor）。
 
 ## 维护
 

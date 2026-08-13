@@ -20,14 +20,26 @@ DIM_PATTERN = re.compile(r"_d(\d+)_")
 # 每个 shard 仅渲染自身 OPT_DIM 的 hdim 分支。若合并 primary shard 的副本会
 # 静默丢失其他 dim 的 dispatch，因此 link job 必须基于重新生成的全 dim 源码重编。
 # （csrc/flash_attn_ck/ 下 dim 无关 shared obj，如 flash_api.obj 等，仍需从 primary 合并。）
-REQUIRED_API_OBJS = frozenset(
+_FWD_API_OBJS = frozenset(
     {
         "fmha_fwd_api.obj",
         "fmha_fwd_appendkv_api.obj",
         "fmha_fwd_splitkv_api.obj",
     }
 )
+_BWD_API_OBJ = "fmha_bwd_api.obj"
 API_OBJ_PATTERN = re.compile(r"^fmha_.*_api\.obj$")
+
+
+def required_api_objs() -> frozenset[str]:
+    value = os.environ.get("CK_FMHA_DISABLE_BWD", "").strip()
+    if value == "1":
+        return _FWD_API_OBJS
+    if value == "0":
+        return _FWD_API_OBJS | frozenset({_BWD_API_OBJ})
+    raise SystemExit(
+        f"CK_FMHA_DISABLE_BWD must be '1' or '0', got {value!r}"
+    )
 
 
 def is_api_dispatch_obj(name: str) -> bool:
@@ -229,10 +241,11 @@ def merge_prebuilt_objects(
             continue
         copy_obj(obj, obj.relative_to(primary_dir))
 
-    if {p.name for p in skipped_api} != REQUIRED_API_OBJS:
+    expected_api = required_api_objs()
+    if {p.name for p in skipped_api} != expected_api:
         raise SystemExit(
             "Primary shard API dispatch skip set mismatch: "
-            f"expected {sorted(REQUIRED_API_OBJS)}, "
+            f"expected {sorted(expected_api)}, "
             f"skipped {sorted(p.name for p in skipped_api)}"
         )
 
@@ -269,6 +282,7 @@ def verify_api_objs_absent(build_dir: Path) -> None:
 
 
 def precheck_link_ninja_will_build_api_objs(build_dir: Path) -> None:
+    expected_api = required_api_objs()
     result = subprocess.run(
         ["ninja", "-n"], cwd=build_dir, capture_output=True, text=True
     )
@@ -279,10 +293,11 @@ def precheck_link_ninja_will_build_api_objs(build_dir: Path) -> None:
     out = result.stdout
     if "no work to do" in out.lower():
         raise SystemExit(
-            "ninja -n reported 'no work to do' on parallel link, but the 3 API "
-            "dispatch objs must be compiled from full OPT_DIM sources"
+            "ninja -n reported 'no work to do' on parallel link, but API "
+            f"dispatch objs {sorted(expected_api)} must be compiled from full "
+            "OPT_DIM sources"
         )
-    missing = [name for name in REQUIRED_API_OBJS if name not in out]
+    missing = [name for name in expected_api if name not in out]
     if missing:
         tail = out[-800:] if len(out) > 800 else out
         raise SystemExit(
@@ -292,7 +307,7 @@ def precheck_link_ninja_will_build_api_objs(build_dir: Path) -> None:
 
 
 def verify_api_objs_recompiled(build_dir: Path, stamp: int) -> None:
-    for name in sorted(REQUIRED_API_OBJS):
+    for name in sorted(required_api_objs()):
         matches = [p for p in build_dir.rglob(name) if p.name == name]
         if len(matches) != 1:
             raise SystemExit(
