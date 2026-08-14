@@ -91,7 +91,7 @@ ComfyUI **推理专用** wheel（workflow `ck_disable_bwd=true`，默认）：
 | `compile-d32` … `d256` | 各 job 内 clone+patch，编一个 OPT_DIM shard，上传 `.obj` | 各 6 h（默认） |
 | `link-wheel` | clone+patch、合并 obj + link + 打 wheel + CPU smoke test（**无** ninja cache） | 6 h（默认） |
 
-> 除 `plan-opt-dim` 外 workflow 未显式设 `timeout-minutes`；「6 h（默认）」为 GitHub hosted runner 上限。CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
+> CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
 
 - **Ninja cache**（`flash-attention/build/` 增量编译）：
   - 串行：`fa2-ck-gfx120x-serial-v7-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`

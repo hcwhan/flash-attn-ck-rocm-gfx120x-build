@@ -91,7 +91,7 @@ ComfyUI **inference-only** wheel (workflow `ck_disable_bwd=true`, default):
 | `compile-d32` … `d256` | clone+patch per job, one OPT_DIM shard each, upload `.obj` | 6 h each (default) |
 | `link-wheel` | clone+patch, merge objs + link + wheel + CPU smoke test (**no** ninja cache) | 6 h (default) |
 
-> Except `plan-opt-dim`, workflows do not set `timeout-minutes`; “6 h (default)” is the GitHub hosted runner limit. CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
+> CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
 
 - **Ninja cache** (`flash-attention/build/` incremental compile):
   - Serial: `fa2-ck-gfx120x-serial-v7-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
