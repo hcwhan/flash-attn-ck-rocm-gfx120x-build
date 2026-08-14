@@ -9,7 +9,7 @@
 | **serial** | `compile-full-and-link-wheel`（clone+patch → 全量 build_ext → 原地 `bdist_wheel`）→ smoke test |
 | **parallel** | `plan-opt-dim` → compile-d32\|d64\|d128\|d256（各 job 内 clone+patch）→ link-wheel → smoke test |
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Ninja cache：串行 `fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`；并行 `fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[…]-rocmClang[…]-ninja[…]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = `fmha_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；精确 key，无 `restore-keys`；serial/parallel 互不共用）。Pip：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Ninja cache：串行 `fa2-ck-gfx120x-serial-v7-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`；并行 `fa2-ck-gfx120x-parallel-v7-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[…]-rocmClang[…]-ninja[…]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = `fmha_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；精确 key，无 `restore-keys`；serial/parallel 互不共用）。Pip：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
 
 ## 命名约定
 
@@ -37,7 +37,7 @@
 
 **lock → GITHUB_ENV 映射：** `toolchain.python`→`PYTHON_VERSION`，`toolchain.pytorch`→`PYTORCH_VERSION`，`toolchain.torch_device_extra`→`TORCH_DEVICE_EXTRA`，`toolchain.rocm`→`ROCM_VERSION`，`toolchain.rocm_index`→`ROCM_INDEX`，`compile.ck_opt_dim`→`CK_OPT_DIM`（首档另导出 `PRIMARY_DIM`），`compile.gpu_archs`→`GPU_ARCHS`，`flash_attention.repo`→`FLASH_ATTENTION_REPO`，`flash_attention.build_commit`→`FLASH_ATTENTION_BUILD_COMMIT`，`flash_attention.build_commit_date`→`FLASH_ATTENTION_BUILD_COMMIT_DATE`（另导出 `SOURCE_DATE_EPOCH`），`wheel.wheel_local_version`→`WHEEL_LOCAL_VERSION`，`wheel.wheel_artifact_name`→`WHEEL_ARTIFACT_NAME`，`release.release_tag_prefix`→`RELEASE_TAG_PREFIX`，`release.release_title_prefix`→`RELEASE_TITLE_PREFIX`；`EXPECTED_WHEEL_PATTERN` / `PIP_TOOLCHAIN_CACHE_KEY` 由 `version-lock.ts` 推导。**workflow env（非 lock）：** `ck_disable_bwd`→`CK_FMHA_DISABLE_BWD`（`1`/`0`）。
 
-**缩写对照：** 仓库 `flash-attn-ck-rocm-gfx120x-build`；Ninja cache 前缀 `fa2-ck-gfx120x-*-v6`；Release tag 前缀见 lock `release.release_tag_prefix`（当前 `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x`）；wheel artifact 见 lock `wheel_artifact_name`。HIP 编译目标仅 lock `compile.gpu_archs`（当前 `gfx1200;gfx1201`）。
+**缩写对照：** 仓库 `flash-attn-ck-rocm-gfx120x-build`；Ninja cache 前缀 `fa2-ck-gfx120x-*-v7`；Release tag 前缀见 lock `release.release_tag_prefix`（当前 `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x`）；wheel artifact 见 lock `wheel_artifact_name`。HIP 编译目标仅 lock `compile.gpu_archs`（当前 `gfx1200;gfx1201`）。
 
 ## 复用入口
 
@@ -118,7 +118,7 @@
 
 **不要添加：** 双源校验、manifest 读回自证、`FA_SKIP_*`、多候选目录排序、git 考古、薄 one-liner 包装、排障用 build-log artifact、lock 只读字段进逻辑、**命令内二次 `readVersionLock`**、**`GITHUB_ENV` 存在却不 export**、**缺 env 时用 `??` 或本地再读 lock 顶上**。
 
-**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 fwd 3 个 `fmha_*_api.obj`（`CK_FMHA_DISABLE_BWD=0` 时再加 `fmha_bwd_api.obj`）；link merge skip + ninja API 重编三重校验；patch before-state；smoke 产物校验；cache 精确 key（`fa2-ck-gfx120x-serial-v6-…` / `fa2-ck-gfx120x-parallel-v6-…` + `msvc`/`rocmClang` 完整版本 + `ninja` major.minor）。
+**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 fwd 3 个 `fmha_*_api.obj`（`CK_FMHA_DISABLE_BWD=0` 时再加 `fmha_bwd_api.obj`）；link merge skip + ninja API 重编三重校验；patch before-state；smoke 产物校验；cache 精确 key（`fa2-ck-gfx120x-serial-v7-…` / `fa2-ck-gfx120x-parallel-v7-…` + `msvc`/`rocmClang` 完整版本 + `ninja` major.minor）。
 
 ## 维护
 

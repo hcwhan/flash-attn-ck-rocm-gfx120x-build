@@ -11,8 +11,8 @@ export function buildNinjaCacheKey(options: {
 }): string {
   const segments = [
     options.buildVariant === "serial"
-      ? "fa2-ck-gfx120x-serial-v6"
-      : "fa2-ck-gfx120x-parallel-v6",
+      ? "fa2-ck-gfx120x-serial-v7"
+      : "fa2-ck-gfx120x-parallel-v7",
     `lock[${options.lockHash}]`,
     `bwd[${options.fmhaBwd}]`,
   ];

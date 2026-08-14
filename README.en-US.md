@@ -63,8 +63,8 @@ ComfyUI **inference-only** wheel (workflow `ck_disable_bwd=true`, default):
 
 | Workflow | Purpose | Trigger |
 |----------|---------|---------|
-| **Build FlashAttention CK serial (Windows gfx120x)** | Single-job full build + cache (`serial-v6`) | **Manual only** |
-| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM shard compile + link (table shorthand `parallel-v6`; full key includes `-dim[{shard}]`) | **Manual only** |
+| **Build FlashAttention CK serial (Windows gfx120x)** | Single-job full build + cache (`serial-v7`) | **Manual only** |
+| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM shard compile + link (table shorthand `parallel-v7`; full key includes `-dim[{shard}]`) | **Manual only** |
 
 > Push to `main` does **not** auto-trigger builds.
 
@@ -94,8 +94,8 @@ ComfyUI **inference-only** wheel (workflow `ck_disable_bwd=true`, default):
 > Except `plan-opt-dim`, workflows do not set `timeout-minutes`; “6 h (default)” is the GitHub hosted runner limit. CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
 
 - **Ninja cache** (`flash-attention/build/` incremental compile):
-  - Serial: `fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
-  - Parallel: `fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - Serial: `fa2-ck-gfx120x-serial-v7-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - Parallel: `fa2-ck-gfx120x-parallel-v7-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`: lock `toolchain`+`flash_attention`+`compile` → SHA256 prefix (8 hex chars; excludes `wheel`/`release`; excludes workflow `ck_disable_bwd`)
   - `bwd`: `fmha_bwd` (`true` = bwd kernels compiled; `false` = inference-only bwd omission)
   - `msvcVersion` / `rocmClangVersion`: full MSVC toolset version / parsed `clang --version` token (e.g. `14.42.34433`, `19.0.0git`); normalized via `cacheKeyToken` before entering the key

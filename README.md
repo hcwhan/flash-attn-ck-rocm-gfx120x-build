@@ -63,8 +63,8 @@ ComfyUI **推理专用** wheel（workflow `ck_disable_bwd=true`，默认）：
 
 | Workflow | 用途 | 触发 |
 |----------|------|------|
-| **Build FlashAttention CK serial (Windows gfx120x)** | 单 job 全量编译 + cache（`serial-v6`） | **仅手动** |
-| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM 分片 compile + link（表格简称 `parallel-v6`；完整 key 含 `-dim[{shard}]`） | **仅手动** |
+| **Build FlashAttention CK serial (Windows gfx120x)** | 单 job 全量编译 + cache（`serial-v7`） | **仅手动** |
+| **Build FlashAttention CK parallel (Windows gfx120x)** | OPT_DIM 分片 compile + link（表格简称 `parallel-v7`；完整 key 含 `-dim[{shard}]`） | **仅手动** |
 
 > 推送到 `main` **不会**自动触发编译。
 
@@ -94,8 +94,8 @@ ComfyUI **推理专用** wheel（workflow `ck_disable_bwd=true`，默认）：
 > 除 `plan-opt-dim` 外 workflow 未显式设 `timeout-minutes`；「6 h（默认）」为 GitHub hosted runner 上限。CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
 
 - **Ninja cache**（`flash-attention/build/` 增量编译）：
-  - 串行：`fa2-ck-gfx120x-serial-v6-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
-  - 并行：`fa2-ck-gfx120x-parallel-v6-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - 串行：`fa2-ck-gfx120x-serial-v7-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - 并行：`fa2-ck-gfx120x-parallel-v7-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`：lock `toolchain`+`flash_attention`+`compile` → SHA256 前 8 位（不含 `wheel`/`release`；不含 workflow `ck_disable_bwd`）
   - `bwd`：`fmha_bwd`（`true` = 编译 bwd 内核；`false` = 推理专用省略 bwd）
   - `msvcVersion` / `rocmClangVersion`：MSVC 工具集完整版本 / `clang --version` 解析完整版本（如 `14.42.34433`、`19.0.0git`）；写入 key 前经 `cacheKeyToken` 规范化
