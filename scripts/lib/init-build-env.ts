@@ -59,6 +59,15 @@ export function initBuildEnv(options: { optDim: string }): void {
     "import torch; print('torch', torch.__version__); print('rocm', torch.version.rocm); print('hip', torch.version.hip); print('abi', torch._C._GLIBCXX_USE_CXX11_ABI)",
   ]);
 
+  const clangClFlags =
+    "-Wno-ignored-attributes -Wno-unknown-argument -Wno-unused-command-line-argument -Wno-unknown-attributes -Wno-inconsistent-dllimport -Wno-cuda-compat -Wno-pass-failed";
+  process.env.CFLAGS = process.env.CFLAGS
+    ? `${process.env.CFLAGS} ${clangClFlags}`
+    : clangClFlags;
+  process.env.CXXFLAGS = process.env.CXXFLAGS
+    ? `${process.env.CXXFLAGS} ${clangClFlags}`
+    : clangClFlags;
+
   console.log(
     `Build env ready (GPU_ARCHS=${process.env.GPU_ARCHS}, OPT_DIM=${process.env.OPT_DIM})`,
   );

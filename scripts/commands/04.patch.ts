@@ -46,6 +46,38 @@ const breproPatchPoint: StringPatchPoint = {
   regex: false,
 };
 
+const warningSuppressionPatchPoints: PatchPoint[] = [
+  {
+    name: "suppress-nvcc-warnings",
+    before: `        cc_flag += ["-O3","-std=c++20",
+                    "-Wno-unknown-warning-option",
+                    "-fbracket-depth=1024",`,
+    after: `        cc_flag += ["-O3","-std=c++20",
+                    "-Wno-unknown-warning-option",
+                    "-Wno-ignored-attributes",
+                    "-Wno-unknown-argument",
+                    "-Wno-unused-command-line-argument",
+                    "-Wno-unknown-attributes",
+                    "-Wno-inconsistent-dllimport",
+                    "-Wno-cuda-compat",
+                    "-Wno-pass-failed",
+                    "-fbracket-depth=1024",`,
+    regex: false,
+  },
+  {
+    name: "suppress-cxx-warnings",
+    before: `        extra_compile_args = {
+            "cxx": ["-O3", "-std=c++20"] + generator_flag + maybe_hipify_v2_flag,
+            "nvcc": cc_flag + generator_flag + maybe_hipify_v2_flag,
+        }`,
+    after: `        extra_compile_args = {
+            "cxx": ["-O3", "-std=c++20", "-Wno-unknown-warning-option", "-Wno-ignored-attributes", "-Wno-unknown-argument", "-Wno-unused-command-line-argument", "-Wno-unknown-attributes", "-Wno-inconsistent-dllimport", "-Wno-cuda-compat", "-Wno-pass-failed"] + generator_flag + maybe_hipify_v2_flag,
+            "nvcc": cc_flag + generator_flag + maybe_hipify_v2_flag,
+        }`,
+    regex: false,
+  },
+];
+
 function readNormalized(filePath: string): { content: string; eol: "\n" | "\r\n" } {
   const raw = readFileSync(filePath, "utf8");
   const eol: "\n" | "\r\n" = raw.includes("\r\n") ? "\r\n" : "\n";
@@ -61,15 +93,30 @@ function writeNormalized(
   writeFileSync(filePath, out, "utf8");
 }
 
-function spawnBreproAlreadyPatched(content: string): boolean {
-  return (
-    content.includes('if "/Brepro" not in cmd and "-Brepro" not in cmd:') &&
-    content.includes('cmd.append("/Brepro")')
-  );
+function isAlreadyPatched(content: string, pointName: string): boolean {
+  if (pointName === "link-spawn-brepro") {
+    return (
+      content.includes('if "/Brepro" not in cmd and "-Brepro" not in cmd:') &&
+      content.includes('cmd.append("/Brepro")')
+    );
+  }
+  if (pointName === "suppress-nvcc-warnings") {
+    return (
+      content.includes('"-Wno-unknown-attributes",') &&
+      content.includes('"-Wno-pass-failed",')
+    );
+  }
+  if (pointName === "suppress-cxx-warnings") {
+    return (
+      content.includes('"cxx": ["-O3", "-std=c++20", "-Wno-unknown-warning-option"') &&
+      content.includes('"-Wno-pass-failed"')
+    );
+  }
+  return false;
 }
 
 function applyPatchPoint(content: string, point: PatchPoint): string {
-  if (point.name === "link-spawn-brepro" && spawnBreproAlreadyPatched(content)) {
+  if (isAlreadyPatched(content, point.name)) {
     return content;
   }
   return point.regex
@@ -78,7 +125,7 @@ function applyPatchPoint(content: string, point: PatchPoint): string {
 }
 
 function validatePatchPoint(content: string, point: PatchPoint): void {
-  if (point.name === "link-spawn-brepro" && spawnBreproAlreadyPatched(content)) {
+  if (isAlreadyPatched(content, point.name)) {
     console.log(`  OK ${point.name}: already patched`);
     return;
   }
@@ -94,8 +141,8 @@ function validatePatchPoint(content: string, point: PatchPoint): void {
 export function runPatch(options: { faSrc: string }): void {
   const disableBwd = requireGithubActionsEnv("CK_FMHA_DISABLE_BWD") === "1";
   const patchPoints: PatchPoint[] = disableBwd
-    ? [...bwdPatchPoints, breproPatchPoint]
-    : [breproPatchPoint];
+    ? [...bwdPatchPoints, breproPatchPoint, ...warningSuppressionPatchPoints]
+    : [breproPatchPoint, ...warningSuppressionPatchPoints];
 
   const setup = path.join(path.resolve(options.faSrc), "setup.py");
   let content: string;
