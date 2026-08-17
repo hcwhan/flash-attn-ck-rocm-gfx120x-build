@@ -83,7 +83,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: npx tsx scripts/cli.ts 12.watchdog-retry --build-variant serial
+        run: npx tsx scripts/cli.ts 07-retry --build-variant serial
 
       - name: Write compile cache metadata
         if: success()
@@ -101,7 +101,7 @@ jobs:
       - name: Link and package wheel from in-place objects
         if: success()
         shell: pwsh
-        run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist
+        run: npx tsx scripts/cli.ts 09.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist
 
       - name: Verify wheel and publish
         if: success()

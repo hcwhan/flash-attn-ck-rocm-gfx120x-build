@@ -90,22 +90,22 @@ GitHub-hosted runner jobs have a **6-hour** hard limit. A **5-hour** watchdog st
 | `use_cache=false` | No save on compile failure; **no** auto-retry |
 | `taskkill` after 3× SIGINT | No save, no retry (`ABORT_FORCE_KILLED`) |
 
-Wheel / verify / publish do not run unless compile succeeds. `wheel.manifest.json` `dispatch.retry_count` records this run's retry count. **Parallel** runs a single auto-retry from the dedicated `watchdog-retry` job after all compile shards finish (shards upload `abort-meta-d{dim}`); **serial** retries inside the compile job. See [docs/watchdog-design.md](docs/watchdog-design.md).
+Wheel / verify / publish do not run unless compile succeeds. `wheel.manifest.json` `dispatch.retry_count` records this run's retry count. **Parallel** runs `07-retry` from the dedicated `watchdog-retry` job after all compile shards finish (shards upload `abort-meta-d{dim}`); **serial** calls `07-retry` inside the compile job. See [docs/watchdog-design.md](docs/watchdog-design.md).
 
 ### Serial (`build-fa2-ck-gfx120x-serial.yml`)
 
 | Job | Role | Timeout |
 |-----|------|---------|
-| `compile-full-and-link-wheel` | clone+patch, toolchain, cache, `06.compile` + `08.wheel`, CPU smoke test | 6 h (GitHub limit; compile bounded by 5h watchdog) |
+| `compile-full-and-link-wheel` | clone+patch, toolchain, cache, `06.compile` (on failure `07-retry`) → `09.wheel` → `10.verify` / `11.publish` | 6 h (GitHub limit; compile bounded by 5h watchdog) |
 
 ### Parallel (`build-fa2-ck-gfx120x-parallel.yml`)
 
 | Job | Role | Timeout |
 |-----|------|---------|
-| `plan-opt-dim` | export parallel OPT_DIM matrix | 5 min |
-| `compile-d32` … `d256` | clone+patch per job, one OPT_DIM shard each, upload `.obj` | 6 h each (GitHub limit; compile bounded by 5h watchdog) |
-| `watchdog-retry` | On compile failure: read abort/cache meta, single auto-retry dispatch | 10 min |
-| `link-wheel` | clone+patch, merge objs + link + wheel + CPU smoke test (**no** ninja cache) | 6 h (default) |
+| `plan-opt-dim` | `02.plan-opt-dim-matrix` exports parallel OPT_DIM matrix | 5 min |
+| `compile-d32` … `d256` | clone+patch, `06.compile` → `08.shard`, upload `.obj` | 6 h each (GitHub limit; compile bounded by 5h watchdog) |
+| `watchdog-retry` | on compile failure: `07-retry` (read abort/cache meta, single auto-retry dispatch) | 10 min |
+| `link-wheel` | clone+patch, `09.wheel` → `10.verify` / `11.publish` (**no** ninja cache) | 6 h (default) |
 
 > CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
 
@@ -129,7 +129,7 @@ Single entry point for compile and wheel packaging: `build-fa-steps.py` (in-proc
 |------|------|
 | `compile` | `build_ext` compile; stamps existing objects so the ninja cache pays off |
 | `wheel` | stamp + `bdist_wheel` (objects from the in-place compile) |
-| `merge-and-wheel` | merge objects + stamp + `bdist_wheel` (staging validation runs in `08.wheel` first) |
+| `merge-and-wheel` | merge objects + stamp + `bdist_wheel` (staging validation runs in `09.wheel` first) |
 
 Serial and parallel compose the same entry; both produce identical wheels:
 
@@ -174,8 +174,8 @@ flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.w
 
 | Check | Script |
 |-------|--------|
-| CI smoke test serial (CPU) | `npx tsx scripts/cli.ts 09.verify --dist-dir dist --build-variant serial --build-caches dist\build-caches.json` |
-| CI smoke test parallel (CPU) | `npx tsx scripts/cli.ts 09.verify --dist-dir dist --build-variant parallel --build-caches cache-meta` |
+| CI smoke test serial (CPU) | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant serial --build-caches dist\build-caches.json` |
+| CI smoke test parallel (CPU) | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant parallel --build-caches cache-meta` |
 | Parallel link API dispatch recompile checks | `build/build-fa-steps.py` (merge skip + pre/post ninja asserts) |
 | Pre-deploy GPU smoke test (gfx120x hardware) | `python test/gpu-smoke-test.py -w .` |
 

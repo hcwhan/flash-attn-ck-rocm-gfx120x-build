@@ -20,8 +20,8 @@ GitHub-hosted runner 的 job 硬上限为 **6 小时**（不可突破）。compi
 4. 编译成功 → `COMPILE_COMPLETE=true`。
 5. **A03** save ninja cache（`use_cache=true` 时失败也 save；`ABORT_FORCE_KILLED` 时跳过 save/delete）。
 6. **retry**：
-   - **serial**：compile job 内 save 后 **`12.watchdog-retry`**（workflow 条件：`!cancelled() && ABORT_TRIGGERED && !COMPILE_COMPLETE && ABORT_FORCE_KILLED != 'true'`）。
-   - **parallel**：compile shard 上传 `abort-meta-d{dim}.json`；全部 shard 结束后独立 **`watchdog-retry`** job 下载 abort/cache meta，**单次**调用 **`12.watchdog-retry --abort-meta-dir`**。
+   - **serial**：compile job 内 save 后 **`07-retry`**（workflow 条件：`!cancelled() && ABORT_TRIGGERED && !COMPILE_COMPLETE && ABORT_FORCE_KILLED != 'true'`）。
+   - **parallel**：compile shard 上传 `abort-meta-d{dim}.json`；全部 shard 结束后独立 **`watchdog-retry`** job 下载 abort/cache meta，**单次**调用 **`07-retry --abort-meta-dir`**。
 7. wheel / verify / publish 仅在 **`link-wheel`**（compile 成功）或 serial compile job 成功路径执行。
 
 **Retry run（retry_count=N）：** 继承 `ninja_workers`、`use_cache`、`publish_release`、`ck_disable_bwd`，仅 `retry_count` 递增；restore ninja cache 后续接编译，重复看门狗 + retry，直至 5h 内完成或 `retry_count >= 8`。
@@ -55,7 +55,7 @@ GitHub-hosted runner 的 job 硬上限为 **6 小时**（不可突破）。compi
 | `ABORT_TRIGGERED` | `watchdog.ts` | 已触发优雅中止 |
 | `ABORT_FORCE_KILLED` | `watchdog.ts` | 已 taskkill；不 save、不 retry |
 | `COMPILE_COMPLETE` | `06.compile` | `true` 成功；中止时 `false` |
-| `RETRY_COUNT` | workflow input → env | 当前 retry 计数（manifest `dispatch.retry_count`；save 后 `12.watchdog-retry` 判断） |
+| `RETRY_COUNT` | workflow input → env | 当前 retry 计数（manifest `dispatch.retry_count`；save 后 `07-retry` 判断） |
 | `PUBLISH_RELEASE` | workflow input → env | retry dispatch 时继承 `publish_release` |
 
 ## 结果
@@ -72,9 +72,9 @@ GitHub-hosted runner 的 job 硬上限为 **6 小时**（不可突破）。compi
 - `scripts/lib/exec.ts` — `spawnAsync`（暴露 `child.pid`）
 - `scripts/commands/06.compile.ts` — 看门狗接入
 - `scripts/lib/watchdog-abort-meta.ts` — parallel abort 元数据读取与 eligible 判定
-- `scripts/commands/12.watchdog-retry.ts` — retry dispatch（serial 同 job；parallel 独立 `watchdog-retry` job）
+- `scripts/commands/07-retry.ts` — retry dispatch（serial 同 job；parallel 独立 `watchdog-retry` job）
 
-### 12.watchdog-retry 行为
+### 07-retry 行为
 
 - serial：脚本入口校验 `ABORT_FORCE_KILLED=true` → throw（与 workflow `if:` 双重门禁）。
 - parallel：先经 `evaluateParallelWatchdogRetry`；不 eligible 则 throw（含非看门狗失败、force_killed、abort/cache meta 与 failed shard 不一致）。

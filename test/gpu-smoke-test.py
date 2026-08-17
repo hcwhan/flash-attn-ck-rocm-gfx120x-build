@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """部署前 GPU smoke test（gfx120x 真机；CI 不跑）。
 
-须已 pip install 本仓库 wheel；CPU/wheel 校验由 09.verify 负责。
+须已 pip install 本仓库 wheel；CPU/wheel 校验由 10.verify 负责。
 结束时输出 runtime `fmha_bwd`（是否支持 backward）。
 """
 from __future__ import annotations

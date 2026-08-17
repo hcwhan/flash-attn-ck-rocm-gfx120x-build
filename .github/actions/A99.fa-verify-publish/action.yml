@@ -1,12 +1,12 @@
 name: FA verify and publish
-description: 09.verify（wheel 校验 + manifest）+ upload artifact；可选 10.publish / Release（workflow_dispatch.publish_release）
+description: 10.verify（wheel 校验 + manifest）+ upload artifact；可选 11.publish / Release（workflow_dispatch.publish_release）
 
 inputs:
   build-variant:
-    description: serial 或 parallel（09.verify / 10.publish --build-variant）
+    description: serial 或 parallel（10.verify / 11.publish --build-variant）
     required: true
   build-caches:
-    description: 09.verify --build-caches 相对 GITHUB_WORKSPACE 的路径（serial dist/build-caches.json / parallel cache-meta）
+    description: 10.verify --build-caches 相对 GITHUB_WORKSPACE 的路径（serial dist/build-caches.json / parallel cache-meta）
     required: true
 
 runs:
@@ -17,7 +17,7 @@ runs:
       run: |
         $distDir = Join-Path $env:GITHUB_WORKSPACE 'dist'
         $buildCaches = Join-Path $env:GITHUB_WORKSPACE '${{ inputs.build-caches }}'
-        npx tsx scripts/cli.ts 09.verify --dist-dir $distDir --build-variant ${{ inputs.build-variant }} --build-caches $buildCaches
+        npx tsx scripts/cli.ts 10.verify --dist-dir $distDir --build-variant ${{ inputs.build-variant }} --build-caches $buildCaches
 
     - name: Upload wheel artifact
       uses: actions/upload-artifact@v7
@@ -35,7 +35,7 @@ runs:
       shell: pwsh
       run: |
         $distDir = Join-Path $env:GITHUB_WORKSPACE 'dist'
-        npx tsx scripts/cli.ts 10.publish --dist-dir $distDir --workflow-name "${{ github.workflow }}" --build-variant ${{ inputs.build-variant }}
+        npx tsx scripts/cli.ts 11.publish --dist-dir $distDir --workflow-name "${{ github.workflow }}" --build-variant ${{ inputs.build-variant }}
 
     - name: Publish GitHub Release
       if: ${{ github.event.inputs.publish_release != 'false' }}

@@ -90,22 +90,22 @@ GitHub-hosted runner 的 job 硬上限为 **6 小时**。compile 自 A00 bootstr
 | `use_cache=false` | compile 失败时不 save；**不** auto-retry |
 | 3× SIGINT 后需 `taskkill` | 不 save、不 retry（`ABORT_FORCE_KILLED`） |
 
-wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.json` 的 `dispatch.retry_count` 记录本次 run 的 retry 计数。**parallel** 在全部 compile shard 结束后由独立 `watchdog-retry` job 单次 auto-retry（compile shard 上传 `abort-meta-d{dim}`）；**serial** 在 compile job 内 retry。详见 [docs/watchdog-design.md](docs/watchdog-design.md)。
+wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.json` 的 `dispatch.retry_count` 记录本次 run 的 retry 计数。**parallel** 在全部 compile shard 结束后由独立 `watchdog-retry` job 调用 `07-retry`（compile shard 上传 `abort-meta-d{dim}`）；**serial** 在 compile job 内 `07-retry`。详见 [docs/watchdog-design.md](docs/watchdog-design.md)。
 
 ### 串行（`build-fa2-ck-gfx120x-serial.yml`）
 
 | Job | 作用 | 超时 |
 |-----|------|------|
-| `compile-full-and-link-wheel` | clone+patch、toolchain、cache、`06.compile` + `08.wheel`、CPU smoke test | 6 h（GitHub 上限；compile 受 5h 看门狗约束） |
+| `compile-full-and-link-wheel` | clone+patch、toolchain、cache、`06.compile`（失败时 `07-retry`）→ `09.wheel` → `10.verify` / `11.publish` | 6 h（GitHub 上限；compile 受 5h 看门狗约束） |
 
 ### 并行（`build-fa2-ck-gfx120x-parallel.yml`）
 
 | Job | 作用 | 超时 |
 |-----|------|------|
-| `plan-opt-dim` | 导出 parallel OPT_DIM matrix | 5 min |
-| `compile-d32` … `d256` | 各 job 内 clone+patch，编一个 OPT_DIM shard，上传 `.obj` | 各 6 h（GitHub 上限；compile 受 5h 看门狗约束） |
-| `watchdog-retry` | compile 失败时读取 abort/cache meta、单次 auto-retry dispatch | 10 min |
-| `link-wheel` | clone+patch、合并 obj + link + 打 wheel + CPU smoke test（**无** ninja cache） | 6 h（默认） |
+| `plan-opt-dim` | `02.plan-opt-dim-matrix` 导出 parallel OPT_DIM matrix | 5 min |
+| `compile-d32` … `d256` | clone+patch、`06.compile` → `08.shard`、上传 `.obj` | 各 6 h（GitHub 上限；compile 受 5h 看门狗约束） |
+| `watchdog-retry` | compile 失败时 `07-retry`（读 abort/cache meta、单次 auto-retry dispatch） | 10 min |
+| `link-wheel` | clone+patch、`09.wheel` → `10.verify` / `11.publish`（**无** ninja cache） | 6 h（默认） |
 
 > CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
 
@@ -129,7 +129,7 @@ wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.jso
 |------|------|
 | `compile` | `build_ext` 编译；stamp 已有对象，让 ninja 缓存生效 |
 | `wheel` | stamp + `bdist_wheel`（对象来自原地编译） |
-| `merge-and-wheel` | merge 对象 + stamp + `bdist_wheel`（staging 校验在 `08.wheel` 前置） |
+| `merge-and-wheel` | merge 对象 + stamp + `bdist_wheel`（staging 校验在 `09.wheel` 前置） |
 
 串行 / 并行共用同一入口编排，产物相同：
 
@@ -174,8 +174,8 @@ flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.w
 
 | 检查 | 脚本 |
 |------|------|
-| CI smoke test serial（CPU） | `npx tsx scripts/cli.ts 09.verify --dist-dir dist --build-variant serial --build-caches dist\build-caches.json` |
-| CI smoke test parallel（CPU） | `npx tsx scripts/cli.ts 09.verify --dist-dir dist --build-variant parallel --build-caches cache-meta` |
+| CI smoke test serial（CPU） | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant serial --build-caches dist\build-caches.json` |
+| CI smoke test parallel（CPU） | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant parallel --build-caches cache-meta` |
 | parallel link API dispatch 重编校验 | `build/build-fa-steps.py`（merge skip + ninja 前后断言） |
 | 部署前 GPU smoke test（gfx120x 真机） | `python test/gpu-smoke-test.py -w .` |
 

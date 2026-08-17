@@ -131,7 +131,7 @@ jobs:
       - name: Validate compile shard outputs
         if: success()
         shell: pwsh
-        run: npx tsx scripts/cli.ts 07.shard --fa-src $env:FA_SRC --opt-dim "${{ matrix.opt-dim }}"
+        run: npx tsx scripts/cli.ts 08.shard --fa-src $env:FA_SRC --opt-dim "${{ matrix.opt-dim }}"
 
       - name: Write compile cache metadata
         if: success()
@@ -201,7 +201,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: npx tsx scripts/cli.ts 12.watchdog-retry --build-variant parallel --abort-meta-dir abort-meta --cache-meta-dir cache-meta --all-opt-dims '${{ needs.plan-opt-dim.outputs.opt-dims-json }}'
+        run: npx tsx scripts/cli.ts 07-retry --build-variant parallel --abort-meta-dir abort-meta --cache-meta-dir cache-meta --all-opt-dims '${{ needs.plan-opt-dim.outputs.opt-dims-json }}'
 
   link:
     name: link-wheel
@@ -232,7 +232,7 @@ jobs:
 
       - name: Link and package wheel from merged objects
         shell: pwsh
-        run: npx tsx scripts/cli.ts 08.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist --staging-root $env:FA_STAGING --primary-dim "${{ needs.plan-opt-dim.outputs.primary-dim }}"
+        run: npx tsx scripts/cli.ts 09.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist --staging-root $env:FA_STAGING --primary-dim "${{ needs.plan-opt-dim.outputs.primary-dim }}"
 
       - name: Verify wheel and publish
         uses: "./.github/actions/A99.fa-verify-publish"

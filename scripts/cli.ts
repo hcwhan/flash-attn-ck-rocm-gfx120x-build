@@ -6,11 +6,11 @@ import { runPrep } from "./commands/03.prep.js";
 import { runPatch } from "./commands/04.patch.js";
 import { runToolchainFingerprint } from "./commands/05.toolchain-fingerprint.js";
 import { runCompile } from "./commands/06.compile.js";
-import { runShard } from "./commands/07.shard.js";
-import { runWheel } from "./commands/08.wheel.js";
-import { runVerify } from "./commands/09.verify.js";
-import { runPublish } from "./commands/10.publish.js";
-import { runWatchdogRetry } from "./commands/12.watchdog-retry.js";
+import { runWatchdogRetry } from "./commands/07-retry.js";
+import { runShard } from "./commands/08.shard.js";
+import { runWheel } from "./commands/09.wheel.js";
+import { runVerify } from "./commands/10.verify.js";
+import { runPublish } from "./commands/11.publish.js";
 
 const program = new Command();
 
@@ -86,68 +86,7 @@ program
   });
 
 program
-  .command("07.shard")
-  .description("校验 compile shard 并将 SHARD_RELEASE_DIR 写入 GITHUB_ENV")
-  .requiredOption("--fa-src <path>")
-  .requiredOption("--opt-dim <value>")
-  .action((opts) => {
-    runShard({
-      faSrc: opts.faSrc,
-      optDim: opts.optDim,
-    });
-  });
-
-program
-  .command("08.wheel")
-  .description("link 并打 wheel（parallel 须同时传 --staging-root 与 --primary-dim）")
-  .requiredOption("--fa-src <path>")
-  .requiredOption("--dist-dir <path>")
-  .option("--staging-root <path>", "parallel link：FA_STAGING 根目录")
-  .option("--primary-dim <value>", "parallel link：lock ck_opt_dim 首档（PRIMARY_DIM）")
-  .action((opts) => {
-    runWheel({
-      faSrc: opts.faSrc,
-      distDir: opts.distDir,
-      stagingRoot: opts.stagingRoot,
-      primaryDim: opts.primaryDim,
-    });
-  });
-
-program
-  .command("09.verify")
-  .description(
-    "CPU wheel smoke test；写 .sha256 / wheel.manifest.json；校验 --build-caches",
-  )
-  .requiredOption("--dist-dir <path>")
-  .requiredOption("--build-variant <name>", "serial 或 parallel")
-  .requiredOption(
-    "--build-caches <path>",
-    "compile cache 元数据：JSON 数组文件（serial）或含 per-shard JSON 的目录（parallel）",
-  )
-  .action((opts) => {
-    runVerify({
-      distDir: opts.distDir,
-      buildVariant: opts.buildVariant,
-      buildCaches: opts.buildCaches,
-    });
-  });
-
-program
-  .command("10.publish")
-  .description("准备 GitHub Release 元数据")
-  .requiredOption("--dist-dir <path>")
-  .requiredOption("--workflow-name <name>")
-  .requiredOption("--build-variant <name>")
-  .action((opts) => {
-    runPublish({
-      distDir: opts.distDir,
-      workflowName: opts.workflowName,
-      buildVariant: opts.buildVariant,
-    });
-  });
-
-program
-  .command("12.watchdog-retry")
+  .command("07-retry")
   .description("看门狗中断后 dispatch retry workflow（gh api + 等 concurrency cancel）")
   .requiredOption("--build-variant <mode>", "serial 或 parallel")
   .option(
@@ -188,6 +127,67 @@ program
       abortMetaDir: opts.abortMetaDir,
       cacheMetaDir: opts.cacheMetaDir,
       allOptDims,
+    });
+  });
+
+program
+  .command("08.shard")
+  .description("校验 compile shard 并将 SHARD_RELEASE_DIR 写入 GITHUB_ENV")
+  .requiredOption("--fa-src <path>")
+  .requiredOption("--opt-dim <value>")
+  .action((opts) => {
+    runShard({
+      faSrc: opts.faSrc,
+      optDim: opts.optDim,
+    });
+  });
+
+program
+  .command("09.wheel")
+  .description("link 并打 wheel（parallel 须同时传 --staging-root 与 --primary-dim）")
+  .requiredOption("--fa-src <path>")
+  .requiredOption("--dist-dir <path>")
+  .option("--staging-root <path>", "parallel link：FA_STAGING 根目录")
+  .option("--primary-dim <value>", "parallel link：lock ck_opt_dim 首档（PRIMARY_DIM）")
+  .action((opts) => {
+    runWheel({
+      faSrc: opts.faSrc,
+      distDir: opts.distDir,
+      stagingRoot: opts.stagingRoot,
+      primaryDim: opts.primaryDim,
+    });
+  });
+
+program
+  .command("10.verify")
+  .description(
+    "CPU wheel smoke test；写 .sha256 / wheel.manifest.json；校验 --build-caches",
+  )
+  .requiredOption("--dist-dir <path>")
+  .requiredOption("--build-variant <name>", "serial 或 parallel")
+  .requiredOption(
+    "--build-caches <path>",
+    "compile cache 元数据：JSON 数组文件（serial）或含 per-shard JSON 的目录（parallel）",
+  )
+  .action((opts) => {
+    runVerify({
+      distDir: opts.distDir,
+      buildVariant: opts.buildVariant,
+      buildCaches: opts.buildCaches,
+    });
+  });
+
+program
+  .command("11.publish")
+  .description("准备 GitHub Release 元数据")
+  .requiredOption("--dist-dir <path>")
+  .requiredOption("--workflow-name <name>")
+  .requiredOption("--build-variant <name>")
+  .action((opts) => {
+    runPublish({
+      distDir: opts.distDir,
+      workflowName: opts.workflowName,
+      buildVariant: opts.buildVariant,
     });
   });
 
