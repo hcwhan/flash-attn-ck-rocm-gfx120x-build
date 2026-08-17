@@ -95,27 +95,27 @@ wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.jso
 
 ### 串行（`build-fa2-ck-gfx120x-serial.yml`）
 
-| Job | 作用 | 超时 |
-|-----|------|------|
-| `compile-full-and-link-wheel` | clone+patch、toolchain、cache、`06.compile`（看门狗中止时 `07-retry`）→ `09.wheel` → `A99`（`10.verify` / `11.publish`） | 6 h（GitHub 上限；compile 受 5h 看门狗约束） |
+| Job | 作用 | workflow 超时 |
+|-----|------|---------------|
+| `compile-full-and-link-wheel` | checkout → **A00**（含 ninja restore）→ **A01** `06.compile`（看门狗中止时 `07-retry`）→ `dist/build-caches.json`（成功）→ `09.wheel` → **A99** | 未设 |
 
 ### 并行（`build-fa2-ck-gfx120x-parallel.yml`）
 
-| Job | 作用 | 超时 |
-|-----|------|------|
-| `plan-opt-dim` | `02.plan-opt-dim-matrix` 导出 parallel OPT_DIM matrix | 5 min |
-| `compile-d32` … `d256` | clone+patch、`06.compile` → `08.shard`、上传 `.obj` | 各 6 h（GitHub 上限；compile 受 5h 看门狗约束） |
-| `watchdog-retry` | compile matrix 失败时 `07-retry`（读 abort/cache meta、单次 auto-retry dispatch；非看门狗失败则 throw） | 10 min |
-| `link-wheel` | clone+patch、`09.wheel` → `A99`（`10.verify` / `11.publish`；**无** ninja cache） | 6 h（默认） |
+| Job | 作用 | workflow 超时 |
+|-----|------|---------------|
+| `plan-opt-dim` | checkout → **A00**（`prep-source=false`, `setup-toolchain=false`）→ `02.plan-opt-dim-matrix` | **5 min** |
+| `compile-d32` … `d256` | checkout → **A00** → **A01** `06.compile` →（成功）`08.shard`、上传 `d{dim}` / `cache-meta-d{dim}`；（看门狗失败）上传 `abort-meta-d{dim}` | 未设 |
+| `watchdog-retry` | checkout → **A00**（`prep-source=false`, `setup-toolchain=false`）→ `07-retry` | 未设 |
+| `link-wheel` | checkout → **A00** → download `d*` / `cache-meta-d*` → `09.wheel` → **A99**（**无** ninja cache） | 未设 |
 
-> CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
+> 除 `plan-opt-dim` 外 workflow **未**显式设 `timeout-minutes`；「未设」表示使用 GitHub hosted runner 默认 **6 h** job 上限。compile job 另有自 A00 第一步起算的 **5 h** 看门狗（见上文）。CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
 
 - **Ninja cache**（`flash-attention/build/` 增量编译）：
   - 串行：`fa2-ck-gfx120x-serial-v7-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - 并行：`fa2-ck-gfx120x-parallel-v7-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`：lock `toolchain`+`flash_attention`+`compile` → SHA256 前 8 位（不含 `wheel`/`release`；不含 workflow `ck_disable_bwd`）
   - `bwd`：`fmha_bwd`（`true` = 编译 bwd 内核；`false` = 推理专用省略 bwd）
-  - `msvcVersion` / `rocmClangVersion`：MSVC 工具集完整版本 / `clang --version` 解析完整版本（如 `14.42.34433`、`19.0.0git`）；写入 key 前经 `cacheKeyToken` 规范化
+  - `msvcVersion` / `rocmClangVersion`：MSVC 工具集完整版本 / `clang --version` 解析完整版本（如 `14.44.35207`、`23.0.0git`）；写入 key 前经 `cacheKeyToken` 规范化
   - `ninja`：`ninja --version` 的 major.minor
   - **仅精确匹配**（无 `restore-keys`）；serial / parallel **互不共用**
   - `use_cache=true` 时 build 非 skipped 即 save；`use_cache=false` 时不 restore（`used=false`），仅 compile 成功时 save；远端已有条目（`exists`）时 save 前先 delete 再刷新

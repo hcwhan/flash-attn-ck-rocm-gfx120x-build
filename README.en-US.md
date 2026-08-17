@@ -95,27 +95,27 @@ Wheel / verify / publish do not run unless compile succeeds. `wheel.manifest.jso
 
 ### Serial (`build-fa2-ck-gfx120x-serial.yml`)
 
-| Job | Role | Timeout |
-|-----|------|---------|
-| `compile-full-and-link-wheel` | clone+patch, toolchain, cache, `06.compile` (watchdog abort → `07-retry`) → `09.wheel` → `A99` (`10.verify` / `11.publish`) | 6 h (GitHub limit; compile bounded by 5h watchdog) |
+| Job | Role | workflow timeout |
+|-----|------|------------------|
+| `compile-full-and-link-wheel` | checkout → **A00** (incl. ninja restore) → **A01** `06.compile` (watchdog abort → `07-retry`) → `dist/build-caches.json` (on success) → `09.wheel` → **A99** | not set |
 
 ### Parallel (`build-fa2-ck-gfx120x-parallel.yml`)
 
-| Job | Role | Timeout |
-|-----|------|---------|
-| `plan-opt-dim` | `02.plan-opt-dim-matrix` exports parallel OPT_DIM matrix | 5 min |
-| `compile-d32` … `d256` | clone+patch, `06.compile` → `08.shard`, upload `.obj` | 6 h each (GitHub limit; compile bounded by 5h watchdog) |
-| `watchdog-retry` | on compile matrix failure: `07-retry` (read abort/cache meta, single auto-retry dispatch; throws if failure was not watchdog-eligible) | 10 min |
-| `link-wheel` | clone+patch, `09.wheel` → `A99` (`10.verify` / `11.publish`; **no** ninja cache) | 6 h (default) |
+| Job | Role | workflow timeout |
+|-----|------|------------------|
+| `plan-opt-dim` | checkout → **A00** (`prep-source=false`, `setup-toolchain=false`) → `02.plan-opt-dim-matrix` | **5 min** |
+| `compile-d32` … `d256` | checkout → **A00** → **A01** `06.compile` → (success) `08.shard`, upload `d{dim}` / `cache-meta-d{dim}`; (watchdog abort) upload `abort-meta-d{dim}` | not set |
+| `watchdog-retry` | checkout → **A00** (`prep-source=false`, `setup-toolchain=false`) → `07-retry` | not set |
+| `link-wheel` | checkout → **A00** → download `d*` / `cache-meta-d*` → `09.wheel` → **A99** (**no** ninja cache) | not set |
 
-> CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
+> Except `plan-opt-dim`, workflows do **not** set `timeout-minutes`; “not set” means the GitHub hosted runner default **6 h** job limit applies. Compile jobs additionally use a **5 h** watchdog from A00 step 1 (see above). CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
 
 - **Ninja cache** (`flash-attention/build/` incremental compile):
   - Serial: `fa2-ck-gfx120x-serial-v7-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - Parallel: `fa2-ck-gfx120x-parallel-v7-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`: lock `toolchain`+`flash_attention`+`compile` → SHA256 prefix (8 hex chars; excludes `wheel`/`release`; excludes workflow `ck_disable_bwd`)
   - `bwd`: `fmha_bwd` (`true` = bwd kernels compiled; `false` = inference-only bwd omission)
-  - `msvcVersion` / `rocmClangVersion`: full MSVC toolset version / parsed `clang --version` token (e.g. `14.42.34433`, `19.0.0git`); normalized via `cacheKeyToken` before entering the key
+  - `msvcVersion` / `rocmClangVersion`: full MSVC toolset version / parsed `clang --version` token (e.g. `14.44.35207`, `23.0.0git`); normalized via `cacheKeyToken` before entering the key
   - `ninja`: major.minor from `ninja --version`
   - **Exact match only** (no `restore-keys`); serial / parallel keys are **not shared**
   - With `use_cache=true`, cache is saved whenever the build step is not skipped; with `use_cache=false`, restore is skipped (`used=false`) and cache is saved only after a successful compile. When a remote entry exists (`exists`), it is deleted before save refreshes it.

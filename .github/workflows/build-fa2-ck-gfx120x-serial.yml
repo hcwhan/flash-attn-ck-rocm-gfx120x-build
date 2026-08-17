@@ -54,27 +54,18 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Bootstrap build job
+        id: bootstrap
         uses: "./.github/actions/A00.fa-job-bootstrap"
-
-      - name: Fingerprint toolchain for cache key
-        id: toolchain-fingerprint
-        shell: pwsh
-        run: npx tsx scripts/cli.ts 05.toolchain-fingerprint -w $env:GITHUB_WORKSPACE --build-variant serial
-
-      - name: Restore ninja incremental build cache
-        id: ninja-cache-restore
-        uses: "./.github/actions/A02.fa-ninja-cache-restore"
         with:
-          fa-src: ${{ env.FA_SRC }}
-          cache-key: ${{ steps.toolchain-fingerprint.outputs.cache-key }}
-          use-cache: ${{ env.USE_CACHE }}
+          ninja-cache-restore: true
+          build-variant: serial
 
       - name: Compile OPT_DIM full with ninja cache
-        uses: "./.github/actions/A03.fa-build-with-cache"
+        uses: "./.github/actions/A01.fa-build-with-cache"
         with:
           fa-src: ${{ env.FA_SRC }}
-          cache-primary-key: ${{ steps.ninja-cache-restore.outputs.cache-primary-key }}
-          cache-exists: ${{ steps.ninja-cache-restore.outputs.cache-exists }}
+          cache-primary-key: ${{ steps.bootstrap.outputs.cache-primary-key }}
+          cache-exists: ${{ steps.bootstrap.outputs.cache-exists }}
           use-cache: ${{ env.USE_CACHE }}
           run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ env.CK_OPT_DIM }}" --fa-src $env:FA_SRC
 
@@ -91,9 +82,9 @@ jobs:
         run: |
           $entry = [ordered]@{
             opt_dim = $env:CK_OPT_DIM
-            key = '${{ steps.toolchain-fingerprint.outputs.cache-key }}'
-            exists = '${{ steps.ninja-cache-restore.outputs.cache-exists }}' -eq 'true'
-            used = '${{ steps.ninja-cache-restore.outputs.cache-used }}' -eq 'true'
+            key = '${{ steps.bootstrap.outputs.cache-key }}'
+            exists = '${{ steps.bootstrap.outputs.cache-exists }}' -eq 'true'
+            used = '${{ steps.bootstrap.outputs.cache-used }}' -eq 'true'
           }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $entry | ConvertTo-Json -Depth 3 -AsArray | Out-File -FilePath dist/build-caches.json -Encoding utf8

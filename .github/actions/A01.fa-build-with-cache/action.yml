@@ -1,0 +1,37 @@
+name: FA build with ninja cache
+description: 运行构建 CLI，并在结束后保存 ninja cache（use_cache=true 时 compile 非 skipped 即 save；false 时仅成功 save）
+
+inputs:
+  fa-src:
+    description: flash-attention 源码根目录
+    required: true
+  cache-primary-key:
+    description: A00 bootstrap 输出的 cache-primary-key
+    required: true
+  cache-exists:
+    description: A00 bootstrap 输出的 cache-exists（true 时 save 前先 delete 旧条目）
+    required: false
+    default: "false"
+  use-cache:
+    description: true 时在 build 非 skipped 时 save；false 时仅 compile 成功时 save
+    required: false
+    default: "true"
+  run:
+    description: 构建 shell 脚本
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Run build CLI step
+      id: run-build
+      shell: pwsh
+      run: ${{ inputs.run }}
+
+    - name: Post-build ninja cache save
+      if: always() && steps.run-build.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-build.conclusion == 'success') && env.ABORT_FORCE_KILLED != 'true'
+      uses: "./.github/actions/A01.fa-build-with-cache/A01.1.fa-post-build-cache"
+      with:
+        fa-src: ${{ inputs.fa-src }}
+        cache-primary-key: ${{ inputs.cache-primary-key }}
+        cache-exists: ${{ inputs.cache-exists }}

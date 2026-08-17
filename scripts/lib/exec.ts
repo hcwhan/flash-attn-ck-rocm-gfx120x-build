@@ -4,7 +4,7 @@ interface RunOptions {
   quiet?: boolean;
 }
 
-/** @deprecated Prefer spawnAsync when the caller needs child.pid (e.g. watchdog force-kill). */
+/** 同步执行并等待退出；需要 `child.pid`（如看门狗 taskkill）时用 {@link spawnAsync}。 */
 export function run(
   command: string,
   args: readonly string[],

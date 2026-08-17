@@ -1,6 +1,6 @@
 import { runCapture } from "./exec.js";
 
-/** 从 `clang --version` 首行提取完整版本 token（如 19.0.0git）。 */
+/** 从 `clang --version` 首行提取完整版本 token（如 23.0.0git）。 */
 export function parseRocmClangFullVersion(raw: string): string {
   const match = raw.match(/clang version (\S+)/i);
   if (!match?.[1]) {

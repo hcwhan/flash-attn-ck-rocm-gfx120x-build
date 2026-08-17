@@ -1,5 +1,5 @@
 name: FA job bootstrap
-description: Node/npm、01.config --export-github-env、可选 03.prep/04.patch 与 A01.fa-rocm-toolchain（job 须先 checkout；plan-opt-dim job 可关 prep/toolchain）
+description: Node/npm、01.config、A00.1 toolchain、可选 05.toolchain-fingerprint + A00.2 ninja restore、条件 03.prep/04.patch（需 job 级 checkout 与 env FA_SRC/USE_CACHE）
 
 inputs:
   prep-source:
@@ -7,9 +7,33 @@ inputs:
     required: false
     default: "true"
   setup-toolchain:
-    description: 运行 A01.fa-rocm-toolchain（PYTHON/PYTORCH/TORCH_DEVICE_EXTRA/ROCM_INDEX/ROCM_VERSION/PIP_TOOLCHAIN_CACHE_KEY）
+    description: 运行 A00.1.fa-rocm-toolchain（PYTHON/PYTORCH/TORCH_DEVICE_EXTRA/ROCM_INDEX/ROCM_VERSION/PIP_TOOLCHAIN_CACHE_KEY）
     required: false
     default: "true"
+  ninja-cache-restore:
+    description: true 时运行 05.toolchain-fingerprint + A00.2 restore（compile job）
+    required: false
+    default: "false"
+  build-variant:
+    description: serial 或 parallel（ninja-cache-restore 时必填）
+    required: false
+  opt-dim:
+    description: parallel shard OPT_DIM（build-variant=parallel 时必填）
+    required: false
+
+outputs:
+  cache-key:
+    description: 05.toolchain-fingerprint 输出的 ninja cache key
+    value: ${{ steps.ninja-fingerprint.outputs.cache-key }}
+  cache-exists:
+    description: ninja cache 远程条目是否存在
+    value: ${{ steps.ninja-cache.outputs.cache-exists }}
+  cache-used:
+    description: 已 restore ninja cache 到 build/
+    value: ${{ steps.ninja-cache.outputs.cache-used }}
+  cache-primary-key:
+    description: ninja cache save/lookup 用的 key
+    value: ${{ steps.ninja-cache.outputs.cache-primary-key }}
 
 runs:
   using: composite
@@ -44,7 +68,7 @@ runs:
 
     - name: Setup ROCm toolchain
       if: inputs.setup-toolchain == 'true'
-      uses: "./.github/actions/A01.fa-rocm-toolchain"
+      uses: "./.github/actions/A00.fa-job-bootstrap/A00.1.fa-rocm-toolchain"
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         pytorch-version: ${{ env.PYTORCH_VERSION }}
@@ -52,3 +76,24 @@ runs:
         rocm-index: ${{ env.ROCM_INDEX }}
         rocm-version: ${{ env.ROCM_VERSION }}
         pip-cache-key: ${{ env.PIP_TOOLCHAIN_CACHE_KEY }}
+
+    - name: Fingerprint toolchain for ninja cache key
+      if: inputs.ninja-cache-restore == 'true'
+      id: ninja-fingerprint
+      shell: pwsh
+      run: |
+        if ('${{ inputs.build-variant }}' -eq 'parallel') {
+          npx tsx scripts/cli.ts 05.toolchain-fingerprint -w $env:GITHUB_WORKSPACE --build-variant parallel --opt-dim "${{ inputs.opt-dim }}"
+        } else {
+          npx tsx scripts/cli.ts 05.toolchain-fingerprint -w $env:GITHUB_WORKSPACE --build-variant serial
+        }
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    - name: Restore ninja incremental build cache
+      if: inputs.ninja-cache-restore == 'true'
+      id: ninja-cache
+      uses: "./.github/actions/A00.fa-job-bootstrap/A00.2.fa-ninja-cache-restore"
+      with:
+        fa-src: ${{ env.FA_SRC }}
+        cache-key: ${{ steps.ninja-fingerprint.outputs.cache-key }}
+        use-cache: ${{ env.USE_CACHE }}
