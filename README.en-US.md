@@ -44,20 +44,23 @@ Prep clones **`flash_attention.build_commit`** (SHA or tag; `fetch origin <ref>`
 
 ## Build profile
 
-ComfyUI **inference-only** wheel (workflow `ck_disable_bwd=true`, default):
+FlashAttention 2 CK wheel default build profile (workflow `ck_disable_bwd=false`, default):
 
-- CK kernels: **fwd + fwd_appendkv + fwd_splitkv** (no bwd when `CK_FMHA_DISABLE_BWD=1`)
-- **`-DFLASHATTENTION_DISABLE_BACKWARD`** (enabled when `CK_FMHA_DISABLE_BWD=1`)
+- CK kernels: **fwd + fwd_appendkv + fwd_splitkv + bwd** (full build by default when `CK_FMHA_DISABLE_BWD=0`; no bwd when `1`)
+- **`-DFLASHATTENTION_DISABLE_BACKWARD`** (enabled only when `CK_FMHA_DISABLE_BWD=1`)
 - **C++11 ABI `cxx11.abi`** (matches pinned PyTorch; local tag see `wheel.wheel_local_version`)
 - **`GPU_ARCHS`** = lock `compile.gpu_archs` (semicolon-separated on Windows)
 - **`CK_OPT_DIM`** = lock `compile.ck_opt_dim` (currently `32,64,128,256`); `init-build-env.ts` maps to upstream `OPT_DIM` env
 
-| Scope | Approx. ninja targets |
-|-------|----------------------|
-| Full link wheel (dual arch) | **~924** |
-| Single OPT_DIM shard (dual arch) | **~218–288** |
+| `ck_disable_bwd` | Scope | Approx. ninja targets (dual arch, cold compile) | CI reference |
+|------------------|-------|-----------------------------------------------|--------------|
+| `false` (default, includes bwd) | Serial full compile | **1837** | serial build24 |
+| `false` | Parallel single shard (d32 / d64 / d128 / d256) | **447 / 453 / 517 / 453** | parallel build22 |
+| `false` | Parallel link (API dispatch recompile) | **4** | parallel build23 |
+| `true` (inference-only) | Parallel single shard (d32 / d64 / d128 / d256) | **192 / 200 / 272 / 204** | parallel build14 |
+| `true` | Parallel link (API dispatch recompile) | **3** | parallel build14 |
 
-> With `GPU_ARCHS=gfx1200;gfx1201`, hipcc emits code for both archs in one ninja rule per source file, so compile targets do **not** scale with arch count (CI logs show `[n/924]`).
+> With `GPU_ARCHS=gfx1200;gfx1201`, hipcc emits code for both archs in one ninja rule per source file, so compile targets do **not** scale with arch count. In log lines `[n/N]`, **N** is the total ninja-graph target count; with a cache hit, N stays the same and only stale entries rebuild. Wheel size reference: full ~55 MB (build23), inference ~20 MB (build14).
 
 ## Trigger
 
@@ -75,7 +78,7 @@ ComfyUI **inference-only** wheel (workflow `ck_disable_bwd=true`, default):
 | `ninja_workers` | `4` | Ninja parallel workers (use `2` if OOM) |
 | `use_cache` | `true` | Set `false` to skip restore (still probes `exists`; `used=false`; save only after a successful compile) |
 | `publish_release` | `true` | Set `false` to skip GitHub Release upload |
-| `ck_disable_bwd` | `true` | Omit CK FMHA bwd codegen and enable `FLASHATTENTION_DISABLE_BACKWARD` (ComfyUI inference-only); set `false` for a full wheel including bwd |
+| `ck_disable_bwd` | `false` | Full build with bwd by default; set `true` to omit bwd codegen and enable `FLASHATTENTION_DISABLE_BACKWARD` (ComfyUI inference-only; smaller wheel, faster CI) |
 
 ### Serial (`build-fa2-ck-gfx120x-serial.yml`)
 
@@ -171,6 +174,8 @@ Smoke test: wheel filename/structure (.pyd size, METADATA) → pip install → i
 $PY = "<ComfyUI>\python_embeded\python.exe"
 & $PY -m pip install .\downloaded.whl
 ```
+
+ComfyUI diffusion inference only needs fwd; the default full wheel installs and runs as-is. When triggering CI yourself, check **`ck_disable_bwd=true`** for a shorter compile and smaller wheel (~20 MB vs ~55 MB; see parallel build14 / build23 in the table above).
 
 Launch arg: `--use-flash-attention` (instead of `--use-pytorch-cross-attention`).
 

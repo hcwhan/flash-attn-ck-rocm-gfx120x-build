@@ -1,6 +1,6 @@
 # flash-attn-ck-rocm-gfx120x-build
 
-**Windows / gfx120x（RDNA4）/ PyTorch 2.12.0+rocm7.14.0 / Python 3.12** 推理专用 FlashAttention 2 CK wheel。版本 pin 见 **`VERSION.lock.json`**。仅 **CI**（`windows-2022` 干净 runner），无本地编译入口。编排脚本为 **TypeScript**（Node 26 + `tsx`；亦可 `npm run fa -- <cmd>`）。
+**Windows / gfx120x（RDNA4）/ PyTorch 2.12.0+rocm7.14.0 / Python 3.12** FlashAttention 2 CK wheel。版本 pin 见 **`VERSION.lock.json`**。仅 **CI**（`windows-2022` 干净 runner），无本地编译入口。编排脚本为 **TypeScript**（Node 26 + `tsx`；亦可 `npm run fa -- <cmd>`）。
 
 ## CI 路径
 
@@ -18,7 +18,7 @@
 | FA 源码根 | `FA_SRC` / `--fa-src` / composite `fa-src` | 全层一致 |
 | parallel staging 根 | `FA_STAGING` / `--staging-root` | artifact `d{dim}` 下载目录；08.wheel parallel link |
 | lock CK OPT_DIM | `CK_OPT_DIM` | lock `ck_opt_dim` 逗号列表 |
-| workflow CK bwd | `CK_FMHA_DISABLE_BWD` | workflow `ck_disable_bwd`（默认 `true` = 推理专用，跳过 bwd codegen + `FLASHATTENTION_DISABLE_BACKWARD`） |
+| workflow CK bwd | `CK_FMHA_DISABLE_BWD` | workflow `ck_disable_bwd`（默认 `false` = 完整编译含 bwd；设为 `true` 跳过 bwd codegen + `FLASHATTENTION_DISABLE_BACKWARD` 推理专用） |
 | 第一档 OPT_DIM | `PRIMARY_DIM` / `--primary-dim` / job output `primary-dim` | parallel link 用 |
 | 单 shard OPT_DIM | matrix `opt-dim` / CLI `--opt-dim` | parallel compile 单值 |
 | 构建模式 | `--build-variant serial\|parallel` | verify / publish / fingerprint 共用 |
@@ -106,7 +106,7 @@
 - **ninja cache save**：`use_cache=true` 时 build 非 skipped 即 save；**`use_cache=false` 时仅成功时 save**；`cache-exists` 时 save 前先 delete
 - **全模式 prebuilt obj 两向 stamp** / **link 排除 `fmha_*_api.obj`**：见 `build/build-fa-steps.py` 注释。
 - **patch 程序化**（`04.patch`）；`CK_OPT_DIM` / `GPU_ARCHS` / `CK_FMHA_DISABLE_BWD` 只从 env 取
-- **ComfyUI 推理 wheel 默认 workflow `ck_disable_bwd=true`**（fwd-only CK FMHA；调用 backward 运行时 `TORCH_CHECK`）
+- **workflow 默认 `ck_disable_bwd=false`**（完整包含 fwd + bwd CK FMHA；设为 `true` 时为 ComfyUI 推理专用 wheel）
 - **双 gfx12 架构**：`compile.gpu_archs` 为唯一源（当前 `gfx1200;gfx1201`）；经 `GPU_ARCHS` 传给 FA setup.py，无额外 patch。
 
 ## 编写规范

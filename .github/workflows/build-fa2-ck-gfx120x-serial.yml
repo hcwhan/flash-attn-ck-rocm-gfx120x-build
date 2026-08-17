@@ -18,10 +18,10 @@ on:
         required: false
         default: true
       ck_disable_bwd:
-        description: "省略 CK FMHA bwd codegen 并启用 FLASHATTENTION_DISABLE_BACKWARD（ComfyUI 推理专用）"
+        description: "设为 true 时省略 CK FMHA bwd codegen 并启用 FLASHATTENTION_DISABLE_BACKWARD（ComfyUI 推理专用）；默认 false 完整编译含 bwd"
         type: boolean
         required: false
-        default: true
+        default: false
 
 concurrency:
   group: build-fa2-ck-gfx120x-serial
@@ -35,7 +35,7 @@ env:
   MAX_JOBS: ${{ github.event.inputs.ninja_workers }}
   FA_SRC: C:\fa\flash-attention
   USE_CACHE: ${{ github.event.inputs.use_cache != 'false' && 'true' || 'false' }}
-  CK_FMHA_DISABLE_BWD: ${{ github.event.inputs.ck_disable_bwd != 'false' && '1' || '0' }}
+  CK_FMHA_DISABLE_BWD: ${{ github.event.inputs.ck_disable_bwd == 'true' && '1' || '0' }}
 
 jobs:
   compile-full-and-link-wheel:

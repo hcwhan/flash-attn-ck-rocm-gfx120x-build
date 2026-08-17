@@ -44,20 +44,23 @@
 
 ## 编译配置
 
-ComfyUI **推理专用** wheel（workflow `ck_disable_bwd=true`，默认）：
+FlashAttention 2 CK wheel 构建配置（workflow `ck_disable_bwd=false`，默认）：
 
-- CK 内核：**fwd + fwd_appendkv + fwd_splitkv**（`CK_FMHA_DISABLE_BWD=1` 时无 bwd）
-- **`-DFLASHATTENTION_DISABLE_BACKWARD`**（`CK_FMHA_DISABLE_BWD=1` 时启用）
+- CK 内核：**fwd + fwd_appendkv + fwd_splitkv + bwd**（`CK_FMHA_DISABLE_BWD=0` 默认完整编译；设为 `1` 时无 bwd）
+- **`-DFLASHATTENTION_DISABLE_BACKWARD`**（仅 `CK_FMHA_DISABLE_BWD=1` 时启用）
 - **C++11 ABI `cxx11.abi`**（与 pin 的 PyTorch 一致；local tag 见 `wheel.wheel_local_version`）
 - **`GPU_ARCHS`** = lock `compile.gpu_archs`（Windows 分号分隔）
 - **`CK_OPT_DIM`** = lock `compile.ck_opt_dim`（当前 `32,64,128,256`）；`init-build-env.ts` 映射为 upstream `OPT_DIM` env
 
-| 范围 | 约计 ninja targets |
-|------|-------------------|
-| link 汇总全量（双 arch） | **~924** |
-| 单 OPT_DIM shard（双 arch） | **~218–288** |
+| `ck_disable_bwd` | 范围 | 约计 ninja targets（双 arch，cold compile） | CI 参考 |
+|------------------|------|-------------------------------------------|---------|
+| `false`（默认，含 bwd） | 串行全量 compile | **1837** | serial build24 |
+| `false` | parallel 单 shard（d32 / d64 / d128 / d256） | **447 / 453 / 517 / 453** | parallel build22 |
+| `false` | parallel link（API dispatch 重编） | **4** | parallel build23 |
+| `true`（推理专用） | parallel 单 shard（d32 / d64 / d128 / d256） | **192 / 200 / 272 / 204** | parallel build14 |
+| `true` | parallel link（API dispatch 重编） | **3** | parallel build14 |
 
-> `GPU_ARCHS=gfx1200;gfx1201` 时 hipcc 在同一 ninja rule 内为两个 arch 生成代码，**不会**按 arch 数量倍增 compile targets（CI 日志中可见 `[n/924]`）。
+> `GPU_ARCHS=gfx1200;gfx1201` 时 hipcc 在同一 ninja rule 内为两个 arch 生成代码，**不会**按 arch 数量倍增 compile targets。日志 `[n/N]` 中 **N** 为 ninja 图总 target 数；ninja cache 命中时 N 不变、仅重建过期条目。wheel 体积参考：full ~55 MB（build23），inference ~20 MB（build14）。
 
 ## 触发方式
 
@@ -75,7 +78,7 @@ ComfyUI **推理专用** wheel（workflow `ck_disable_bwd=true`，默认）：
 | `ninja_workers` | `4` | Ninja 并行 worker 数（OOM 时可改为 `2`） |
 | `use_cache` | `true` | 设为 `false` 时不 restore（仍 lookup 探测 `exists`；`used=false`；仅 compile 成功时 save） |
 | `publish_release` | `true` | 设为 `false` 时跳过 GitHub Release 上传 |
-| `ck_disable_bwd` | `true` | 省略 CK FMHA bwd codegen 并启用 `FLASHATTENTION_DISABLE_BACKWARD`（ComfyUI 推理专用）；设为 `false` 时编译含 bwd 的完整 wheel |
+| `ck_disable_bwd` | `false` | 默认完整编译含 bwd；设为 `true` 时省略 bwd codegen 并启用 `FLASHATTENTION_DISABLE_BACKWARD`（ComfyUI 推理专用，wheel 更小、CI 更快） |
 
 ### 串行（`build-fa2-ck-gfx120x-serial.yml`）
 
@@ -171,6 +174,8 @@ Smoke test：wheel 文件名/结构（.pyd 体积、METADATA）→ pip 安装 �
 $PY = "<ComfyUI>\python_embeded\python.exe"
 & $PY -m pip install .\downloaded.whl
 ```
+
+ComfyUI 扩散推理只需 fwd，默认 full wheel 可直接安装使用。若自行触发 CI 构建，手动勾选 **`ck_disable_bwd=true`** 可缩短编译并减小 wheel（约 20 MB vs ~55 MB；见上表 parallel build14 / build23）。
 
 启动参数：`--use-flash-attention`（替代 `--use-pytorch-cross-attention`）。
 
