@@ -22,6 +22,11 @@ on:
         type: boolean
         required: false
         default: false
+      retry_count:
+        description: "看门狗 retry 计数（≥8 不再自动触发）"
+        type: string
+        required: false
+        default: "0"
 
 concurrency:
   group: build-fa2-ck-gfx120x-parallel
@@ -36,6 +41,8 @@ env:
   FA_SRC: C:\fa\flash-attention
   FA_STAGING: C:\fa-staging
   USE_CACHE: ${{ github.event.inputs.use_cache != 'false' && 'true' || 'false' }}
+  PUBLISH_RELEASE: ${{ github.event.inputs.publish_release != 'false' && 'true' || 'false' }}
+  RETRY_COUNT: ${{ github.event.inputs.retry_count || '0' }}
   CK_FMHA_DISABLE_BWD: ${{ github.event.inputs.ck_disable_bwd == 'true' && '1' || '0' }}
 
 jobs:
@@ -100,11 +107,34 @@ jobs:
           use-cache: ${{ env.USE_CACHE }}
           run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ matrix.opt-dim }}" --fa-src $env:FA_SRC
 
+      - name: Write watchdog abort metadata
+        if: always() && !cancelled() && env.ABORT_TRIGGERED == 'true' && env.COMPILE_COMPLETE != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path abort-meta | Out-Null
+          $entry = [ordered]@{
+            opt_dim = '${{ matrix.opt-dim }}'
+            abort_triggered = $true
+            force_killed = ($env:ABORT_FORCE_KILLED -eq 'true')
+          }
+          $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath abort-meta/d${{ matrix.opt-dim }}.json -Encoding utf8
+
+      - name: Upload watchdog abort metadata
+        if: always() && !cancelled() && env.ABORT_TRIGGERED == 'true' && env.COMPILE_COMPLETE != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: abort-meta-d${{ matrix.opt-dim }}
+          path: abort-meta/d${{ matrix.opt-dim }}.json
+          retention-days: 1
+          if-no-files-found: error
+
       - name: Validate compile shard outputs
+        if: success()
         shell: pwsh
         run: npx tsx scripts/cli.ts 07.shard --fa-src $env:FA_SRC --opt-dim "${{ matrix.opt-dim }}"
 
       - name: Write compile cache metadata
+        if: success()
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path cache-meta | Out-Null
@@ -117,6 +147,7 @@ jobs:
           $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath cache-meta/d${{ matrix.opt-dim }}.json -Encoding utf8
 
       - name: Upload compile cache metadata
+        if: success()
         uses: actions/upload-artifact@v7
         with:
           name: cache-meta-d${{ matrix.opt-dim }}
@@ -125,6 +156,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload object files
+        if: success()
         uses: actions/upload-artifact@v7
         with:
           name: d${{ matrix.opt-dim }}
@@ -133,9 +165,48 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
 
+  watchdog-retry:
+    name: watchdog-retry
+    needs: [plan-opt-dim, compile]
+    if: always() && !cancelled() && needs.compile.result == 'failure'
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v7
+
+      - name: Bootstrap build job
+        uses: "./.github/actions/A00.fa-job-bootstrap"
+        with:
+          prep-source: false
+          setup-toolchain: false
+
+      - name: Download compile cache metadata
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          pattern: cache-meta-d*
+          path: cache-meta
+          merge-multiple: true
+
+      - name: Download watchdog abort metadata
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          pattern: abort-meta-d*
+          path: abort-meta
+          merge-multiple: true
+
+      - name: Retry after watchdog abort
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npx tsx scripts/cli.ts 12.watchdog-retry --build-variant parallel --abort-meta-dir abort-meta --cache-meta-dir cache-meta --all-opt-dims '${{ needs.plan-opt-dim.outputs.opt-dims-json }}'
+
   link:
     name: link-wheel
     needs: [plan-opt-dim, compile]
+    if: needs.compile.result == 'success'
     runs-on: windows-2022
 
     steps:

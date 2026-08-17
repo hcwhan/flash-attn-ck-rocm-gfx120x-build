@@ -96,11 +96,14 @@ function readWorkflowDispatch(): {
   ninja_workers: number;
   use_cache: boolean;
   ck_disable_bwd: boolean;
+  retry_count: number;
 } {
   const maxJobs = requireGithubActionsEnv("MAX_JOBS");
   const useCache = requireGithubActionsEnv("USE_CACHE");
   const ckFmhaDisableBwd = requireGithubActionsEnv("CK_FMHA_DISABLE_BWD");
+  const retryCountRaw = requireGithubActionsEnv("RETRY_COUNT");
   const ninjaWorkers = Number(maxJobs);
+  const retryCount = Number.parseInt(retryCountRaw, 10);
   if (
     !Number.isFinite(ninjaWorkers) ||
     !Number.isInteger(ninjaWorkers) ||
@@ -118,10 +121,14 @@ function readWorkflowDispatch(): {
       `CK_FMHA_DISABLE_BWD must be '1' or '0', got ${ckFmhaDisableBwd}`,
     );
   }
+  if (!Number.isFinite(retryCount) || !Number.isInteger(retryCount) || retryCount < 0) {
+    throw new Error(`RETRY_COUNT must be a non-negative integer, got ${retryCountRaw}`);
+  }
   return {
     ninja_workers: ninjaWorkers,
     use_cache: useCache === "true",
     ck_disable_bwd: ckFmhaDisableBwd === "1",
+    retry_count: retryCount,
   };
 }
 

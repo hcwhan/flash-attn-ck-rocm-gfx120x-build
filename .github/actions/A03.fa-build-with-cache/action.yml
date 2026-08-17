@@ -32,7 +32,7 @@ runs:
       # cache-exists 时先 delete，以便 save 刷新（actions/cache/save 对已存在 key 会失败）。
       # use-cache=true：成功或失败均 delete（允许部分 save）。
       # use-cache=false：仅成功时 delete（仅 lookup 冷构建刷新路径）。
-      if: always() && steps.run-build.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-build.conclusion == 'success') && inputs.cache-exists == 'true' && inputs.cache-primary-key != ''
+      if: always() && steps.run-build.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-build.conclusion == 'success') && inputs.cache-exists == 'true' && inputs.cache-primary-key != '' && env.ABORT_FORCE_KILLED != 'true'
       shell: pwsh
       env:
         GH_TOKEN: ${{ github.token }}
@@ -46,7 +46,7 @@ runs:
         }
 
     - name: Save ninja incremental build cache
-      if: always() && steps.run-build.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-build.conclusion == 'success') && inputs.cache-primary-key != ''
+      if: always() && steps.run-build.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-build.conclusion == 'success') && inputs.cache-primary-key != '' && env.ABORT_FORCE_KILLED != 'true'
       uses: "./.github/actions/A04.fa-ninja-cache-save"
       with:
         fa-src: ${{ inputs.fa-src }}

@@ -80,18 +80,31 @@ FlashAttention 2 CK wheel default build profile (workflow `ck_disable_bwd=false`
 | `publish_release` | `true` | Set `false` to skip GitHub Release upload |
 | `ck_disable_bwd` | `false` | Full build with bwd by default; set `true` to omit bwd codegen and enable `FLASHATTENTION_DISABLE_BACKWARD` (ComfyUI inference-only; smaller wheel, faster CI) |
 
+### Watchdog and auto-retry
+
+GitHub-hosted runner jobs have a **6-hour** hard limit. A **5-hour** watchdog starts at A00 bootstrap step 1: on expiry, 3× SIGINT graceful abort → save ninja cache → auto `workflow_dispatch` retry (`retry_count` increments internally, default `0`, **give up at ≥8**; do not set manually).
+
+| Condition | Behavior |
+|-----------|----------|
+| `use_cache=true` (default) | Save cache after abort and auto-retry |
+| `use_cache=false` | No save on compile failure; **no** auto-retry |
+| `taskkill` after 3× SIGINT | No save, no retry (`ABORT_FORCE_KILLED`) |
+
+Wheel / verify / publish do not run unless compile succeeds. `wheel.manifest.json` `dispatch.retry_count` records this run's retry count. **Parallel** runs a single auto-retry from the dedicated `watchdog-retry` job after all compile shards finish (shards upload `abort-meta-d{dim}`); **serial** retries inside the compile job. See [docs/watchdog-design.md](docs/watchdog-design.md).
+
 ### Serial (`build-fa2-ck-gfx120x-serial.yml`)
 
 | Job | Role | Timeout |
 |-----|------|---------|
-| `compile-full-and-link-wheel` | clone+patch, toolchain, cache, `06.compile` + `08.wheel`, CPU smoke test | 6 h (default) |
+| `compile-full-and-link-wheel` | clone+patch, toolchain, cache, `06.compile` + `08.wheel`, CPU smoke test | 6 h (GitHub limit; compile bounded by 5h watchdog) |
 
 ### Parallel (`build-fa2-ck-gfx120x-parallel.yml`)
 
 | Job | Role | Timeout |
 |-----|------|---------|
 | `plan-opt-dim` | export parallel OPT_DIM matrix | 5 min |
-| `compile-d32` … `d256` | clone+patch per job, one OPT_DIM shard each, upload `.obj` | 6 h each (default) |
+| `compile-d32` … `d256` | clone+patch per job, one OPT_DIM shard each, upload `.obj` | 6 h each (GitHub limit; compile bounded by 5h watchdog) |
+| `watchdog-retry` | On compile failure: read abort/cache meta, single auto-retry dispatch | 10 min |
 | `link-wheel` | clone+patch, merge objs + link + wheel + CPU smoke test (**no** ninja cache) | 6 h (default) |
 
 > CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.

@@ -10,6 +10,7 @@ import { runShard } from "./commands/07.shard.js";
 import { runWheel } from "./commands/08.wheel.js";
 import { runVerify } from "./commands/09.verify.js";
 import { runPublish } from "./commands/10.publish.js";
+import { runWatchdogRetry } from "./commands/12.watchdog-retry.js";
 
 const program = new Command();
 
@@ -74,11 +75,11 @@ program
 
 program
   .command("06.compile")
-  .description("编译单个 OPT_DIM shard 或 lock 全量 ck_opt_dim")
+  .description("编译单个 OPT_DIM shard 或 lock 全量 ck_opt_dim（含 5h 看门狗）")
   .requiredOption("--opt-dim <value>")
   .requiredOption("--fa-src <path>")
-  .action((opts) => {
-    runCompile({
+  .action(async (opts) => {
+    await runCompile({
       optDim: opts.optDim,
       faSrc: opts.faSrc,
     });
@@ -142,6 +143,51 @@ program
       distDir: opts.distDir,
       workflowName: opts.workflowName,
       buildVariant: opts.buildVariant,
+    });
+  });
+
+program
+  .command("12.watchdog-retry")
+  .description("看门狗中断后 dispatch retry workflow（gh api + 等 concurrency cancel）")
+  .requiredOption("--build-variant <mode>", "serial 或 parallel")
+  .option(
+    "--abort-meta-dir <path>",
+    "parallel watchdog-retry job：读取 compile shard 上传的 abort 元数据目录",
+  )
+  .option(
+    "--cache-meta-dir <path>",
+    "parallel watchdog-retry job：读取成功 shard 的 cache-meta 目录",
+  )
+  .option(
+    "--all-opt-dims <json>",
+    "parallel watchdog-retry job：plan 导出的全部 OPT_DIM JSON 数组",
+  )
+  .action(async (opts) => {
+    const buildVariant = opts.buildVariant as "serial" | "parallel";
+    if (buildVariant !== "serial" && buildVariant !== "parallel") {
+      throw new Error(`build-variant must be serial or parallel, got ${opts.buildVariant}`);
+    }
+
+    let allOptDims: string[] | undefined;
+    if (opts.allOptDims !== undefined) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(opts.allOptDims);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        throw new Error(`Invalid --all-opt-dims JSON: ${detail}`);
+      }
+      if (!Array.isArray(parsed) || parsed.some((dim) => typeof dim !== "string" || dim.length === 0)) {
+        throw new Error("--all-opt-dims must be a JSON array of non-empty strings");
+      }
+      allOptDims = parsed;
+    }
+
+    await runWatchdogRetry({
+      buildVariant,
+      abortMetaDir: opts.abortMetaDir,
+      cacheMetaDir: opts.cacheMetaDir,
+      allOptDims,
     });
   });
 

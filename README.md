@@ -80,18 +80,31 @@ FlashAttention 2 CK wheel 构建配置（workflow `ck_disable_bwd=false`，默�
 | `publish_release` | `true` | 设为 `false` 时跳过 GitHub Release 上传 |
 | `ck_disable_bwd` | `false` | 默认完整编译含 bwd；设为 `true` 时省略 bwd codegen 并启用 `FLASHATTENTION_DISABLE_BACKWARD`（ComfyUI 推理专用，wheel 更小、CI 更快） |
 
+### 看门狗与自动 retry
+
+GitHub-hosted runner 的 job 硬上限为 **6 小时**。compile 自 A00 bootstrap 第一步起算 **5 小时**看门狗：到期后 3× SIGINT 优雅中断 → save ninja cache → 自动 dispatch retry（`retry_count` 内部递增，默认 `0`，**≥8 放弃**；手动触发时无需填写）。
+
+| 条件 | 行为 |
+|------|------|
+| `use_cache=true`（默认） | 中断后 save cache 并 auto-retry |
+| `use_cache=false` | compile 失败时不 save；**不** auto-retry |
+| 3× SIGINT 后需 `taskkill` | 不 save、不 retry（`ABORT_FORCE_KILLED`） |
+
+wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.json` 的 `dispatch.retry_count` 记录本次 run 的 retry 计数。**parallel** 在全部 compile shard 结束后由独立 `watchdog-retry` job 单次 auto-retry（compile shard 上传 `abort-meta-d{dim}`）；**serial** 在 compile job 内 retry。详见 [docs/watchdog-design.md](docs/watchdog-design.md)。
+
 ### 串行（`build-fa2-ck-gfx120x-serial.yml`）
 
 | Job | 作用 | 超时 |
 |-----|------|------|
-| `compile-full-and-link-wheel` | clone+patch、toolchain、cache、`06.compile` + `08.wheel`、CPU smoke test | 6 h（默认） |
+| `compile-full-and-link-wheel` | clone+patch、toolchain、cache、`06.compile` + `08.wheel`、CPU smoke test | 6 h（GitHub 上限；compile 受 5h 看门狗约束） |
 
 ### 并行（`build-fa2-ck-gfx120x-parallel.yml`）
 
 | Job | 作用 | 超时 |
 |-----|------|------|
 | `plan-opt-dim` | 导出 parallel OPT_DIM matrix | 5 min |
-| `compile-d32` … `d256` | 各 job 内 clone+patch，编一个 OPT_DIM shard，上传 `.obj` | 各 6 h（默认） |
+| `compile-d32` … `d256` | 各 job 内 clone+patch，编一个 OPT_DIM shard，上传 `.obj` | 各 6 h（GitHub 上限；compile 受 5h 看门狗约束） |
+| `watchdog-retry` | compile 失败时读取 abort/cache meta、单次 auto-retry dispatch | 10 min |
 | `link-wheel` | clone+patch、合并 obj + link + 打 wheel + CPU smoke test（**无** ninja cache） | 6 h（默认） |
 
 > CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
