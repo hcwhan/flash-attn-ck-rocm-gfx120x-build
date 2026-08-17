@@ -20,9 +20,9 @@ GitHub-hosted runner 的 job 硬上限为 **6 小时**（不可突破）。compi
 4. 编译成功 → `COMPILE_COMPLETE=true`。
 5. **A03** save ninja cache（`use_cache=true` 时失败也 save；`ABORT_FORCE_KILLED` 时跳过 save/delete）。
 6. **retry**：
-   - **serial**：compile job 内 save 后 **`07-retry`**（workflow 条件：`!cancelled() && ABORT_TRIGGERED && !COMPILE_COMPLETE && ABORT_FORCE_KILLED != 'true'`）。
-   - **parallel**：compile shard 上传 `abort-meta-d{dim}.json`；全部 shard 结束后独立 **`watchdog-retry`** job 下载 abort/cache meta，**单次**调用 **`07-retry --abort-meta-dir`**。
-7. wheel / verify / publish 仅在 **`link-wheel`**（compile 成功）或 serial compile job 成功路径执行。
+   - **serial**：compile job 内 save 后 **`07-retry`**（workflow 条件：`!cancelled() && ABORT_TRIGGERED && !COMPILE_COMPLETE && ABORT_FORCE_KILLED != 'true'`；普通 compile 失败不触发）。
+   - **parallel**：compile shard 写 `abort-meta/d{dim}.json` 并上传 artifact **`abort-meta-d{dim}`**；compile matrix **失败**且全部 shard 结束后独立 **`watchdog-retry`** job 下载 abort/cache meta，**单次**调用 **`07-retry --abort-meta-dir`**。
+7. wheel / verify / publish 仅在 compile 成功路径执行（serial 同 job 内 `09.wheel` → `A99`；parallel 独立 **`link-wheel`** job）。
 
 **Retry run（retry_count=N）：** 继承 `ninja_workers`、`use_cache`、`publish_release`、`ck_disable_bwd`，仅 `retry_count` 递增；restore ninja cache 后续接编译，重复看门狗 + retry，直至 5h 内完成或 `retry_count >= 8`。
 
@@ -32,7 +32,7 @@ GitHub-hosted runner 的 job 硬上限为 **6 小时**（不可突破）。compi
 
 1. 从 `--all-opt-dims` 得 plan 全部 OPT_DIM；从 `--cache-meta-dir` 得已成功 shard（有 cache-meta 的 dim）。
 2. `failedDims` = 全部 dim − 成功 dim。
-3. 从 `--abort-meta-dir` 读 abort 条目；任一 `force_killed=true` → 直接 throw（不 retry）。
+3. 从 `--abort-meta-dir` 读 abort 条目（JSON 文件 `abort-meta/d{dim}.json`，artifact 名 `abort-meta-d{dim}`）；任一 `force_killed=true` → 直接 throw（不 retry）。
 4. **eligible** 当且仅当 `failedDims` 与 abort 条目中的 `opt_dim` 集合**完全一致**（无缺项、无多余、无非看门狗失败 shard）。
 
 不支持 partial link：部分 shard 成功时 matrix 仍为 `failure`，`link-wheel` 跳过，由 retry run 全量重跑（已成功 shard 的 ninja cache 可被 restore 加速）。

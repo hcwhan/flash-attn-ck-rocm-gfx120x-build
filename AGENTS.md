@@ -6,8 +6,8 @@
 
 | Workflow | 链路 |
 |----------|------|
-| **serial** | `compile-full-and-link-wheel`（clone+patch → `06.compile` → 失败 `07-retry` / 成功 `09.wheel` → `10.verify`/`11.publish`） |
-| **parallel** | `02.plan-opt-dim-matrix` → compile shard（`06.compile` → `08.shard`）→ 失败 `07-retry` / 成功 `09.wheel` → `10.verify`/`11.publish` |
+| **serial** | `compile-full-and-link-wheel`：`06.compile` → 看门狗中止时同 job `07-retry` / 成功 `09.wheel` → `A99`（`10.verify`/`11.publish`） |
+| **parallel** | `plan-opt-dim` → `compile-d*`（`06.compile` → `08.shard`）→ matrix 失败时 `watchdog-retry`（`07-retry`）/ 成功时 `link-wheel`（`09.wheel` → `A99`） |
 
 手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。Ninja cache：串行 `fa2-ck-gfx120x-serial-v7-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`；并行 `fa2-ck-gfx120x-parallel-v7-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[…]-rocmClang[…]-ninja[…]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = `fmha_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；精确 key，无 `restore-keys`；serial/parallel 互不共用）。Pip：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
 
@@ -107,7 +107,7 @@
 - **`PRIMARY_DIM`** = lock `ck_opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
 - **`ninja_workers` 默认 4**（OOM 改 2）；**`use_cache` 默认 true**（false 时 lookup-only：`cache-exists` 仍探测，`cache-used=false`）
 - **ninja cache save**：`use_cache=true` 时 build 非 skipped 即 save；**`use_cache=false` 时仅成功时 save**；`cache-exists` 时 save 前先 delete
-- **看门狗 5h 优雅中断**：A00 第一步写 `JOB_START_TIME`；`watchdog.ts` deadline 到期后写 `ABORT_TRIGGERED`/`COMPILE_COMPLETE=false`，3× SIGINT（1min 间隔；失败则 `ABORT_FORCE_KILLED` + taskkill，**不 save/retry**）；A03 save 后 serial 在 compile job 内 `07-retry`；parallel compile 上传 `abort-meta-d{dim}`，**全部 shard 结束后** 独立 `watchdog-retry` job 单次 retry；`use_cache=true && retry_count<8`；wheel 等仅在 `link-wheel`（compile 成功）执行（详见 `docs/watchdog-design.md`）
+- **看门狗 5h 优雅中断**：A00 第一步写 `JOB_START_TIME`；`watchdog.ts` deadline 到期后写 `ABORT_TRIGGERED`/`COMPILE_COMPLETE=false`，3× SIGINT（1min 间隔；失败则 `ABORT_FORCE_KILLED` + taskkill，**不 save/retry**）；A03 save 后 serial 在 compile job 内 `07-retry`；parallel compile 上传 artifact `abort-meta-d{dim}`（文件 `abort-meta/d{dim}.json`），compile matrix **失败**且全部 shard 结束后独立 `watchdog-retry` job 单次 retry；`use_cache=true && retry_count<8`；wheel 等仅在 compile 成功路径（serial 同 job / parallel `link-wheel`）执行（详见 `docs/watchdog-design.md`）
 - **全模式 prebuilt obj 两向 stamp** / **link 排除 `fmha_*_api.obj`**：见 `build/build-fa-steps.py` 注释。
 - **patch 程序化**（`04.patch`）；`CK_OPT_DIM` / `GPU_ARCHS` / `CK_FMHA_DISABLE_BWD` 只从 env 取
 - **workflow 默认 `ck_disable_bwd=false`**（完整包含 fwd + bwd CK FMHA；设为 `true` 时为 ComfyUI 推理专用 wheel）

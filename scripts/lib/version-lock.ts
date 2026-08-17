@@ -8,7 +8,7 @@ const gitShaSchema = z
   .string()
   .regex(/^[0-9a-f]{40}$/i, "must be a 40-character git commit SHA");
 
-/** lock `build_commit`：40 位 SHA 或 semver tag（如 v2.7.4）。 */
+/** lock `build_commit`：40 位 SHA 或 semver tag（如 v2.8.4）。 */
 const gitBuildRefSchema = z
   .string()
   .min(1)
@@ -16,7 +16,7 @@ const gitBuildRefSchema = z
     (value) =>
       gitShaSchema.safeParse(value).success ||
       /^v\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$/.test(value),
-    "must be a 40-character git commit SHA or a version tag (e.g. v2.7.4)",
+    "must be a 40-character git commit SHA or a version tag (e.g. v2.8.4)",
   );
 
 const ckOptDimSchema = z

@@ -23,7 +23,7 @@
 | 分组 | 字段 | 作用 |
 |------|------|------|
 | `toolchain` | `python`、`pytorch`、`torch_device_extra`、`rocm_index`、`rocm` | pip 工具链 pin |
-| `flash_attention` | `repo`、`build_commit`、`build_commit_date` | 每次构建精确 clone 的 FA 源码（`build_commit` 可为 40 位 SHA 或 tag，如 `v2.7.4.post1`）；**升级 FA 时改 `build_commit` 与 `build_commit_date`** |
+| `flash_attention` | `repo`、`build_commit`、`build_commit_date` | 每次构建精确 clone 的 FA 源码（`build_commit` 可为 40 位 SHA 或 tag，如 `v2.8.4`）；**升级 FA 时改 `build_commit` 与 `build_commit_date`** |
 | `flash_attention` | `min_commit` | RDNA4 gfx12x 最低要求 commit（[PR #2400](https://github.com/Dao-AILab/flash-attention/pull/2400)）；**仅人类可读参考** |
 | `compile` | `gpu_archs`、`ck_opt_dim` | HIP 编译目标（**唯一架构源**）、CK FMHA `opt_dim` 档位 |
 | `wheel` | `wheel_local_version` | wheel 的 `+local` 标签（env `WHEEL_LOCAL_VERSION`；wheel 时映射 upstream `FLASH_ATTN_LOCAL_VERSION`） |
@@ -54,8 +54,8 @@ FlashAttention 2 CK wheel 构建配置（workflow `ck_disable_bwd=false`，默�
 
 | `ck_disable_bwd` | 范围 | 约计 ninja targets（双 arch，cold compile） | CI 参考 |
 |------------------|------|-------------------------------------------|---------|
-| `false`（默认，含 bwd） | 串行全量 compile | **1837** | serial build24 |
-| `false` | parallel 单 shard（d32 / d64 / d128 / d256） | **447 / 453 / 517 / 453** | parallel build22 |
+| `false`（默认，含 bwd） | 串行全量 compile | **1837** | serial build27 |
+| `false` | parallel 单 shard（d32 / d64 / d128 / d256） | **447 / 453 / 517 / 453** | parallel build23（compile-d*） |
 | `false` | parallel link（API dispatch 重编） | **4** | parallel build23 |
 | `true`（推理专用） | parallel 单 shard（d32 / d64 / d128 / d256） | **192 / 200 / 272 / 204** | parallel build14 |
 | `true` | parallel link（API dispatch 重编） | **3** | parallel build14 |
@@ -79,6 +79,7 @@ FlashAttention 2 CK wheel 构建配置（workflow `ck_disable_bwd=false`，默�
 | `use_cache` | `true` | 设为 `false` 时不 restore（仍 lookup 探测 `exists`；`used=false`；仅 compile 成功时 save） |
 | `publish_release` | `true` | 设为 `false` 时跳过 GitHub Release 上传 |
 | `ck_disable_bwd` | `false` | 默认完整编译含 bwd；设为 `true` 时省略 bwd codegen 并启用 `FLASHATTENTION_DISABLE_BACKWARD`（ComfyUI 推理专用，wheel 更小、CI 更快） |
+| `retry_count` | `0` | 看门狗 auto-retry 内部递增；手动触发时保持默认，**勿改** |
 
 ### 看门狗与自动 retry
 
@@ -90,13 +91,13 @@ GitHub-hosted runner 的 job 硬上限为 **6 小时**。compile 自 A00 bootstr
 | `use_cache=false` | compile 失败时不 save；**不** auto-retry |
 | 3× SIGINT 后需 `taskkill` | 不 save、不 retry（`ABORT_FORCE_KILLED`） |
 
-wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.json` 的 `dispatch.retry_count` 记录本次 run 的 retry 计数。**parallel** 在全部 compile shard 结束后由独立 `watchdog-retry` job 调用 `07-retry`（compile shard 上传 `abort-meta-d{dim}`）；**serial** 在 compile job 内 `07-retry`。详见 [docs/watchdog-design.md](docs/watchdog-design.md)。
+wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.json` 的 `dispatch` 含 `retry_count` 等 workflow 快照（见下文 schema）。**parallel** 在 compile matrix **失败**且全部 shard 结束后，由独立 `watchdog-retry` job 调用 `07-retry`（失败 shard 上传 artifact `abort-meta-d{dim}`，文件 `abort-meta/d{dim}.json`）；**serial** 在 compile job 内看门狗中止时 `07-retry`（普通 compile 失败不 retry）。详见 [docs/watchdog-design.md](docs/watchdog-design.md)。
 
 ### 串行（`build-fa2-ck-gfx120x-serial.yml`）
 
 | Job | 作用 | 超时 |
 |-----|------|------|
-| `compile-full-and-link-wheel` | clone+patch、toolchain、cache、`06.compile`（失败时 `07-retry`）→ `09.wheel` → `10.verify` / `11.publish` | 6 h（GitHub 上限；compile 受 5h 看门狗约束） |
+| `compile-full-and-link-wheel` | clone+patch、toolchain、cache、`06.compile`（看门狗中止时 `07-retry`）→ `09.wheel` → `A99`（`10.verify` / `11.publish`） | 6 h（GitHub 上限；compile 受 5h 看门狗约束） |
 
 ### 并行（`build-fa2-ck-gfx120x-parallel.yml`）
 
@@ -104,8 +105,8 @@ wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.jso
 |-----|------|------|
 | `plan-opt-dim` | `02.plan-opt-dim-matrix` 导出 parallel OPT_DIM matrix | 5 min |
 | `compile-d32` … `d256` | clone+patch、`06.compile` → `08.shard`、上传 `.obj` | 各 6 h（GitHub 上限；compile 受 5h 看门狗约束） |
-| `watchdog-retry` | compile 失败时 `07-retry`（读 abort/cache meta、单次 auto-retry dispatch） | 10 min |
-| `link-wheel` | clone+patch、`09.wheel` → `10.verify` / `11.publish`（**无** ninja cache） | 6 h（默认） |
+| `watchdog-retry` | compile matrix 失败时 `07-retry`（读 abort/cache meta、单次 auto-retry dispatch；非看门狗失败则 throw） | 10 min |
+| `link-wheel` | clone+patch、`09.wheel` → `A99`（`10.verify` / `11.publish`；**无** ninja cache） | 6 h（默认） |
 
 > CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
 
@@ -151,17 +152,27 @@ GitHub Release（构建成功后自动上传；serial / parallel 使用不同 ta
 
 | Workflow | Tag 示例 | Release 标题示例 |
 |----------|----------|------------------|
-| serial | `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123` | FlashAttention 2 CK gfx120x Windows (serial) 2026.08.10 19:00:00 |
-| parallel | `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123` | FlashAttention 2 CK gfx120x Windows (parallel) 2026.08.10 19:00:00 |
+| serial | `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build27` | FlashAttention 2 CK gfx120x Windows (serial) 2026.08.10 19:00:00 |
+| parallel | `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build23` | FlashAttention 2 CK gfx120x Windows (parallel) 2026.08.10 19:00:00 |
 
 - `flash_attn-*.whl`
 - `flash_attn-*.whl.sha256`
 - `wheel.manifest.json`
 
+`wheel.manifest.json` 由 `10.verify` 写入（CI 经 `A99.fa-verify-publish` 上传）。主要字段：
+
+| 字段 | 含义 |
+|------|------|
+| `fmha_bwd` | 顶层；是否编译 bwd 内核（=`CK_FMHA_DISABLE_BWD=0`） |
+| `dispatch` | `ninja_workers`、`use_cache`、`ck_disable_bwd`、`retry_count`（workflow 快照） |
+| `build_caches[]` | serial 单条 / parallel 四 shard（`opt_dim` / `key` / `exists` / `used`） |
+
+> 旧版 manifest 可能在顶层使用 `ck_disable_bwd`，或 cache key 为 `*-v6`（无 `bwd[...]` 段）；以当前 `10.verify` 输出为准。`dist/` 内样例可能来自较早 CI run。
+
 ```powershell
 gh release list
-gh release download flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build123 -D .\dist
-gh release download flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build123 -D .\dist
+gh release download flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-serial-build27 -D .\dist
+gh release download flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x-parallel-build23 -D .\dist
 ```
 
 预期 wheel 文件名（由 `wheel.wheel_local_version` + `toolchain.python` 推导；PEP 440 将 local tag 中的 `-`、`_` 规范化为 `.`）：
