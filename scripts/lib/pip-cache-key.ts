@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
+
 import { cacheKeyToken } from "./cache-key-token.js";
+
+export const PIP_TOOLCHAIN_CACHE_PREFIX = "fa-pip-toolchain-v2";
 
 function cacheKeySegment(label: string, value: string): string {
   return `${label}[${cacheKeyToken(value)}]`;
@@ -18,7 +21,7 @@ export function buildPipToolchainCacheKey(options: {
     .slice(0, 8);
 
   return [
-    "fa-pip-toolchain-v2",
+    PIP_TOOLCHAIN_CACHE_PREFIX,
     cacheKeySegment("py", options.pythonVersion),
     cacheKeySegment("pt", options.pytorchVersion),
     cacheKeySegment("dev", options.torchDeviceExtra),

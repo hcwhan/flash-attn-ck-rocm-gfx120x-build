@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { runCapture } from "../lib/exec.js";
 import { appendGithubOutput } from "../lib/github.js";
-import { buildNinjaCacheKey } from "../lib/ninja-cache-key.js";
+import { buildNinjaCacheFamilyKey, buildNinjaCacheKey } from "../lib/ninja-cache-key.js";
 import {
   parseRocmClangFullVersion,
   resolveNinjaMinorVersion,
@@ -135,17 +135,23 @@ export function runToolchainFingerprint(options?: {
     const fmhaBwd = ckFmhaDisableBwd === "0";
     console.log(`fmha_bwd (cache key): ${fmhaBwd}`);
 
-    const cacheKey = buildNinjaCacheKey({
-      buildVariant,
+    const cacheKeyOptions = {
+      buildVariant: buildVariant as "serial" | "parallel",
       lockHash,
       fmhaBwd,
       optDim: options.optDim?.trim(),
       msvcVersion,
       rocmClangVersion,
       ninjaMinor,
-    });
+    };
+    const cacheFamilyKey = buildNinjaCacheFamilyKey(cacheKeyOptions);
+    const cacheKey = buildNinjaCacheKey(cacheKeyOptions);
+    console.log(`Ninja cache family-key: ${cacheFamilyKey}`);
     console.log(`Ninja cache key: ${cacheKey}`);
-    appendGithubOutput({ "cache-key": cacheKey });
+    appendGithubOutput({
+      "cache-family-key": cacheFamilyKey,
+      "cache-key": cacheKey,
+    });
     return;
   }
 

@@ -5,13 +5,12 @@ inputs:
   fa-src:
     description: flash-attention 源码根目录
     required: true
-  cache-primary-key:
-    description: A00 bootstrap 输出的 cache-primary-key
+  cache-family-key:
+    description: A00 bootstrap 输出的 cache-family-key
     required: true
-  cache-exists:
-    description: A00 bootstrap 输出的 cache-exists（true 时 save 前先 delete 旧条目）
-    required: false
-    default: "false"
+  cache-key:
+    description: A00 bootstrap 输出的 cache-key
+    required: true
   use-cache:
     description: true 时在 build 非 skipped 时 save；false 时仅 compile 成功时 save
     required: false
@@ -33,5 +32,5 @@ runs:
       uses: "./.github/actions/A01.fa-build-with-cache/A01.1.fa-post-build-cache"
       with:
         fa-src: ${{ inputs.fa-src }}
-        cache-primary-key: ${{ inputs.cache-primary-key }}
-        cache-exists: ${{ inputs.cache-exists }}
+        cache-family-key: ${{ inputs.cache-family-key }}
+        cache-key: ${{ inputs.cache-key }}

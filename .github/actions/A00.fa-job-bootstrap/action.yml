@@ -22,6 +22,9 @@ inputs:
     required: false
 
 outputs:
+  cache-family-key:
+    description: 05.toolchain-fingerprint 输出的 ninja cache family-key
+    value: ${{ steps.ninja-fingerprint.outputs.cache-family-key }}
   cache-key:
     description: 05.toolchain-fingerprint 输出的 ninja cache key
     value: ${{ steps.ninja-fingerprint.outputs.cache-key }}
@@ -31,9 +34,6 @@ outputs:
   cache-used:
     description: 已 restore ninja cache 到 build/
     value: ${{ steps.ninja-cache.outputs.cache-used }}
-  cache-primary-key:
-    description: ninja cache save/lookup 用的 key
-    value: ${{ steps.ninja-cache.outputs.cache-primary-key }}
 
 runs:
   using: composite
@@ -75,7 +75,6 @@ runs:
         torch-device-extra: ${{ env.TORCH_DEVICE_EXTRA }}
         rocm-index: ${{ env.ROCM_INDEX }}
         rocm-version: ${{ env.ROCM_VERSION }}
-        pip-cache-key: ${{ env.PIP_TOOLCHAIN_CACHE_KEY }}
 
     - name: Fingerprint toolchain for ninja cache key
       if: inputs.ninja-cache-restore == 'true'
@@ -95,5 +94,6 @@ runs:
       uses: "./.github/actions/A00.fa-job-bootstrap/A00.2.fa-ninja-cache-restore"
       with:
         fa-src: ${{ env.FA_SRC }}
+        cache-family-key: ${{ steps.ninja-fingerprint.outputs.cache-family-key }}
         cache-key: ${{ steps.ninja-fingerprint.outputs.cache-key }}
         use-cache: ${{ env.USE_CACHE }}

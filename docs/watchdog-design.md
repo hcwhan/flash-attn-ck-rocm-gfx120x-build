@@ -18,7 +18,7 @@ GitHub-hosted runner 的 job 硬上限为 **6 小时**（不可突破）。compi
 2. **`06.compile`**（经 **A01**）经 `spawnAsync` 启动 Python 编译，同时 `watchdog.ts` 注册单次 deadline（`jobStartMs + 5h`）。
 3. 到期且子进程仍在运行 → 写 `ABORT_TRIGGERED=true`、`COMPILE_COMPLETE=false` → 最多 **3× SIGINT**（间隔 1min）→ 仍不退出则 `taskkill /T /F` 并写 `ABORT_FORCE_KILLED=true`（**不 save、不 retry**）。中止期间 Node 通过 `process.on('SIGINT')` + `swallowSigint` 拦截误传到自身的 SIGINT，以保持存活并完成 save。
 4. 编译成功 → `COMPILE_COMPLETE=true`。
-5. **A01.1** save ninja cache + 180s 传播等待（`use_cache=true` 时失败也 save；`ABORT_FORCE_KILLED` 时 A01 跳过 post-build）。
+5. **A01.1** save ninja cache（`hcwhan/actions/cache/save`；内置 API verify + 同族 cleanup；`use_cache=true` 时失败也 save；`ABORT_FORCE_KILLED` 时 A01 跳过 post-build）。
 6. **retry**：
    - **serial**：compile job 内 save 后 **`07-retry`**（workflow 条件：`!cancelled() && ABORT_TRIGGERED && !COMPILE_COMPLETE && ABORT_FORCE_KILLED != 'true'`；普通 compile 失败不触发）。
    - **parallel**：compile shard 写 `abort-meta/d{dim}.json` 并上传 artifact **`abort-meta-d{dim}`**；compile matrix **失败**且全部 shard 结束后独立 **`watchdog-retry`** job 下载 abort/cache meta，**单次**调用 **`07-retry --build-variant parallel --abort-meta-dir … --cache-meta-dir … --all-opt-dims …`**。
@@ -93,7 +93,7 @@ GitHub-hosted runner 的 job 硬上限为 **6 小时**（不可突破）。compi
 | 风险 | 缓解 |
 |------|------|
 | SIGINT 单次失败 | 每 1min 重复，最多 3 次 |
-| 3 次后仍不退出 | `taskkill` + `ABORT_FORCE_KILLED=true`；A01 跳过 post-build save/delete，workflow 跳过 retry |
+| 3 次后仍不退出 | `taskkill` + `ABORT_FORCE_KILLED=true`；A01 跳过 post-build save，workflow 跳过 retry |
 | dispatch 失败 | 3 次重试 + 明确报错 |
 | 并发取消延迟 | 等 300s 后报错；wheel 仅在 compile 成功路径执行 |
 | parallel 非看门狗 compile 失败 | `watchdog-retry` job 运行后 `evaluateParallelWatchdogRetry` 拒绝并 failure |

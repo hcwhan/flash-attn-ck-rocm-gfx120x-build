@@ -110,16 +110,16 @@ Wheel / verify / publish do not run unless compile succeeds. `wheel.manifest.jso
 
 > Except `plan-opt-dim`, workflows do **not** set `timeout-minutes`; “not set” means the GitHub hosted runner default **6 h** job limit applies. Compile jobs additionally use a **5 h** watchdog from A00 step 1 (see above). CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
 
-- **Ninja cache** (`flash-attention/build/` incremental compile):
-  - Serial: `fa2-ck-gfx120x-serial-v7-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
-  - Parallel: `fa2-ck-gfx120x-parallel-v7-lock[{lockHash8}]-bwd[{true|false}]-dim[{ck_opt_dim}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+- **Ninja cache** (`flash-attention/build/` incremental compile; `hcwhan/actions/cache@v1`):
+  - **family-key** (cleanup scope): serial `fa2-ck-gfx120x-serial-v7`; parallel `fa2-ck-gfx120x-parallel-v7-dim[{ck_opt_dim}]`
+  - **cache-key** (lookup slot; actual GHA key = cache-key + UTC suffix): `{family}-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`: lock `toolchain`+`flash_attention`+`compile` → SHA256 prefix (8 hex chars; excludes `wheel`/`release`; excludes workflow `ck_disable_bwd`)
   - `bwd`: `fmha_bwd` (`true` = bwd kernels compiled; `false` = inference-only bwd omission)
   - `msvcVersion` / `rocmClangVersion`: full MSVC toolset version / parsed `clang --version` token (e.g. `14.44.35207`, `23.0.0git`); normalized via `cacheKeyToken` before entering the key
   - `ninja`: major.minor from `ninja --version`
-  - **Exact match only** (no `restore-keys`); serial / parallel keys are **not shared**
-  - With `use_cache=true`, cache is saved whenever the build step is not skipped; with `use_cache=false`, restore is skipped (`used=false`) and cache is saved only after a successful compile. When a remote entry exists (`exists`), it is deleted before save refreshes it.
-- **Pip toolchain cache** (`PIP_TOOLCHAIN_CACHE_KEY`): `fa-pip-toolchain-v2-py[{python}]-pt[{pytorch}]-dev[{torch_device_extra}]-rocm[{rocm}]-idx[{indexHash8}]` (`01.config`; `indexHash8` = lock `toolchain.rocm_index` → SHA256 prefix)
+  - restore/lookup picks the newest versioned key in the slot; save verifies via API + family cleanup; serial / parallel keys are **not shared**
+  - With `use_cache=true`, cache is saved whenever the build step is not skipped; with `use_cache=false`, restore is skipped (`used=false`) and cache is saved only after a successful compile
+- **Pip toolchain cache** (`PIP_TOOLCHAIN_CACHE_PREFIX` + `PIP_TOOLCHAIN_CACHE_KEY`): family `fa-pip-toolchain-v2`; key `fa-pip-toolchain-v2-py[{python}]-pt[{pytorch}]-dev[{torch_device_extra}]-rocm[{rocm}]-idx[{indexHash8}]` (`01.config`; `indexHash8` = lock `toolchain.rocm_index` → SHA256 prefix)
 - All four shards compile shared objs; link uses only the **first lock `ck_opt_dim` tier** (currently `32`) for shared objs.
 
 ### Build stages

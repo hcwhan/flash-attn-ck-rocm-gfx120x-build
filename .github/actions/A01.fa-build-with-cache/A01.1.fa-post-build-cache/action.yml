@@ -1,43 +1,23 @@
 name: FA post-build ninja cache save
-description: compile 后 delete stale、save ninja cache 与传播等待（由调用方 gate 执行条件）
+description: compile 后保存 ninja cache（清理与 verify 由 hcwhan/actions/cache 默认 cleanup-stale 处理；由调用方 gate 执行条件）
 
 inputs:
   fa-src:
     description: flash-attention 源码根目录
     required: true
-  cache-primary-key:
-    description: A00.2.fa-ninja-cache-restore 输出的 cache-primary-key
+  cache-family-key:
+    description: 05.toolchain-fingerprint 输出的 ninja cache family-key
     required: true
-  cache-exists:
-    description: true 时 save 前先 delete 旧条目（actions/cache/save 对已存在 key 会失败）
-    required: false
-    default: "false"
+  cache-key:
+    description: 05.toolchain-fingerprint 输出的 ninja cache key
+    required: true
 
 runs:
   using: composite
   steps:
-    - name: Delete stale ninja cache entry
-      if: inputs.cache-exists == 'true'
-      shell: pwsh
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        $key = [uri]::EscapeDataString('${{ inputs.cache-primary-key }}')
-        $ref = [uri]::EscapeDataString('${{ github.ref }}')
-        gh api --method DELETE "/repos/${{ github.repository }}/actions/caches?key=$key&ref=$ref"
-        if ($LASTEXITCODE -ne 0) {
-          Write-Error "Failed to delete stale ninja cache entry (key=$key, ref=$ref, exit=$LASTEXITCODE)"
-          exit $LASTEXITCODE
-        }
-
     - name: Save ninja incremental build cache
-      uses: actions/cache/save@v6
+      uses: hcwhan/actions/cache/save@v1
       with:
         path: ${{ inputs.fa-src }}\build
-        key: ${{ inputs.cache-primary-key }}
-
-    - name: Wait for GitHub Actions cache propagation
-      shell: pwsh
-      run: |
-        Write-Host "Waiting 180s after ninja cache save for GitHub cache API propagation..."
-        Start-Sleep -Seconds 180
+        family-key: ${{ inputs.cache-family-key }}
+        cache-key: ${{ inputs.cache-key }}

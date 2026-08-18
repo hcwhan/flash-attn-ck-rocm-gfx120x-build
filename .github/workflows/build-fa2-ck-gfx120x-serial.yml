@@ -64,8 +64,8 @@ jobs:
         uses: "./.github/actions/A01.fa-build-with-cache"
         with:
           fa-src: ${{ env.FA_SRC }}
-          cache-primary-key: ${{ steps.bootstrap.outputs.cache-primary-key }}
-          cache-exists: ${{ steps.bootstrap.outputs.cache-exists }}
+          cache-family-key: ${{ steps.bootstrap.outputs.cache-family-key }}
+          cache-key: ${{ steps.bootstrap.outputs.cache-key }}
           use-cache: ${{ env.USE_CACHE }}
           run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ env.CK_OPT_DIM }}" --fa-src $env:FA_SRC
 
