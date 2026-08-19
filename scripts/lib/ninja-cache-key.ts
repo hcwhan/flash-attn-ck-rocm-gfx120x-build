@@ -1,7 +1,7 @@
 import { cacheKeyToken } from "./cache-key-token.js";
 
-export const NINJA_CACHE_SERIAL_PREFIX = "fa2-ck-gfx120x-serial-v7";
-export const NINJA_CACHE_PARALLEL_PREFIX = "fa2-ck-gfx120x-parallel-v7";
+const NINJA_CACHE_SERIAL_PREFIX = "fa2-ck-gfx120x-serial-v7";
+const NINJA_CACHE_PARALLEL_PREFIX = "fa2-ck-gfx120x-parallel-v7";
 
 interface NinjaCacheFamilyKeyOptions {
   buildVariant: "serial" | "parallel";

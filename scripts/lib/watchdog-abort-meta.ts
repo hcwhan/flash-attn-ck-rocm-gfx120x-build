@@ -15,9 +15,9 @@ const cacheMetaSchema = z.object({
   used: z.boolean(),
 });
 
-export type WatchdogAbortMetaEntry = z.infer<typeof abortMetaSchema>;
+type WatchdogAbortMetaEntry = z.infer<typeof abortMetaSchema>;
 
-export type ParallelWatchdogRetryEvaluation =
+type ParallelWatchdogRetryEvaluation =
   | { eligible: true; entries: WatchdogAbortMetaEntry[] }
   | { eligible: false; reason: string };
 
@@ -102,7 +102,7 @@ function readWatchdogAbortMetaEntries(abortMetaDir: string): WatchdogAbortMetaEn
   return entries;
 }
 
-export function readCompileCacheMetaOptDims(cacheMetaDir: string): string[] {
+function readCompileCacheMetaOptDims(cacheMetaDir: string): string[] {
   const root = path.resolve(cacheMetaDir);
   let jsonFiles: string[];
   try {

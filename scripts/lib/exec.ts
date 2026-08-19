@@ -52,12 +52,12 @@ export function runCapture(
   return result.stdout ?? "";
 }
 
-export interface SpawnAsyncResult {
+interface SpawnAsyncResult {
   exitCode: number | null;
   signal: NodeJS.Signals | null;
 }
 
-export interface SpawnAsyncHandle {
+interface SpawnAsyncHandle {
   child: ChildProcess;
   completed: Promise<SpawnAsyncResult>;
 }
