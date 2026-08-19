@@ -110,7 +110,7 @@ wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.jso
 
 > 除 `plan-opt-dim` 外 workflow **未**显式设 `timeout-minutes`；「未设」表示使用 GitHub hosted runner 默认 **6 h** job 上限。compile job 另有自 A00 第一步起算的 **5 h** 看门狗（见上文）。CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
 
-- **Ninja cache**（`flash-attention/build/` 增量编译；`hcwhan/actions/cache@main`）：
+- **Ninja cache**（`flash-attention/build/` 增量编译；`hcwhan/actions/kit/cache@main`）：
   - **family-key**（同族 cleanup 范围）：串行 `fa2-ck-gfx120x-serial-v7`；并行 `fa2-ck-gfx120x-parallel-v7-dim[{ck_opt_dim}]`
   - **cache-key**（lookup 槽位；实际 GHA key = cache-key + UTC 后缀）：`{family}-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`：lock `toolchain`+`flash_attention`+`compile` → SHA256 前 8 位（不含 `wheel`/`release`；不含 workflow `ck_disable_bwd`）

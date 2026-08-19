@@ -1,5 +1,5 @@
 name: FA post-build ninja cache save
-description: compile 后保存 ninja cache（清理与 verify 由 hcwhan/actions/cache 默认 cleanup-stale 处理；由调用方 gate 执行条件）
+description: compile 后保存 ninja cache（清理与 verify 由 hcwhan/actions/kit/cache 默认 cleanup-stale 处理；由调用方 gate 执行条件）
 
 inputs:
   fa-src:
@@ -16,7 +16,7 @@ runs:
   using: composite
   steps:
     - name: Save ninja incremental build cache
-      uses: hcwhan/actions/cache/save@main
+      uses: hcwhan/actions/kit/cache/save@main
       with:
         path: ${{ inputs.fa-src }}\build
         family-key: ${{ inputs.cache-family-key }}
