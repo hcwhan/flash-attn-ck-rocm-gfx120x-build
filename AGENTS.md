@@ -42,7 +42,7 @@ A01.fa-build-with-cache
 A99.fa-verify-publish
 ```
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。GHA cache 经 **`hcwhan/actions/cache@v1`**（`family-key` + `cache-key` 槽位；实际 key = `cache-key` + UTC 后缀；restore/lookup 取槽位最新 versioned key；save 后 API verify + `cleanup-stale`）。Ninja **family-key**：串行 `fa2-ck-gfx120x-serial-v7`；并行 `fa2-ck-gfx120x-parallel-v7-dim[{ck_opt_dim}]`。**cache-key**：`{family}-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = `fmha_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；serial/parallel 互不共用）。Pip **family-key**：`fa-pip-toolchain-v2`；**cache-key**：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。GHA cache 经 **`hcwhan/actions/cache@main`**（`family-key` + `cache-key` 槽位；实际 key = `cache-key` + UTC 后缀；restore/lookup 取槽位最新 versioned key；save 后 API verify + `cleanup-stale`）。Ninja **family-key**：串行 `fa2-ck-gfx120x-serial-v7`；并行 `fa2-ck-gfx120x-parallel-v7-dim[{ck_opt_dim}]`。**cache-key**：`{family}-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = `fmha_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；serial/parallel 互不共用）。Pip **family-key**：`fa-pip-toolchain-v2`；**cache-key**：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
 
 ## 命名约定
 

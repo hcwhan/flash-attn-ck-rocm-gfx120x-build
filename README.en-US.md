@@ -110,7 +110,7 @@ Wheel / verify / publish do not run unless compile succeeds. `wheel.manifest.jso
 
 > Except `plan-opt-dim`, workflows do **not** set `timeout-minutes`; “not set” means the GitHub hosted runner default **6 h** job limit applies. Compile jobs additionally use a **5 h** watchdog from A00 step 1 (see above). CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
 
-- **Ninja cache** (`flash-attention/build/` incremental compile; `hcwhan/actions/cache@v1`):
+- **Ninja cache** (`flash-attention/build/` incremental compile; `hcwhan/actions/cache@main`):
   - **family-key** (cleanup scope): serial `fa2-ck-gfx120x-serial-v7`; parallel `fa2-ck-gfx120x-parallel-v7-dim[{ck_opt_dim}]`
   - **cache-key** (lookup slot; actual GHA key = cache-key + UTC suffix): `{family}-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`: lock `toolchain`+`flash_attention`+`compile` → SHA256 prefix (8 hex chars; excludes `wheel`/`release`; excludes workflow `ck_disable_bwd`)

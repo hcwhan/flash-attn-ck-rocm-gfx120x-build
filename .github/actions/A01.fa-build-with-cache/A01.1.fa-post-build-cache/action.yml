@@ -16,7 +16,7 @@ runs:
   using: composite
   steps:
     - name: Save ninja incremental build cache
-      uses: hcwhan/actions/cache/save@v1
+      uses: hcwhan/actions/cache/save@main
       with:
         path: ${{ inputs.fa-src }}\build
         family-key: ${{ inputs.cache-family-key }}
