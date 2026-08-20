@@ -1,7 +1,8 @@
 import { cacheKeyToken } from "./cache-key-token.js";
 
-const NINJA_CACHE_SERIAL_PREFIX = "fa2-ck-gfx120x-serial-v7";
-const NINJA_CACHE_PARALLEL_PREFIX = "fa2-ck-gfx120x-parallel-v7";
+export const NINJA_CACHE_SERIAL_FAMILY = "fa2-ck-serial";
+export const NINJA_CACHE_PARALLEL_FAMILY = "fa2-ck-parallel";
+const NINJA_CACHE_VERSION = "v7";
 
 interface NinjaCacheFamilyKeyOptions {
   buildVariant: "serial" | "parallel";
@@ -21,7 +22,7 @@ export function buildNinjaCacheFamilyKey(
   options: NinjaCacheFamilyKeyOptions,
 ): string {
   if (options.buildVariant === "serial") {
-    return NINJA_CACHE_SERIAL_PREFIX;
+    return NINJA_CACHE_SERIAL_FAMILY;
   }
 
   const optDim = options.optDim?.trim();
@@ -29,7 +30,7 @@ export function buildNinjaCacheFamilyKey(
     throw new Error("optDim is required for parallel ninja cache family key");
   }
 
-  return `${NINJA_CACHE_PARALLEL_PREFIX}-dim[${optDim}]`;
+  return `${NINJA_CACHE_PARALLEL_FAMILY}-dim[${optDim}]`;
 }
 
 export function buildNinjaCacheKey(options: NinjaCacheKeyOptions): string {
@@ -37,6 +38,7 @@ export function buildNinjaCacheKey(options: NinjaCacheKeyOptions): string {
 
   return [
     familyKey,
+    NINJA_CACHE_VERSION,
     `lock[${options.lockHash}]`,
     `bwd[${options.fmhaBwd}]`,
     `msvc[${cacheKeyToken(options.msvcVersion)}]`,

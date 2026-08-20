@@ -38,7 +38,7 @@ A01.compile-with-cache（06.prepare + watchdog/run + hcwhan/actions/kit/cache/sa
 A99.verify-and-publish
 ```
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。GHA cache 经 **`hcwhan/actions/kit/cache@main`**（`family-key` + `cache-key` 槽位；实际 key = `cache-key` + UTC 后缀；restore（含 `only-lookup`）取槽位最新 versioned key；save 后 API verify + `cleanup-stale`）。Ninja **family-key**：串行 `fa2-ck-gfx120x-serial-v7`；并行 `fa2-ck-gfx120x-parallel-v7-dim[{ck_opt_dim}]`。**cache-key**：`{family}-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = `fmha_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；serial/parallel 互不共用）。Pip **family-key**：`fa-pip-toolchain-v2`；**cache-key**：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。GHA cache 经 **`hcwhan/actions/kit/cache@main`**（`family-key` + `cache-key` 槽位；实际 key = `cache-key` + UTC 后缀；restore（含 `only-lookup`）取槽位最新 versioned key；save 后 API verify + `cleanup-stale`）。Ninja **family-key**：串行 `fa2-ck-serial`；并行 `fa2-ck-parallel-dim[{ck_opt_dim}]`。**cache-key**：`{family}-v7-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = `fmha_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；serial/parallel 互不共用）。Pip **family-key**：`fa2-pip-toolchain`；**cache-key**：`fa2-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
 
 ## 命名约定
 
@@ -65,9 +65,9 @@ A99.verify-and-publish
 | FA 相关 env | `FLASH_ATTENTION_*` | repo / commit / force-build 等 |
 | Python 包名 | `flash_attn` | wheel / import 名；与本仓库目录名 `flash-attn-*` 有意区分 |
 
-**lock → GITHUB_ENV 映射：** `toolchain.python`→`PYTHON_VERSION`，`toolchain.pytorch`→`PYTORCH_VERSION`，`toolchain.torch_device_extra`→`TORCH_DEVICE_EXTRA`，`toolchain.rocm`→`ROCM_VERSION`，`toolchain.rocm_index`→`ROCM_INDEX`，`compile.ck_opt_dim`→`CK_OPT_DIM`（首档另导出 `PRIMARY_DIM`），`compile.gpu_archs`→`GPU_ARCHS`，`flash_attention.repo`→`FLASH_ATTENTION_REPO`，`flash_attention.build_commit`→`FLASH_ATTENTION_BUILD_COMMIT`，`flash_attention.build_commit_date`→`FLASH_ATTENTION_BUILD_COMMIT_DATE`（另导出 `SOURCE_DATE_EPOCH`），`wheel.wheel_local_version`→`WHEEL_LOCAL_VERSION`，`wheel.wheel_artifact_name`→`WHEEL_ARTIFACT_NAME`，`release.release_tag_prefix`→`RELEASE_TAG_PREFIX`，`release.release_title_prefix`→`RELEASE_TITLE_PREFIX`；`EXPECTED_WHEEL_PATTERN` / `PIP_TOOLCHAIN_CACHE_PREFIX` / `PIP_TOOLCHAIN_CACHE_KEY` 由 `version-lock.ts` 推导。**workflow env（非 lock）：** `ninja_workers`→`MAX_JOBS`，`use_cache`→`USE_CACHE`，`publish_release`→`PUBLISH_RELEASE`，`retry_count`→`RETRY_COUNT`，`ck_disable_bwd`→`CK_DISABLE_BWD`（`'true'`/`'false'`）。
+**lock → GITHUB_ENV 映射：** `toolchain.python`→`PYTHON_VERSION`，`toolchain.pytorch`→`PYTORCH_VERSION`，`toolchain.torch_device_extra`→`TORCH_DEVICE_EXTRA`，`toolchain.rocm`→`ROCM_VERSION`，`toolchain.rocm_index`→`ROCM_INDEX`，`compile.ck_opt_dim`→`CK_OPT_DIM`（首档另导出 `PRIMARY_DIM`），`compile.gpu_archs`→`GPU_ARCHS`，`flash_attention.repo`→`FLASH_ATTENTION_REPO`，`flash_attention.build_commit`→`FLASH_ATTENTION_BUILD_COMMIT`，`flash_attention.build_commit_date`→`FLASH_ATTENTION_BUILD_COMMIT_DATE`（另导出 `SOURCE_DATE_EPOCH`），`wheel.wheel_local_version`→`WHEEL_LOCAL_VERSION`，`wheel.wheel_artifact_name`→`WHEEL_ARTIFACT_NAME`，`release.release_tag_prefix`→`RELEASE_TAG_PREFIX`，`release.release_title_prefix`→`RELEASE_TITLE_PREFIX`；`EXPECTED_WHEEL_PATTERN` / `PIP_TOOLCHAIN_CACHE_FAMILY` / `PIP_TOOLCHAIN_CACHE_KEY` 由 `version-lock.ts` 推导。**workflow env（非 lock）：** `ninja_workers`→`MAX_JOBS`，`use_cache`→`USE_CACHE`，`publish_release`→`PUBLISH_RELEASE`，`retry_count`→`RETRY_COUNT`，`ck_disable_bwd`→`CK_DISABLE_BWD`（`'true'`/`'false'`）。
 
-**缩写对照：** 仓库 `flash-attn-ck-rocm-gfx120x-build`；Ninja cache 前缀 `fa2-ck-gfx120x-*-v7`；Release tag 前缀见 lock `release.release_tag_prefix`（当前 `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x`）；wheel artifact 见 lock `wheel_artifact_name`。HIP 编译目标仅 lock `compile.gpu_archs`（当前 `gfx1200;gfx1201`）。
+**缩写对照：** 仓库 `flash-attn-ck-rocm-gfx120x-build`；Ninja cache family `fa2-ck-serial` / `fa2-ck-parallel-dim[…]`，cache-key 版本槽 `v7`；Release tag 前缀见 lock `release.release_tag_prefix`（当前 `flash-attn-ck-cp312-torch2.12.0-rocm7.14.0-gfx120x`）；wheel artifact 见 lock `wheel_artifact_name`。HIP 编译目标仅 lock `compile.gpu_archs`（当前 `gfx1200;gfx1201`）。
 
 ## 复用入口
 
@@ -150,9 +150,9 @@ A99.verify-and-publish
 
 **不要添加：** 双源校验、manifest 读回自证、`FA_SKIP_*`、多候选目录排序、git 考古、薄 one-liner 包装、排障用 build-log artifact、lock 只读字段进逻辑、**命令内二次 `readVersionLock`**、**`GITHUB_ENV` 存在却不 export**、**缺 env 时用 `??` 或本地再读 lock 顶上**。
 
-**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 fwd 3 个 `fmha_*_api.obj`（`CK_DISABLE_BWD=false` 时再加 `fmha_bwd_api.obj`）；link merge skip + ninja API 重编三重校验；patch before-state；smoke 产物校验；ninja cache family/key 前缀（`NINJA_CACHE_SERIAL_PREFIX` / `NINJA_CACHE_PARALLEL_PREFIX` + parallel `dim[shard]`）+ `lock`/`bwd`/`msvc`/`rocmClang`/`ninja` 槽位。
+**应当保留：** staging 四目录 + dim kernel + primary shared obj 检查；primary 含 fwd 3 个 `fmha_*_api.obj`（`CK_DISABLE_BWD=false` 时再加 `fmha_bwd_api.obj`）；link merge skip + ninja API 重编三重校验；patch before-state；smoke 产物校验；ninja cache family/key（`NINJA_CACHE_SERIAL_FAMILY` / `NINJA_CACHE_PARALLEL_FAMILY` + parallel `dim[shard]` + `v7` 版本槽）+ `lock`/`bwd`/`msvc`/`rocmClang`/`ninja` 槽位。
 
-**cache key 前缀统一定义**：`NINJA_CACHE_SERIAL_PREFIX` / `NINJA_CACHE_PARALLEL_PREFIX`（`ninja-cache-key.ts`）、`PIP_TOOLCHAIN_CACHE_PREFIX`（`pip-cache-key.ts`）经 `05.toolchain-fingerprint` 或 `01.config` 写入 `GITHUB_OUTPUT` / `GITHUB_ENV`，作为 `hcwhan/actions/kit/cache` 的 `family-key`。
+**cache key 前缀统一定义**：`NINJA_CACHE_SERIAL_FAMILY` / `NINJA_CACHE_PARALLEL_FAMILY`（`ninja-cache-key.ts`）、`PIP_TOOLCHAIN_CACHE_FAMILY`（`pip-cache-key.ts`）经 `05.toolchain-fingerprint` 或 `01.config` 写入 `GITHUB_OUTPUT` / `GITHUB_ENV`，作为 `hcwhan/actions/kit/cache` 的 `family-key`；完整 `cache-key` = `{family}-v{version}-…`。
 
 ## 维护
 

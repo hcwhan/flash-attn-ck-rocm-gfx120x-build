@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { buildPipToolchainCacheKey, PIP_TOOLCHAIN_CACHE_PREFIX } from "./pip-cache-key.js";
+import { buildPipToolchainCacheKey, PIP_TOOLCHAIN_CACHE_FAMILY } from "./pip-cache-key.js";
 
 const gitShaSchema = z
   .string()
@@ -67,7 +67,7 @@ type VersionLockVars = {
   TORCH_DEVICE_EXTRA: string;
   ROCM_INDEX: string;
   ROCM_VERSION: string;
-  PIP_TOOLCHAIN_CACHE_PREFIX: string;
+  PIP_TOOLCHAIN_CACHE_FAMILY: string;
   PIP_TOOLCHAIN_CACHE_KEY: string;
   GPU_ARCHS: string;
   CK_OPT_DIM: string;
@@ -195,7 +195,7 @@ export function readVersionLock(workspaceRoot: string): VersionLockVars {
     TORCH_DEVICE_EXTRA: lock.toolchain.torch_device_extra,
     ROCM_INDEX: lock.toolchain.rocm_index,
     ROCM_VERSION: lock.toolchain.rocm,
-    PIP_TOOLCHAIN_CACHE_PREFIX,
+    PIP_TOOLCHAIN_CACHE_FAMILY,
     PIP_TOOLCHAIN_CACHE_KEY: buildPipToolchainCacheKey({
       pythonVersion: lock.toolchain.python,
       pytorchVersion: lock.toolchain.pytorch,

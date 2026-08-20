@@ -111,15 +111,15 @@ wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.jso
 > 除 `plan-opt-dim` 外 workflow **未**显式设 `timeout-minutes`；「未设」表示使用 GitHub hosted runner 默认 **6 h** job 上限。compile job 另有自 `watchdog/job-start` 起算的 **5 h** deadline（见上文）。CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
 
 - **Ninja cache**（`flash-attention/build/` 增量编译；`hcwhan/actions/kit/cache@main`）：
-  - **family-key**（同族 cleanup 范围）：串行 `fa2-ck-gfx120x-serial-v7`；并行 `fa2-ck-gfx120x-parallel-v7-dim[{ck_opt_dim}]`
-  - **cache-key**（lookup 槽位；实际 GHA key = cache-key + UTC 后缀）：`{family}-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
+  - **family-key**（同族 cleanup 范围）：串行 `fa2-ck-serial`；并行 `fa2-ck-parallel-dim[{ck_opt_dim}]`
+  - **cache-key**（lookup 槽位；实际 GHA key = cache-key + UTC 后缀）：`{family}-v7-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`
   - `lockHash8`：lock `toolchain`+`flash_attention`+`compile` → SHA256 前 8 位（不含 `wheel`/`release`；不含 workflow `ck_disable_bwd`）
   - `bwd`：`fmha_bwd`（`true` = 编译 bwd 内核；`false` = 推理专用省略 bwd）
   - `msvcVersion` / `rocmClangVersion`：MSVC 工具集完整版本 / `clang --version` 解析完整版本（如 `14.44.35207`、`23.0.0git`）；写入 key 前经 `cacheKeyToken` 规范化
   - `ninja`：`ninja --version` 的 major.minor
   - restore（含 `only-lookup`）取槽位最新 versioned key；save 后 API verify + 同族 cleanup；serial / parallel **互不共用**
   - `use_cache=true` 时 build 非 skipped 即 save；`use_cache=false` 时不 restore（`used=false`），仅 compile 成功时 save
-- **Pip toolchain cache**（`PIP_TOOLCHAIN_CACHE_PREFIX` + `PIP_TOOLCHAIN_CACHE_KEY`）：family `fa-pip-toolchain-v2`；key `fa-pip-toolchain-v2-py[{python}]-pt[{pytorch}]-dev[{torch_device_extra}]-rocm[{rocm}]-idx[{indexHash8}]`（`01.config`；`indexHash8` = lock `toolchain.rocm_index` → SHA256 前 8 位）
+- **Pip toolchain cache**（`PIP_TOOLCHAIN_CACHE_FAMILY` + `PIP_TOOLCHAIN_CACHE_KEY`）：family `fa2-pip-toolchain`；key `fa2-pip-toolchain-v2-py[{python}]-pt[{pytorch}]-dev[{torch_device_extra}]-rocm[{rocm}]-idx[{indexHash8}]`（`01.config`；`indexHash8` = lock `toolchain.rocm_index` → SHA256 前 8 位）
 - 四 shard 各编 shared obj；link 仅使用 **lock `ck_opt_dim` 第一档**（当前 `32`）的 shared obj。
 
 ### 构建阶段
