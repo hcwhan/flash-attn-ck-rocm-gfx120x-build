@@ -83,32 +83,32 @@ FlashAttention 2 CK wheel 构建配置（workflow `ck_disable_bwd=false`，默�
 
 ### 看门狗与自动 retry
 
-GitHub-hosted runner 的 job 硬上限为 **6 小时**。compile 自 A00 bootstrap 第一步起算 **5 小时**看门狗：到期后 3× SIGINT 优雅中断 → save ninja cache → 自动 dispatch retry（`retry_count` 内部递增，默认 `0`，**≥8 放弃**；手动触发时无需填写）。
+GitHub-hosted runner 的 job 硬上限为 **6 小时**。自 compile job 第一步 `watchdog/job-start` 起 **5 小时** deadline：到期后 5× SIGINT 优雅中断 → save ninja cache → `watchdog/dispatch-retry` 自动 dispatch（`retry_count` 内部递增，默认 `0`，**≥8 放弃**；手动触发时无需填写）。
 
 | 条件 | 行为 |
 |------|------|
 | `use_cache=true`（默认） | 中断后 save cache 并 auto-retry |
 | `use_cache=false` | compile 失败时不 save；**不** auto-retry |
-| 3× SIGINT 后需 `taskkill` | 不 save、不 retry（`ABORT_FORCE_KILLED`） |
+| 5× SIGINT 后需 `taskkill` | 不 save、不 retry（`force-killed`） |
 
-wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.json` 的 `dispatch` 含 `retry_count` 等 workflow 快照（见下文 schema）。**parallel** 在 compile matrix **失败**且全部 shard 结束后，由独立 `watchdog-retry` job 调用 `07-retry`（失败 shard 上传 artifact `abort-meta-d{dim}`，文件 `abort-meta/d{dim}.json`）；**serial** 在 compile job 内看门狗中止时 `07-retry`（普通 compile 失败不 retry）。详见 [docs/watchdog-design.md](docs/watchdog-design.md)。
+wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.json` 的 `dispatch` 含 `retry_count` 等 workflow 快照（见下文 schema）。**parallel** 在 compile matrix **失败**且全部 shard 结束后，由 `watchdog-retry` job 调用 `07.evaluate-parallel-retry` + `dispatch-retry@main`；**serial** 在 `should-retry == true` 时同 job 内 `dispatch-retry@main`（普通 compile 失败不 retry）。
 
 ### 串行（`build-fa2-ck-gfx120x-serial.yml`）
 
 | Job | 作用 | workflow 超时 |
 |-----|------|---------------|
-| `compile-full-and-link-wheel` | checkout → **A00**（含 ninja restore）→ **A01** `06.compile`（看门狗中止时 `07-retry`）→ `dist/build-caches.json`（成功）→ `09.wheel` → **A99** | 未设 |
+| `compile-full-and-link-wheel` | job-start → **A00** → **A01** `watchdog/run` → `dispatch-retry` → `09.wheel` → **A99** | 未设 |
 
 ### 并行（`build-fa2-ck-gfx120x-parallel.yml`）
 
 | Job | 作用 | workflow 超时 |
 |-----|------|---------------|
 | `plan-opt-dim` | checkout → **A00**（`prep-source=false`, `setup-toolchain=false`）→ `02.plan-opt-dim-matrix` | **5 min** |
-| `compile-d32` … `d256` | checkout → **A00** → **A01** `06.compile` →（成功）`08.shard`、上传 `d{dim}` / `cache-meta-d{dim}`；（看门狗失败）上传 `abort-meta-d{dim}` | 未设 |
-| `watchdog-retry` | checkout → **A00**（`prep-source=false`, `setup-toolchain=false`）→ `07-retry` | 未设 |
+| `compile-d32` … `d256` | job-start → **A00** → **A01** →（成功）`08.shard`、上传 artifacts；（`aborted`）上传 `abort-meta-d{dim}` | 未设 |
+| `watchdog-retry` | **A00**（轻量）→ download meta → `07.evaluate-parallel-retry` → `dispatch-retry` | 未设 |
 | `link-wheel` | checkout → **A00** → download `d*` / `cache-meta-d*` → `09.wheel` → **A99**（**无** ninja cache） | 未设 |
 
-> 除 `plan-opt-dim` 外 workflow **未**显式设 `timeout-minutes`；「未设」表示使用 GitHub hosted runner 默认 **6 h** job 上限。compile job 另有自 A00 第一步起算的 **5 h** 看门狗（见上文）。CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
+> 除 `plan-opt-dim` 外 workflow **未**显式设 `timeout-minutes`；「未设」表示使用 GitHub hosted runner 默认 **6 h** job 上限。compile job 另有自 `watchdog/job-start` 起算的 **5 h** deadline（见上文）。CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
 
 - **Ninja cache**（`flash-attention/build/` 增量编译；`hcwhan/actions/kit/cache@main`）：
   - **family-key**（同族 cleanup 范围）：串行 `fa2-ck-gfx120x-serial-v7`；并行 `fa2-ck-gfx120x-parallel-v7-dim[{ck_opt_dim}]`

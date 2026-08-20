@@ -1,10 +1,9 @@
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 interface RunOptions {
   quiet?: boolean;
 }
 
-/** 同步执行并等待退出；需要 `child.pid`（如看门狗 taskkill）时用 {@link spawnAsync}。 */
 export function run(
   command: string,
   args: readonly string[],
@@ -50,29 +49,4 @@ export function runCapture(
   }
 
   return result.stdout ?? "";
-}
-
-interface SpawnAsyncResult {
-  exitCode: number | null;
-  signal: NodeJS.Signals | null;
-}
-
-interface SpawnAsyncHandle {
-  child: ChildProcess;
-  completed: Promise<SpawnAsyncResult>;
-}
-
-export function spawnAsync(
-  command: string,
-  args: readonly string[],
-): SpawnAsyncHandle {
-  const { promise, resolve, reject } = Promise.withResolvers<SpawnAsyncResult>();
-  const child = spawn(command, args as string[], {
-    env: process.env,
-    stdio: "inherit",
-    shell: false,
-  });
-  child.on("error", reject);
-  child.on("exit", (exitCode, signal) => resolve({ exitCode, signal }));
-  return { child, completed: promise };
 }

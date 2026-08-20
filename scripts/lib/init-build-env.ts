@@ -1,13 +1,54 @@
 import path from "node:path";
+
 import { run } from "./exec.js";
+import { appendGithubEnv } from "./github.js";
 import { requireMaxJobs } from "./max-jobs.js";
 import { getRocmSdkPaths } from "./rocm-sdk-paths.js";
 import { requireLockEnv } from "./require-env.js";
 
 const PYTHON = "python";
 
-export function initBuildEnv(options: { optDim: string }): void {
+// initBuildEnv 写入或覆盖的 env 键（供 export 至 GITHUB_ENV）
+const BUILD_ENV_VAR_NAMES = [
+  "MAX_JOBS",
+  "OPT_DIM",
+  "ROCM_HOME",
+  "ROCM_PATH",
+  "HIP_PATH",
+  "HIP_INCLUDE_PATH",
+  "HIP_DEVICE_LIB_PATH",
+  "DEVICE_LIB_PATH",
+  "CPATH",
+  "INCLUDE",
+  "PATH",
+  "CC",
+  "CXX",
+  "DISTUTILS_USE_SDK",
+  "GPU_ARCHS",
+  "BUILD_TARGET",
+  "SOURCE_DATE_EPOCH",
+  "CFLAGS",
+  "CXXFLAGS",
+] as const;
+
+// 将编译 env 追加至 GITHUB_ENV（供后续 watchdog/run spawn 继承）
+function exportBuildEnvToGithub(): void {
+  const vars: Record<string, string> = {};
+  for (const name of BUILD_ENV_VAR_NAMES) {
+    const value = process.env[name];
+    if (value !== undefined) {
+      vars[name] = value;
+    }
+  }
+  appendGithubEnv(vars);
+}
+
+export function initBuildEnv(options: {
+  optDim: string;
+  exportGithubEnv?: boolean;
+}): void {
   const maxJobs = requireMaxJobs();
+  process.env.MAX_JOBS = String(maxJobs);
   console.log(`MAX_JOBS=${maxJobs}`);
 
   run(PYTHON, ["-m", "pip", "install", "numpy", "-q"], { quiet: true });
@@ -67,6 +108,10 @@ export function initBuildEnv(options: { optDim: string }): void {
   process.env.CXXFLAGS = process.env.CXXFLAGS
     ? `${process.env.CXXFLAGS} ${clangClFlags}`
     : clangClFlags;
+
+  if (options.exportGithubEnv) {
+    exportBuildEnvToGithub();
+  }
 
   console.log(
     `Build env ready (GPU_ARCHS=${process.env.GPU_ARCHS}, OPT_DIM=${process.env.OPT_DIM})`,

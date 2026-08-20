@@ -6,17 +6,17 @@
 
 | Workflow | 链路 |
 |----------|------|
-| **serial** | `compile-full-and-link-wheel`：A00 bootstrap（含 ninja restore）→ A01 `06.compile` → 看门狗中止时 `07-retry` / 成功 `09.wheel` → `A99`（`10.verify`/`11.publish`） |
-| **parallel** | `plan-opt-dim`（A00 轻量）→ `compile-d*`（A00 + A01 + `08.shard`）→ matrix 失败时 `watchdog-retry`（`07-retry`）/ 成功时 `link-wheel`（A00 + `09.wheel` → `A99`） |
+| **serial** | `compile-full-and-link-wheel`：job-start → A00 bootstrap → A01 `06.prepare`/`watchdog/run` → `dispatch-retry` / 成功 `09.wheel` → `A99` |
+| **parallel** | `plan-opt-dim` → `compile-d*`（job-start + A01 + `08.shard`）→ matrix 失败时 `watchdog-retry`（`07.evaluate-parallel-retry` + `dispatch-retry`）/ 成功 `link-wheel` |
 
 ### Workflow 步骤顺序（与 pytorch 对齐：`Axx` = workflow 直接 `uses`）
 
 **serial `compile-full-and-link-wheel`**
 
 ```
-checkout → A00.fa-job-bootstrap（ninja-cache-restore=true, build-variant=serial）
-        → A01.fa-build-with-cache（06.compile）
-        → 07-retry（看门狗条件）
+checkout → job-start → A00.fa-job-bootstrap（ninja-cache-restore=true, build-variant=serial）
+        → A01.fa-build-with-cache（06.prepare + watchdog/run）
+        → dispatch-retry（should-retry）
         → dist/build-caches.json
         → 09.wheel → A99.fa-verify-publish
 ```
@@ -26,8 +26,8 @@ checkout → A00.fa-job-bootstrap（ninja-cache-restore=true, build-variant=seri
 | Job | 步骤 |
 |-----|------|
 | `plan-opt-dim` | checkout → A00（prep-source=false, setup-toolchain=false）→ `02.plan-opt-dim-matrix` |
-| `compile-d{dim}` | checkout → A00（ninja-cache-restore, build-variant=parallel, opt-dim）→ A01 → abort/cache meta + obj artifacts |
-| `watchdog-retry` | checkout → A00（prep/toolchain=false）→ `07-retry` |
+| `compile-d{dim}` | checkout → job-start → A00 → A01 → abort/cache meta + obj artifacts |
+| `watchdog-retry` | checkout → A00（prep/toolchain=false）→ download meta → `07.evaluate-parallel-retry` → `dispatch-retry` |
 | `link-wheel` | checkout → A00 → download artifacts → `09.wheel` → A99 |
 
 **Composite 调用树**
@@ -85,17 +85,16 @@ A99.fa-verify-publish
 | `scripts/lib/version-lock.ts` | **唯一直接读 lock 的 TS 模块**（Zod 校验） |
 | `scripts/lib/require-env.ts` | CI env 读取（`requireLockEnv` / `requireGithubActionsEnv`）；缺 env 直接 throw |
 | `scripts/lib/rocm-sdk-paths.ts` | ROCm SDK `CoreRoot`/`DevelRoot`（唯一路径发现） |
-| `scripts/lib/init-build-env.ts` | numpy + upstream `OPT_DIM`（由 `CK_OPT_DIM`/shard 映射）+ ROCm 编译 env |
-| `scripts/lib/watchdog.ts` | 5h deadline 看门狗：`createWatchdog`（3× SIGINT + taskkill；`06.compile` 调用） |
-| `scripts/lib/watchdog-abort-meta.ts` | parallel compile abort 元数据读取（`07-retry --abort-meta-dir` / `--cache-meta-dir` / `--all-opt-dims`） |
+| `scripts/lib/init-build-env.ts` | numpy + upstream `OPT_DIM` + ROCm 编译 env；`exportGithubEnv` 供 `06.prepare` 写入 GITHUB_ENV |
+| `scripts/lib/watchdog-abort-meta.ts` | parallel compile abort 元数据读取（`07.evaluate-parallel-retry`） |
 | `scripts/lib/validate-staging.ts` | parallel link staging 校验（`09.wheel` 前置） |
 | `01.config` | 读 lock；`--export-github-env` 写 CI env |
 | `02.plan-opt-dim-matrix` | 导出 parallel OPT_DIM matrix（`GITHUB_OUTPUT`：`opt-dims-json` / `primary-dim`） |
 | `03.prep` | clone FA 源码（SHA 或 tag）；校验 commit author date 与 lock 一致 |
 | `04.patch` | 改 setup.py：`CK_FMHA_DISABLE_BWD=1` 时跳过 bwd + 启用 `FLASHATTENTION_DISABLE_BACKWARD` + 校验 bwd guard；始终 link `spawn` 注入 `/Brepro` |
 | `05.toolchain-fingerprint` | MSVC/clang + ninja 指纹；`--build-variant` 输出 `cache-family-key` + `cache-key`（`scripts/lib/ninja-cache-key.ts`） |
-| `06.compile` | 任意 `--opt-dim` 编译入口（serial 全量 / parallel 单 dim）；**自 bootstrap 起 5h 看门狗** |
-| `07-retry` | 看门狗中断后 dispatch retry（serial：compile job；parallel：独立 `watchdog-retry` job + `--abort-meta-dir` / `--cache-meta-dir` / `--all-opt-dims`） |
+| `06.prepare` | 初始化编译 env 并输出 `command`/`args`；由 A01 转发至 `hcwhan/actions/kit/watchdog/run@main` |
+| `07.evaluate-parallel-retry` | parallel `watchdog-retry` job：校验 abort-meta 与 failed shard 对齐（通过后 workflow 调用 `dispatch-retry`） |
 | `08.shard` | 校验 compile 产物 .obj；写 `SHARD_RELEASE_DIR` 到 `GITHUB_ENV` |
 | `09.wheel` | parallel link staging 校验 + `FLASH_ATTENTION_FORCE_BUILD` + link 脚本 |
 | `10.verify` | CI CPU smoke test；wheel 文件名/结构（.pyd 体积 + METADATA）与 torch 运行时校验；读 `--build-caches` 写入 manifest `build_caches` 与 `dispatch`；manifest 顶层含 `fmha_bwd` |
@@ -113,10 +112,10 @@ A99.fa-verify-publish
 
 | Action | 用途 |
 |--------|------|
-| `A00.fa-job-bootstrap` | `JOB_START_TIME` + Node/npm + `01.config` + 条件 `03.prep`/`04.patch` + A00.1 + 条件 `05.toolchain-fingerprint` + A00.2 restore；inputs `prep-source` / `setup-toolchain` / `ninja-cache-restore` / `build-variant` / `opt-dim`；outputs `cache-family-key`/`cache-key`/`cache-exists`/`cache-used`（需 job 级 checkout；依赖 env `FA_SRC`/`USE_CACHE`） |
+| `A00.fa-job-bootstrap` | Node/npm + `01.config` + 条件 `03.prep`/`04.patch` + A00.1 + 条件 `05.toolchain-fingerprint` + A00.2 restore；inputs `prep-source` / `setup-toolchain` / `ninja-cache-restore` / `build-variant` / `opt-dim`；outputs `cache-family-key`/`cache-key`/`cache-exists`/`cache-used`（需 job 级 checkout；依赖 env `FA_SRC`/`USE_CACHE`） |
 | `A00.1.fa-rocm-toolchain` | Python / MSVC / pip toolchain cache（`PIP_TOOLCHAIN_CACHE_PREFIX` + `PIP_TOOLCHAIN_CACHE_KEY`）/ rocm[devel] / torch[device-*]（仅 A00 调用） |
 | `A00.2.fa-ninja-cache-restore` | 恢复 `FA_SRC/build` ninja 增量 cache（`hcwhan/actions/kit/cache/restore` 或 `lookup`；仅 A00 调用） |
-| `A01.fa-build-with-cache` | 编译 CLI + 调用 A01.1 post-build cache save |
+| `A01.fa-build-with-cache` | `06.prepare` + `watchdog/run@main` + A01.1 save；转发 `should-retry` 等 outputs |
 | `A01.1.fa-post-build-cache` | `hcwhan/actions/kit/cache/save` ninja cache（verify + cleanup-stale 内置） |
 | `A99.fa-verify-publish` | `10.verify` + upload wheel artifact + 可选 `11.publish` / GitHub Release；inputs `build-variant` / `build-caches` |
 
@@ -143,7 +142,7 @@ A99.fa-verify-publish
 - **`PRIMARY_DIM`** = lock `ck_opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
 - **`ninja_workers` 默认 4**（OOM 改 2）；**`use_cache` 默认 true**（false 时 lookup-only：`cache-exists` 仍探测，`cache-used=false`）
 - **ninja cache save**：`use_cache=true` 时 build 非 skipped 即 save；**`use_cache=false` 时仅成功时 save**；`hcwhan/actions/kit/cache` 默认 `cleanup-stale` 在 save/restore 成功后清理同族旧 key；save 内置 API verify（默认最长 180s）
-- **看门狗 5h 优雅中断**：A00 第一步写 `JOB_START_TIME`；`watchdog.ts` deadline 到期后写 `ABORT_TRIGGERED`/`COMPILE_COMPLETE=false`，3× SIGINT（1min 间隔；失败则 `ABORT_FORCE_KILLED` + taskkill，**不 save/retry**）；A01.1 save 后 serial 在 compile job 内 `07-retry`；parallel compile 上传 artifact `abort-meta-d{dim}`（文件 `abort-meta/d{dim}.json`），compile matrix **失败**且全部 shard 结束后独立 `watchdog-retry` job 单次 retry；`use_cache=true && retry_count<8`；wheel 等仅在 compile 成功路径（serial 同 job / parallel `link-wheel`）执行（详见 `docs/watchdog-design.md`）
+- **看门狗 5h 优雅中断**：compile job 第一步 `watchdog/job-start@main`；A01 `watchdog/run@main`；deadline 到期后 5× SIGINT（1min 间隔）graceful abort → `should-retry=true` → save → serial 同 job / parallel `watchdog-retry` job 内 `dispatch-retry@main`；5× SIGINT 仍不退出则 `force-killed=true`（不 save/retry）；parallel abort-meta 上传条件 `aborted == true`（含 force-killed）；wheel 等仅在 compile 成功路径执行
 - **全模式 prebuilt obj 两向 stamp** / **link 排除 `fmha_*_api.obj`**：见 `build/build-fa-steps.py` 注释。
 - **patch 程序化**（`04.patch`）；`CK_OPT_DIM` / `GPU_ARCHS` / `CK_FMHA_DISABLE_BWD` 只从 env 取
 - **workflow 默认 `ck_disable_bwd=false`**（完整包含 fwd + bwd CK FMHA；设为 `true` 时为 ComfyUI 推理专用 wheel）

@@ -83,32 +83,32 @@ FlashAttention 2 CK wheel default build profile (workflow `ck_disable_bwd=false`
 
 ### Watchdog and auto-retry
 
-GitHub-hosted runner jobs have a **6-hour** hard limit. A **5-hour** watchdog starts at A00 bootstrap step 1: on expiry, 3× SIGINT graceful abort → save ninja cache → auto `workflow_dispatch` retry (`retry_count` increments internally, default `0`, **give up at ≥8**; do not set manually).
+GitHub-hosted runner jobs have a **6-hour** hard limit. A **5-hour** deadline starts at compile job step one (`watchdog/job-start`): on expiry, 5× SIGINT graceful abort → save ninja cache → `watchdog/dispatch-retry` auto dispatch (`retry_count` increments internally, default `0`, **give up at ≥8**; do not set manually).
 
 | Condition | Behavior |
 |-----------|----------|
 | `use_cache=true` (default) | Save cache after abort and auto-retry |
 | `use_cache=false` | No save on compile failure; **no** auto-retry |
-| `taskkill` after 3× SIGINT | No save, no retry (`ABORT_FORCE_KILLED`) |
+| `taskkill` after 5× SIGINT | No save, no retry (`force-killed`) |
 
-Wheel / verify / publish do not run unless compile succeeds. `wheel.manifest.json` `dispatch` records workflow snapshot including `retry_count` (see schema below). **Parallel** runs `07-retry` from the dedicated `watchdog-retry` job when the compile matrix **fails** and all shards finish (failed shards upload artifact `abort-meta-d{dim}`, file `abort-meta/d{dim}.json`); **serial** calls `07-retry` inside the compile job on watchdog abort only (ordinary compile failure does not retry). See [docs/watchdog-design.md](docs/watchdog-design.md).
+Wheel / verify / publish do not run unless compile succeeds. `wheel.manifest.json` `dispatch` records workflow snapshot including `retry_count` (see schema below). **Parallel** uses `07.evaluate-parallel-retry` + `dispatch-retry@main` from the `watchdog-retry` job when the compile matrix **fails**; **serial** calls `dispatch-retry@main` when `should-retry == true` (ordinary compile failure does not retry).
 
 ### Serial (`build-fa2-ck-gfx120x-serial.yml`)
 
 | Job | Role | workflow timeout |
 |-----|------|------------------|
-| `compile-full-and-link-wheel` | checkout → **A00** (incl. ninja restore) → **A01** `06.compile` (watchdog abort → `07-retry`) → `dist/build-caches.json` (on success) → `09.wheel` → **A99** | not set |
+| `compile-full-and-link-wheel` | job-start → **A00** → **A01** `watchdog/run` → `dispatch-retry` → `09.wheel` → **A99** | not set |
 
 ### Parallel (`build-fa2-ck-gfx120x-parallel.yml`)
 
 | Job | Role | workflow timeout |
 |-----|------|------------------|
 | `plan-opt-dim` | checkout → **A00** (`prep-source=false`, `setup-toolchain=false`) → `02.plan-opt-dim-matrix` | **5 min** |
-| `compile-d32` … `d256` | checkout → **A00** → **A01** `06.compile` → (success) `08.shard`, upload `d{dim}` / `cache-meta-d{dim}`; (watchdog abort) upload `abort-meta-d{dim}` | not set |
-| `watchdog-retry` | checkout → **A00** (`prep-source=false`, `setup-toolchain=false`) → `07-retry` | not set |
+| `compile-d32` … `d256` | job-start → **A00** → **A01** → (success) `08.shard`, upload artifacts; (`aborted`) upload `abort-meta-d{dim}` | not set |
+| `watchdog-retry` | **A00** (lightweight) → download meta → `07.evaluate-parallel-retry` → `dispatch-retry` | not set |
 | `link-wheel` | checkout → **A00** → download `d*` / `cache-meta-d*` → `09.wheel` → **A99** (**no** ninja cache) | not set |
 
-> Except `plan-opt-dim`, workflows do **not** set `timeout-minutes`; “not set” means the GitHub hosted runner default **6 h** job limit applies. Compile jobs additionally use a **5 h** watchdog from A00 step 1 (see above). CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
+> Except `plan-opt-dim`, workflows do **not** set `timeout-minutes`; “not set” means the GitHub hosted runner default **6 h** job limit applies. Compile jobs additionally use a **5 h** deadline from `watchdog/job-start` (see above). CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
 
 - **Ninja cache** (`flash-attention/build/` incremental compile; `hcwhan/actions/kit/cache@main`):
   - **family-key** (cleanup scope): serial `fa2-ck-gfx120x-serial-v7`; parallel `fa2-ck-gfx120x-parallel-v7-dim[{ck_opt_dim}]`

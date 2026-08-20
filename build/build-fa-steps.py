@@ -1,6 +1,6 @@
 """同进程 setuptools 构建 flash-attn（compile / wheel / merge-and-wheel）。
 
-由 TS CLI（06.compile / 09.wheel）调用；直接运行须自行设置 OPT_DIM、GPU_ARCHS、ROCM_* 等 env。
+由 TS CLI（06.prepare / watchdog/run / 09.wheel）调用；直接运行须自行设置 OPT_DIM、GPU_ARCHS、ROCM_* 等 env。
 """
 from __future__ import annotations
 

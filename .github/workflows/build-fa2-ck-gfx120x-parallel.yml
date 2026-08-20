@@ -82,6 +82,10 @@ jobs:
       - name: Checkout build repo
         uses: actions/checkout@v7
 
+      - name: Record job start
+        id: job-start
+        uses: hcwhan/actions/kit/watchdog/job-start@main
+
       - name: Bootstrap build job
         id: bootstrap
         uses: "./.github/actions/A00.fa-job-bootstrap"
@@ -91,28 +95,30 @@ jobs:
           opt-dim: "${{ matrix.opt-dim }}"
 
       - name: Compile OPT_DIM shard with ninja cache
+        id: build
         uses: "./.github/actions/A01.fa-build-with-cache"
         with:
           fa-src: ${{ env.FA_SRC }}
+          opt-dim: ${{ matrix.opt-dim }}
           cache-family-key: ${{ steps.bootstrap.outputs.cache-family-key }}
           cache-key: ${{ steps.bootstrap.outputs.cache-key }}
           use-cache: ${{ env.USE_CACHE }}
-          run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ matrix.opt-dim }}" --fa-src $env:FA_SRC
+          job-start-time: ${{ steps.job-start.outputs.job-start-time }}
 
       - name: Write watchdog abort metadata
-        if: always() && !cancelled() && env.ABORT_TRIGGERED == 'true' && env.COMPILE_COMPLETE != 'true'
+        if: always() && !cancelled() && steps.build.outputs.aborted == 'true'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path abort-meta | Out-Null
           $entry = [ordered]@{
             opt_dim = '${{ matrix.opt-dim }}'
             abort_triggered = $true
-            force_killed = ($env:ABORT_FORCE_KILLED -eq 'true')
+            force_killed = ('${{ steps.build.outputs.force-killed }}' -eq 'true')
           }
           $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath abort-meta/d${{ matrix.opt-dim }}.json -Encoding utf8
 
       - name: Upload watchdog abort metadata
-        if: always() && !cancelled() && env.ABORT_TRIGGERED == 'true' && env.COMPILE_COMPLETE != 'true'
+        if: always() && !cancelled() && steps.build.outputs.aborted == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: abort-meta-d${{ matrix.opt-dim }}
@@ -189,11 +195,21 @@ jobs:
           path: abort-meta
           merge-multiple: true
 
-      - name: Retry after watchdog abort
+      - name: Evaluate parallel watchdog retry eligibility
+        id: evaluate-retry
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: npx tsx scripts/cli.ts 07-retry --build-variant parallel --abort-meta-dir abort-meta --cache-meta-dir cache-meta --all-opt-dims '${{ needs.plan-opt-dim.outputs.opt-dims-json }}'
+        run: npx tsx scripts/cli.ts 07.evaluate-parallel-retry --abort-meta-dir abort-meta --cache-meta-dir cache-meta --all-opt-dims '${{ needs.plan-opt-dim.outputs.opt-dims-json }}'
+
+      - name: Retry after watchdog abort
+        if: success()
+        uses: hcwhan/actions/kit/watchdog/dispatch-retry@main
+        with:
+          should-retry: "true"
+          use-cache: ${{ env.USE_CACHE }}
+          retry-count: ${{ env.RETRY_COUNT }}
+          workflow-file: build-fa2-ck-gfx120x-parallel.yml
+          dispatch-inputs: |
+            {"ninja_workers":"${{ env.MAX_JOBS }}","use_cache":"${{ env.USE_CACHE }}","publish_release":"${{ env.PUBLISH_RELEASE }}","ck_disable_bwd":"${{ env.CK_FMHA_DISABLE_BWD == '1' && 'true' || 'false' }}"}
 
   link:
     name: link-wheel

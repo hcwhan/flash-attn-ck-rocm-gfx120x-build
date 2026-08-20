@@ -53,6 +53,10 @@ jobs:
       - name: Checkout build repo
         uses: actions/checkout@v7
 
+      - name: Record job start
+        id: job-start
+        uses: hcwhan/actions/kit/watchdog/job-start@main
+
       - name: Bootstrap build job
         id: bootstrap
         uses: "./.github/actions/A00.fa-job-bootstrap"
@@ -61,20 +65,26 @@ jobs:
           build-variant: serial
 
       - name: Compile OPT_DIM full with ninja cache
+        id: build
         uses: "./.github/actions/A01.fa-build-with-cache"
         with:
           fa-src: ${{ env.FA_SRC }}
+          opt-dim: ${{ env.CK_OPT_DIM }}
           cache-family-key: ${{ steps.bootstrap.outputs.cache-family-key }}
           cache-key: ${{ steps.bootstrap.outputs.cache-key }}
           use-cache: ${{ env.USE_CACHE }}
-          run: npx tsx scripts/cli.ts 06.compile --opt-dim "${{ env.CK_OPT_DIM }}" --fa-src $env:FA_SRC
+          job-start-time: ${{ steps.job-start.outputs.job-start-time }}
 
       - name: Retry after watchdog abort
-        if: always() && !cancelled() && env.ABORT_TRIGGERED == 'true' && env.COMPILE_COMPLETE != 'true' && env.ABORT_FORCE_KILLED != 'true'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: npx tsx scripts/cli.ts 07-retry --build-variant serial
+        if: always() && !cancelled() && steps.build.outputs.should-retry == 'true'
+        uses: hcwhan/actions/kit/watchdog/dispatch-retry@main
+        with:
+          should-retry: ${{ steps.build.outputs.should-retry }}
+          use-cache: ${{ env.USE_CACHE }}
+          retry-count: ${{ env.RETRY_COUNT }}
+          workflow-file: build-fa2-ck-gfx120x-serial.yml
+          dispatch-inputs: |
+            {"ninja_workers":"${{ env.MAX_JOBS }}","use_cache":"${{ env.USE_CACHE }}","publish_release":"${{ env.PUBLISH_RELEASE }}","ck_disable_bwd":"${{ env.CK_FMHA_DISABLE_BWD == '1' && 'true' || 'false' }}"}
 
       - name: Write compile cache metadata
         if: success()

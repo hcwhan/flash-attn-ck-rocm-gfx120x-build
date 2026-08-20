@@ -5,8 +5,8 @@ import { runPlanOptDimMatrix } from "./commands/02.plan-opt-dim-matrix.js";
 import { runPrep } from "./commands/03.prep.js";
 import { runPatch } from "./commands/04.patch.js";
 import { runToolchainFingerprint } from "./commands/05.toolchain-fingerprint.js";
-import { runCompile } from "./commands/06.compile.js";
-import { runWatchdogRetry } from "./commands/07-retry.js";
+import { runPrepareCompile } from "./commands/06.prepare.js";
+import { runEvaluateParallelWatchdogRetry } from "./commands/07.evaluate-parallel-retry.js";
 import { runShard } from "./commands/08.shard.js";
 import { runWheel } from "./commands/09.wheel.js";
 import { runVerify } from "./commands/10.verify.js";
@@ -74,59 +74,43 @@ program
   });
 
 program
-  .command("06.compile")
-  .description("编译单个 OPT_DIM shard 或 lock 全量 ck_opt_dim（含 5h 看门狗）")
+  .command("06.prepare")
+  .description(
+    "初始化编译 env 并输出 command/args（供 watchdog/run spawn；python build-fa-steps.py --step compile）",
+  )
   .requiredOption("--opt-dim <value>")
   .requiredOption("--fa-src <path>")
-  .action(async (opts) => {
-    await runCompile({
+  .action((opts) => {
+    runPrepareCompile({
       optDim: opts.optDim,
       faSrc: opts.faSrc,
     });
   });
 
 program
-  .command("07-retry")
-  .description("看门狗中断后 dispatch retry workflow（gh api + 等 concurrency cancel）")
-  .requiredOption("--build-variant <mode>", "serial 或 parallel")
-  .option(
-    "--abort-meta-dir <path>",
-    "parallel watchdog-retry job：读取 compile shard 上传的 abort 元数据目录",
+  .command("07.evaluate-parallel-retry")
+  .description(
+    "parallel watchdog-retry job：校验 compile matrix 失败是否均可 retry（不含 force-killed / 非看门狗失败）",
   )
-  .option(
-    "--cache-meta-dir <path>",
-    "parallel watchdog-retry job：读取成功 shard 的 cache-meta 目录",
-  )
-  .option(
-    "--all-opt-dims <json>",
-    "parallel watchdog-retry job：plan 导出的全部 OPT_DIM JSON 数组",
-  )
-  .action(async (opts) => {
-    const buildVariant = opts.buildVariant as "serial" | "parallel";
-    if (buildVariant !== "serial" && buildVariant !== "parallel") {
-      throw new Error(`build-variant must be serial or parallel, got ${opts.buildVariant}`);
+  .requiredOption("--abort-meta-dir <path>")
+  .requiredOption("--cache-meta-dir <path>")
+  .requiredOption("--all-opt-dims <json>", "plan 导出的全部 OPT_DIM JSON 数组")
+  .action((opts) => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(opts.allOptDims);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(`Invalid --all-opt-dims JSON: ${detail}`);
+    }
+    if (!Array.isArray(parsed) || parsed.some((dim) => typeof dim !== "string" || dim.length === 0)) {
+      throw new Error("--all-opt-dims must be a JSON array of non-empty strings");
     }
 
-    let allOptDims: string[] | undefined;
-    if (opts.allOptDims !== undefined) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(opts.allOptDims);
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : String(err);
-        throw new Error(`Invalid --all-opt-dims JSON: ${detail}`);
-      }
-      if (!Array.isArray(parsed) || parsed.some((dim) => typeof dim !== "string" || dim.length === 0)) {
-        throw new Error("--all-opt-dims must be a JSON array of non-empty strings");
-      }
-      allOptDims = parsed;
-    }
-
-    await runWatchdogRetry({
-      buildVariant,
+    runEvaluateParallelWatchdogRetry({
       abortMetaDir: opts.abortMetaDir,
       cacheMetaDir: opts.cacheMetaDir,
-      allOptDims,
+      allOptDims: parsed,
     });
   });
 
