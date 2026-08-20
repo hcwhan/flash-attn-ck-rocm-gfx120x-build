@@ -27,10 +27,10 @@ outputs:
     value: ${{ steps.ninja-fingerprint.outputs.cache-key }}
   cache-exists:
     description: ninja cache 远程条目是否存在
-    value: ${{ steps.ninja-cache.outputs.cache-exists }}
+    value: ${{ steps.cache-restore.outputs.cache-exists }}
   cache-used:
     description: 已 restore ninja cache 到 build/
-    value: ${{ steps.ninja-cache.outputs.cache-used }}
+    value: ${{ steps.cache-restore.outputs.cache-used }}
 
 runs:
   using: composite
@@ -134,33 +134,12 @@ runs:
         }
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    - name: Restore ninja cache
-      if: inputs.step-restore-ninja-cache == 'true' && env.USE_CACHE == 'true'
+    - name: Restore or Lookup ninja cache
+      if: inputs.step-restore-ninja-cache == 'true'
       uses: hcwhan/actions/kit/cache/restore@main
       id: cache-restore
       with:
         path: ${{ env.FA_SRC }}\build
         family-key: ${{ steps.ninja-fingerprint.outputs.cache-family-key }}
         cache-key: ${{ steps.ninja-fingerprint.outputs.cache-key }}
-
-    - name: Lookup ninja cache
-      if: inputs.step-restore-ninja-cache == 'true' && env.USE_CACHE != 'true'
-      uses: hcwhan/actions/kit/cache/lookup@main
-      id: cache-lookup
-      with:
-        cache-key: ${{ steps.ninja-fingerprint.outputs.cache-key }}
-
-    - name: Return ninja cache outputs
-      if: inputs.step-restore-ninja-cache == 'true'
-      id: ninja-cache
-      shell: pwsh
-      run: |
-        if ('${{ env.USE_CACHE }}' -eq 'true') {
-          $existsStr = '${{ steps.cache-restore.outputs.cache-exists }}'
-          $usedStr = '${{ steps.cache-restore.outputs.cache-used }}'
-        } else {
-          $existsStr = '${{ steps.cache-lookup.outputs.cache-exists }}'
-          $usedStr = 'false'
-        }
-        "cache-exists=$existsStr" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-        "cache-used=$usedStr" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        only-lookup: ${{ env.USE_CACHE == 'true' && 'false' || 'true' }}

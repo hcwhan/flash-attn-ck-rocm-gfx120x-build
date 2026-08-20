@@ -38,7 +38,7 @@ A01.compile-with-cache（06.prepare + watchdog/run + hcwhan/actions/kit/cache/sa
 A99.verify-and-publish
 ```
 
-手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。GHA cache 经 **`hcwhan/actions/kit/cache@main`**（`family-key` + `cache-key` 槽位；实际 key = `cache-key` + UTC 后缀；restore/lookup 取槽位最新 versioned key；save 后 API verify + `cleanup-stale`）。Ninja **family-key**：串行 `fa2-ck-gfx120x-serial-v7`；并行 `fa2-ck-gfx120x-parallel-v7-dim[{ck_opt_dim}]`。**cache-key**：`{family}-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = `fmha_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；serial/parallel 互不共用）。Pip **family-key**：`fa-pip-toolchain-v2`；**cache-key**：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
+手动 `workflow_dispatch`；产物相同。setuptools 同进程入口：`build/build-fa-steps.py`。GHA cache 经 **`hcwhan/actions/kit/cache@main`**（`family-key` + `cache-key` 槽位；实际 key = `cache-key` + UTC 后缀；restore（含 `only-lookup`）取槽位最新 versioned key；save 后 API verify + `cleanup-stale`）。Ninja **family-key**：串行 `fa2-ck-gfx120x-serial-v7`；并行 `fa2-ck-gfx120x-parallel-v7-dim[{ck_opt_dim}]`。**cache-key**：`{family}-lock[{lockHash8}]-bwd[{true|false}]-msvc[{msvcVersion}]-rocmClang[{rocmClangVersion}]-ninja[{ninjaMinor}]`（`lockHash8` = lock `toolchain`+`flash_attention`+`compile` SHA256 前 8 位；不含 `wheel`/`release` 与 workflow `ck_disable_bwd`；`bwd` = `fmha_bwd`；`msvc`/`rocmClang` = 完整工具链版本号；serial/parallel 互不共用）。Pip **family-key**：`fa-pip-toolchain-v2`；**cache-key**：`fa-pip-toolchain-v2-py[…]-pt[…]-dev[…]-rocm[…]-idx[…]`（`01.config`）。
 
 ## 命名约定
 
@@ -53,7 +53,7 @@ A99.verify-and-publish
 | 构建模式 | `--build-variant serial\|parallel` | verify / publish / fingerprint 共用 |
 | Ninja cache family-key | `cache-family-key` | `05.toolchain-fingerprint` → A00 output；`hcwhan/actions/kit/cache` cleanup 列举范围 |
 | Ninja cache key | `cache-key` | A00 output（内嵌 `05.toolchain-fingerprint`）/ manifest `build_meta[].key`（不含 UTC 后缀） |
-| Ninja cache exists | `cache-exists` | A00 output / manifest `build_meta[].exists`（lookup 或 restore 探测远端是否有条目） |
+| Ninja cache exists | `cache-exists` | A00 output / manifest `build_meta[].exists`（restore 或 only-lookup 探测远端是否有条目） |
 | Ninja cache used | `cache-used` | A00 output / manifest `build_meta[].used`（`use_cache=true` 且 restore 命中） |
 | Build meta | `--build-meta` | workflow 写入 JSON（serial `dist/compile-success-meta.json` / parallel `compile-success-meta/`）→ 10.verify → manifest `build_meta`（`opt_dim/key/exists/used`） |
 | workflow_dispatch 快照 | `dispatch` | manifest 顶层；`10.verify` 从 `MAX_JOBS` / `USE_CACHE` / `CK_FMHA_DISABLE_BWD` / `RETRY_COUNT` 写入 `ninja_workers` / `use_cache` / `ck_disable_bwd` / `retry_count` |
@@ -108,7 +108,7 @@ A99.verify-and-publish
 
 | Action | 用途 |
 |--------|------|
-| `A00.bootstrap-job` | Node/npm + `01.config` + 条件 `03.prep`/`04.patch`（`step-prep-source`）+ 条件 ROCm toolchain（`step-setup-toolchain`）+ 条件 `05.toolchain-fingerprint` + ninja cache restore/lookup（`step-restore-ninja-cache`）；三 step 开关均必填；outputs `cache-family-key`/`cache-key`/`cache-exists`/`cache-used` |
+| `A00.bootstrap-job` | Node/npm + `01.config` + 条件 `03.prep`/`04.patch`（`step-prep-source`）+ 条件 ROCm toolchain（`step-setup-toolchain`）+ 条件 `05.toolchain-fingerprint` + ninja cache restore（`step-restore-ninja-cache`；`use_cache=false` 时 `only-lookup`）；三 step 开关均必填；outputs `cache-family-key`/`cache-key`/`cache-exists`/`cache-used` |
 | `A01.compile-with-cache` | `06.prepare` + `watchdog/run@main` + `hcwhan/actions/kit/cache/save`；转发 `should-retry` 等 outputs |
 | `A99.verify-and-publish` | `10.verify` + upload wheel artifact + 可选 `11.publish` / GitHub Release；inputs `build-variant` / `build-meta` |
 
@@ -133,7 +133,7 @@ A99.verify-and-publish
 - **连续 CI 链**：各 compile/link job 内 clone+patch → compile/link → smoke 自动跑完；staging/shard 齐全等流水线检查保留。
 - **serial ∥ parallel 产物相同**：共用 link 脚本与 smoke test；parallel link 用 `FLASH_ATTENTION_FORCE_BUILD=TRUE` + prebuilt `.obj` 时间戳 merge；`/Brepro` + `SOURCE_DATE_EPOCH` 使 serial / parallel wheel **byte-identical**。
 - **`PRIMARY_DIM`** = lock `ck_opt_dim` 第一档（当前 `32`）；各 shard 均编 shared obj 是预期行为。
-- **`ninja_workers` 默认 4**（OOM 改 2）；**`use_cache` 默认 true**（false 时 lookup-only：`cache-exists` 仍探测，`cache-used=false`）
+- **`ninja_workers` 默认 4**（OOM 改 2）；**`use_cache` 默认 true**（false 时 `only-lookup`：`cache-exists` 仍探测，`cache-used=false`）
 - **ninja cache save**：`use_cache=true` 时 build 非 skipped 即 save；**`use_cache=false` 时仅成功时 save**；`hcwhan/actions/kit/cache` 默认 `cleanup-stale` 在 save/restore 成功后清理同族旧 key；save 内置 API verify（默认最长 180s）
 - **看门狗 5h 优雅中断**：compile job 第一步 `watchdog/job-start@main`；A01 `watchdog/run@main`；deadline 到期后 5× SIGINT（1min 间隔）graceful abort → `should-retry=true` → save → serial 同 job / parallel `watchdog-retry` job 内 `dispatch-retry@main`；5× SIGINT 仍不退出则 `force-killed=true`（不 save/retry）；parallel `watchdog-abort-meta` 在 `aborted==true` 时上传（含 force-kill），JSON 含 `opt_dim`/`should_retry`；wheel 等仅在 compile 成功路径执行
 - **全模式 prebuilt obj 两向 stamp** / **link 排除 `fmha_*_api.obj`**：见 `build/build-fa-steps.py` 注释。

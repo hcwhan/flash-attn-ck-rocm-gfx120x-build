@@ -76,7 +76,7 @@ FlashAttention 2 CK wheel 构建配置（workflow `ck_disable_bwd=false`，默�
 | 输入 | 默认 | 说明 |
 |------|------|------|
 | `ninja_workers` | `4` | Ninja 并行 worker 数（OOM 时可改为 `2`） |
-| `use_cache` | `true` | 设为 `false` 时不 restore（仍 lookup 探测 `exists`；`used=false`；仅 compile 成功时 save） |
+| `use_cache` | `true` | 设为 `false` 时不 restore（`restore` + `only-lookup` 仍探测 `exists`；`used=false`；仅 compile 成功时 save） |
 | `publish_release` | `true` | 设为 `false` 时跳过 GitHub Release 上传 |
 | `ck_disable_bwd` | `false` | 默认完整编译含 bwd；设为 `true` 时省略 bwd codegen 并启用 `FLASHATTENTION_DISABLE_BACKWARD`（ComfyUI 推理专用，wheel 更小、CI 更快） |
 | `retry_count` | `0` | 看门狗 auto-retry 内部递增；手动触发时保持默认，**勿改** |
@@ -117,7 +117,7 @@ wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.jso
   - `bwd`：`fmha_bwd`（`true` = 编译 bwd 内核；`false` = 推理专用省略 bwd）
   - `msvcVersion` / `rocmClangVersion`：MSVC 工具集完整版本 / `clang --version` 解析完整版本（如 `14.44.35207`、`23.0.0git`）；写入 key 前经 `cacheKeyToken` 规范化
   - `ninja`：`ninja --version` 的 major.minor
-  - restore/lookup 取槽位最新 versioned key；save 后 API verify + 同族 cleanup；serial / parallel **互不共用**
+  - restore（含 `only-lookup`）取槽位最新 versioned key；save 后 API verify + 同族 cleanup；serial / parallel **互不共用**
   - `use_cache=true` 时 build 非 skipped 即 save；`use_cache=false` 时不 restore（`used=false`），仅 compile 成功时 save
 - **Pip toolchain cache**（`PIP_TOOLCHAIN_CACHE_PREFIX` + `PIP_TOOLCHAIN_CACHE_KEY`）：family `fa-pip-toolchain-v2`；key `fa-pip-toolchain-v2-py[{python}]-pt[{pytorch}]-dev[{torch_device_extra}]-rocm[{rocm}]-idx[{indexHash8}]`（`01.config`；`indexHash8` = lock `toolchain.rocm_index` → SHA256 前 8 位）
 - 四 shard 各编 shared obj；link 仅使用 **lock `ck_opt_dim` 第一档**（当前 `32`）的 shared obj。

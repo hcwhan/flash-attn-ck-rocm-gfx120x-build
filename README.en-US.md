@@ -117,7 +117,7 @@ Wheel / verify / publish do not run unless compile succeeds. `wheel.manifest.jso
   - `bwd`: `fmha_bwd` (`true` = bwd kernels compiled; `false` = inference-only bwd omission)
   - `msvcVersion` / `rocmClangVersion`: full MSVC toolset version / parsed `clang --version` token (e.g. `14.44.35207`, `23.0.0git`); normalized via `cacheKeyToken` before entering the key
   - `ninja`: major.minor from `ninja --version`
-  - restore/lookup picks the newest versioned key in the slot; save verifies via API + family cleanup; serial / parallel keys are **not shared**
+  - restore (with `only-lookup`) picks the newest versioned key in the slot; save verifies via API + family cleanup; serial / parallel keys are **not shared**
   - With `use_cache=true`, cache is saved whenever the build step is not skipped; with `use_cache=false`, restore is skipped (`used=false`) and cache is saved only after a successful compile
 - **Pip toolchain cache** (`PIP_TOOLCHAIN_CACHE_PREFIX` + `PIP_TOOLCHAIN_CACHE_KEY`): family `fa-pip-toolchain-v2`; key `fa-pip-toolchain-v2-py[{python}]-pt[{pytorch}]-dev[{torch_device_extra}]-rocm[{rocm}]-idx[{indexHash8}]` (`01.config`; `indexHash8` = lock `toolchain.rocm_index` → SHA256 prefix)
 - All four shards compile shared objs; link uses only the **first lock `ck_opt_dim` tier** (currently `32`) for shared objs.

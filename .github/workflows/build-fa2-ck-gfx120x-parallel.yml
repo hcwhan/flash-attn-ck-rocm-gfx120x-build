@@ -8,7 +8,7 @@ on:
         required: false
         default: "4"
       use_cache:
-        description: "存在匹配条目时恢复 ninja cache 到 build/（false 时仅 lookup）"
+        description: "存在匹配条目时恢复 ninja cache 到 build/（false 时 restore only-lookup 探测 exists）"
         type: boolean
         required: false
         default: true
