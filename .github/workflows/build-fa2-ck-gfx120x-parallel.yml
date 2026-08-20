@@ -128,7 +128,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-      - name: Validate compile shard outputs
+      - name: Validate compile shard artifacts
         if: success()
         shell: pwsh
         run: npx tsx scripts/cli.ts 08.shard --fa-src $env:FA_SRC --opt-dim "${{ matrix.opt-dim }}"
