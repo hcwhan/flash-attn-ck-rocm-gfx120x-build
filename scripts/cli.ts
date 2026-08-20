@@ -92,9 +92,9 @@ program
   .description(
     "parallel watchdog-retry job：校验 compile matrix 失败是否均可 retry（不含 force-killed / 非看门狗失败）",
   )
-  .requiredOption("--abort-meta-dir <path>")
-  .requiredOption("--cache-meta-dir <path>")
   .requiredOption("--all-opt-dims <json>", "plan 导出的全部 OPT_DIM JSON 数组")
+  .requiredOption("--watchdog-abort-meta-dir <path>")
+  .requiredOption("--compile-success-meta-dir <path>")
   .action((opts) => {
     let parsed: unknown;
     try {
@@ -108,8 +108,8 @@ program
     }
 
     runEvaluateParallelWatchdogRetry({
-      abortMetaDir: opts.abortMetaDir,
-      cacheMetaDir: opts.cacheMetaDir,
+      watchdogAbortMetaDir: opts.watchdogAbortMetaDir,
+      compileSuccessMetaDir: opts.compileSuccessMetaDir,
       allOptDims: parsed,
     });
   });
@@ -145,19 +145,19 @@ program
 program
   .command("10.verify")
   .description(
-    "CPU wheel smoke test；写 .sha256 / wheel.manifest.json；校验 --build-caches",
+    "CPU wheel smoke test；写 .sha256 / wheel.manifest.json；校验 --build-meta",
   )
   .requiredOption("--dist-dir <path>")
   .requiredOption("--build-variant <name>", "serial 或 parallel")
   .requiredOption(
-    "--build-caches <path>",
-    "compile cache 元数据：JSON 数组文件（serial）或含 per-shard JSON 的目录（parallel）",
+    "--build-meta <path>",
+    "compile-success 元数据（manifest build_meta）：serial dist/compile-success-meta.json / parallel compile-success-meta 目录",
   )
   .action((opts) => {
     runVerify({
       distDir: opts.distDir,
       buildVariant: opts.buildVariant,
-      buildCaches: opts.buildCaches,
+      buildMeta: opts.buildMeta,
     });
   });
 

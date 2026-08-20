@@ -1,7 +1,10 @@
-name: FA build with ninja cache
+name: Compile with cache
 description: prepare 编译命令 + watchdog/run + post-build ninja cache save（use_cache=true 时 compile 非 skipped 即 save；false 时仅成功 save）
 
 inputs:
+  job-start-time:
+    description: UTC epoch 毫秒，来自 watchdog/job-start output
+    required: true
   fa-src:
     description: flash-attention 源码根目录
     required: true
@@ -18,9 +21,6 @@ inputs:
     description: true 时在 build 非 skipped 时 save；false 时仅 compile 成功时 save
     required: false
     default: "true"
-  job-start-time:
-    description: UTC epoch 毫秒，来自 watchdog/job-start output
-    required: true
 
 outputs:
   should-retry:
@@ -57,10 +57,10 @@ runs:
         job-start-time: ${{ inputs.job-start-time }}
         limit-hours: "5"
 
-    - name: Post-build ninja cache save
+    - name: Save ninja cache
       if: always() && steps.run-task.conclusion != 'skipped' && (inputs.use-cache == 'true' || steps.run-task.conclusion == 'success') && steps.run-task.outputs.force-killed != 'true'
-      uses: "./.github/actions/A01.fa-build-with-cache/A01.1.fa-post-build-cache"
+      uses: hcwhan/actions/kit/cache/save@main
       with:
-        fa-src: ${{ inputs.fa-src }}
-        cache-family-key: ${{ inputs.cache-family-key }}
+        path: ${{ inputs.fa-src }}\build
+        family-key: ${{ inputs.cache-family-key }}
         cache-key: ${{ inputs.cache-key }}

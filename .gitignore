@@ -4,8 +4,8 @@ node_modules/
 
 # Dist / CI metadata
 dist/
-cache-meta/
-abort-meta/
+compile-success-meta/
+watchdog-abort-meta/
 
 # Python
 __pycache__/

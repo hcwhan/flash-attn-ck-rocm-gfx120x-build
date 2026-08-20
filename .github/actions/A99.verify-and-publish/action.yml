@@ -1,12 +1,12 @@
-name: FA verify and publish
-description: 10.verify（wheel 校验 + manifest）+ upload artifact；可选 11.publish / Release（workflow_dispatch.publish_release）
+name: Verify and publish
+description: Wheel 收尾：10.verify + upload artifact；publish_release≠false 时 11.publish + GitHub Release。
 
 inputs:
   build-variant:
     description: serial 或 parallel（10.verify / 11.publish --build-variant）
     required: true
-  build-caches:
-    description: 10.verify --build-caches 相对 GITHUB_WORKSPACE 的路径（serial dist/build-caches.json / parallel cache-meta）
+  build-meta:
+    description: 10.verify --build-meta 相对 GITHUB_WORKSPACE 的路径（serial dist/compile-success-meta.json / parallel compile-success-meta）
     required: true
 
 runs:
@@ -16,8 +16,8 @@ runs:
       shell: pwsh
       run: |
         $distDir = Join-Path $env:GITHUB_WORKSPACE 'dist'
-        $buildCaches = Join-Path $env:GITHUB_WORKSPACE '${{ inputs.build-caches }}'
-        npx tsx scripts/cli.ts 10.verify --dist-dir $distDir --build-variant ${{ inputs.build-variant }} --build-caches $buildCaches
+        $buildMeta = Join-Path $env:GITHUB_WORKSPACE '${{ inputs.build-meta }}'
+        npx tsx scripts/cli.ts 10.verify --dist-dir $distDir --build-variant ${{ inputs.build-variant }} --build-meta $buildMeta
 
     - name: Upload wheel artifact
       uses: actions/upload-artifact@v7

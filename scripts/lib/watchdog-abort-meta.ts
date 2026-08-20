@@ -4,8 +4,7 @@ import { z } from "zod";
 
 const abortMetaSchema = z.object({
   opt_dim: z.string().min(1),
-  abort_triggered: z.literal(true),
-  force_killed: z.boolean(),
+  should_retry: z.boolean(),
 });
 
 const cacheMetaSchema = z.object({
@@ -75,8 +74,8 @@ function parseJsonFiles<T>(
   });
 }
 
-function readWatchdogAbortMetaEntries(abortMetaDir: string): WatchdogAbortMetaEntry[] {
-  const root = path.resolve(abortMetaDir);
+function readWatchdogAbortMetaEntries(watchdogAbortMetaDir: string): WatchdogAbortMetaEntry[] {
+  const root = path.resolve(watchdogAbortMetaDir);
   let jsonFiles: string[];
   try {
     jsonFiles = collectJsonFiles(root);
@@ -90,20 +89,20 @@ function readWatchdogAbortMetaEntries(abortMetaDir: string): WatchdogAbortMetaEn
 
   const entries = parseJsonFiles(root, abortMetaSchema, "watchdog abort metadata");
 
-  const forceKilledDims = entries
-    .filter((entry) => entry.force_killed)
+  const noRetryDims = entries
+    .filter((entry) => !entry.should_retry)
     .map((entry) => entry.opt_dim);
-  if (forceKilledDims.length > 0) {
+  if (noRetryDims.length > 0) {
     throw new Error(
-      `Watchdog force-killed shard(s): ${forceKilledDims.join(", ")}; cannot retry`,
+      `Watchdog abort without retry on shard(s): ${noRetryDims.join(", ")}; cannot retry`,
     );
   }
 
   return entries;
 }
 
-function readCompileCacheMetaOptDims(cacheMetaDir: string): string[] {
-  const root = path.resolve(cacheMetaDir);
+function readCompileSuccessMetaOptDims(compileSuccessMetaDir: string): string[] {
+  const root = path.resolve(compileSuccessMetaDir);
   let jsonFiles: string[];
   try {
     jsonFiles = collectJsonFiles(root);
@@ -115,15 +114,15 @@ function readCompileCacheMetaOptDims(cacheMetaDir: string): string[] {
     return [];
   }
 
-  return parseJsonFiles(root, cacheMetaSchema, "compile cache metadata").map(
+  return parseJsonFiles(root, cacheMetaSchema, "compile success metadata").map(
     (entry) => entry.opt_dim,
   );
 }
 
 export function evaluateParallelWatchdogRetry(options: {
   allOptDims: string[];
-  cacheMetaDir: string;
-  abortMetaDir: string;
+  watchdogAbortMetaDir: string;
+  compileSuccessMetaDir: string;
 }): ParallelWatchdogRetryEvaluation {
   const allDimsSet = new Set(options.allOptDims);
   if (allDimsSet.size !== options.allOptDims.length) {
@@ -133,18 +132,18 @@ export function evaluateParallelWatchdogRetry(options: {
     throw new Error("allOptDims is empty");
   }
 
-  const successDims = new Set(readCompileCacheMetaOptDims(options.cacheMetaDir));
+  const successDims = new Set(readCompileSuccessMetaOptDims(options.compileSuccessMetaDir));
   const failedDims = [...allDimsSet].filter((dim) => !successDims.has(dim));
 
   if (failedDims.length === 0) {
     return {
       eligible: false,
       reason:
-        "compile matrix reported failure but every OPT_DIM has cache-meta (success)",
+        "compile matrix reported failure but every OPT_DIM has compile-success metadata",
     };
   }
 
-  const abortEntries = readWatchdogAbortMetaEntries(options.abortMetaDir);
+  const abortEntries = readWatchdogAbortMetaEntries(options.watchdogAbortMetaDir);
   const watchdogDims = new Set(abortEntries.map((entry) => entry.opt_dim));
   const failedSet = new Set(failedDims);
 

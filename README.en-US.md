@@ -103,10 +103,10 @@ Wheel / verify / publish do not run unless compile succeeds. `wheel.manifest.jso
 
 | Job | Role | workflow timeout |
 |-----|------|------------------|
-| `plan-opt-dim` | checkout → **A00** (`prep-source=false`, `setup-toolchain=false`) → `02.plan-opt-dim-matrix` | **5 min** |
-| `compile-d32` … `d256` | job-start → **A00** → **A01** → (success) `08.shard`, upload artifacts; (`aborted`) upload `abort-meta-d{dim}` | not set |
+| `plan-opt-dim` | checkout → **A00** (`step-prep-source=false`, `step-setup-toolchain=false`, `step-restore-ninja-cache=false`) → `02.plan-opt-dim-matrix` | **5 min** |
+| `compile-d32` … `d256` | job-start → **A00** → **A01** → (success) `08.shard`, upload `compile-success-meta-d{dim}` and obj artifacts; (`aborted`) upload `watchdog-abort-meta-d{dim}` | not set |
 | `watchdog-retry` | **A00** (lightweight) → download meta → `07.evaluate-parallel-retry` → `dispatch-retry` | not set |
-| `link-wheel` | checkout → **A00** → download `d*` / `cache-meta-d*` → `09.wheel` → **A99** (**no** ninja cache) | not set |
+| `link-wheel` | checkout → **A00** → download `d*` / `compile-success-meta-d*` → `09.wheel` → **A99** (**no** ninja cache) | not set |
 
 > Except `plan-opt-dim`, workflows do **not** set `timeout-minutes`; “not set” means the GitHub hosted runner default **6 h** job limit applies. Compile jobs additionally use a **5 h** deadline from `watchdog/job-start` (see above). CI paths: `FA_SRC=C:\fa\flash-attention`; parallel also uses `FA_STAGING=C:\fa-staging`.
 
@@ -159,13 +159,13 @@ GitHub Release (uploaded automatically after a successful build; serial / parall
 - `flash_attn-*.whl.sha256`
 - `wheel.manifest.json`
 
-`wheel.manifest.json` is written by `10.verify` (uploaded in CI via `A99.fa-verify-publish`). Key fields:
+`wheel.manifest.json` is written by `10.verify` (uploaded in CI via `A99.verify-and-publish`). Key fields:
 
 | Field | Meaning |
 |-------|---------|
 | `fmha_bwd` | Top-level; whether bwd kernels were compiled (`CK_FMHA_DISABLE_BWD=0`) |
 | `dispatch` | `ninja_workers`, `use_cache`, `ck_disable_bwd`, `retry_count` (workflow snapshot) |
-| `build_caches[]` | Serial single entry / parallel four shards (`opt_dim` / `key` / `exists` / `used`) |
+| `build_meta[]` | Serial single entry / parallel four shards (`opt_dim` / `key` / `exists` / `used`) |
 
 > Older manifests may use top-level `ck_disable_bwd` or cache keys with `*-v6` (no `bwd[...]` segment); treat current `10.verify` output as canonical. Samples under `dist/` may be from earlier CI runs.
 
@@ -185,8 +185,8 @@ flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.w
 
 | Check | Script |
 |-------|--------|
-| CI smoke test serial (CPU) | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant serial --build-caches dist\build-caches.json` |
-| CI smoke test parallel (CPU) | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant parallel --build-caches cache-meta` |
+| CI smoke test serial (CPU) | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant serial --build-meta dist\compile-success-meta.json` |
+| CI smoke test parallel (CPU) | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant parallel --build-meta compile-success-meta` |
 | Parallel link API dispatch recompile checks | `build/build-fa-steps.py` (merge skip + pre/post ninja asserts) |
 | Pre-deploy GPU smoke test (gfx120x hardware) | `python test/gpu-smoke-test.py -w .` |
 

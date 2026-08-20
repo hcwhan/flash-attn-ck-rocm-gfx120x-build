@@ -103,10 +103,10 @@ wheel / verify / publish 在 compile 未成功时不运行。`wheel.manifest.jso
 
 | Job | 作用 | workflow 超时 |
 |-----|------|---------------|
-| `plan-opt-dim` | checkout → **A00**（`prep-source=false`, `setup-toolchain=false`）→ `02.plan-opt-dim-matrix` | **5 min** |
-| `compile-d32` … `d256` | job-start → **A00** → **A01** →（成功）`08.shard`、上传 artifacts；（`aborted`）上传 `abort-meta-d{dim}` | 未设 |
+| `plan-opt-dim` | checkout → **A00**（`step-prep-source=false`, `step-setup-toolchain=false`, `step-restore-ninja-cache=false`）→ `02.plan-opt-dim-matrix` | **5 min** |
+| `compile-d32` … `d256` | job-start → **A00** → **A01** →（成功）`08.shard`、上传 `compile-success-meta-d{dim}` 与 obj artifacts；（`aborted`）上传 `watchdog-abort-meta-d{dim}` | 未设 |
 | `watchdog-retry` | **A00**（轻量）→ download meta → `07.evaluate-parallel-retry` → `dispatch-retry` | 未设 |
-| `link-wheel` | checkout → **A00** → download `d*` / `cache-meta-d*` → `09.wheel` → **A99**（**无** ninja cache） | 未设 |
+| `link-wheel` | checkout → **A00** → download `d*` / `compile-success-meta-d*` → `09.wheel` → **A99**（**无** ninja cache） | 未设 |
 
 > 除 `plan-opt-dim` 外 workflow **未**显式设 `timeout-minutes`；「未设」表示使用 GitHub hosted runner 默认 **6 h** job 上限。compile job 另有自 `watchdog/job-start` 起算的 **5 h** deadline（见上文）。CI 路径：`FA_SRC=C:\fa\flash-attention`；parallel 另设 `FA_STAGING=C:\fa-staging`。
 
@@ -159,13 +159,13 @@ GitHub Release（构建成功后自动上传；serial / parallel 使用不同 ta
 - `flash_attn-*.whl.sha256`
 - `wheel.manifest.json`
 
-`wheel.manifest.json` 由 `10.verify` 写入（CI 经 `A99.fa-verify-publish` 上传）。主要字段：
+`wheel.manifest.json` 由 `10.verify` 写入（CI 经 `A99.verify-and-publish` 上传）。主要字段：
 
 | 字段 | 含义 |
 |------|------|
 | `fmha_bwd` | 顶层；是否编译 bwd 内核（=`CK_FMHA_DISABLE_BWD=0`） |
 | `dispatch` | `ninja_workers`、`use_cache`、`ck_disable_bwd`、`retry_count`（workflow 快照） |
-| `build_caches[]` | serial 单条 / parallel 四 shard（`opt_dim` / `key` / `exists` / `used`） |
+| `build_meta[]` | serial 单条 / parallel 四 shard（`opt_dim` / `key` / `exists` / `used`） |
 
 > 旧版 manifest 可能在顶层使用 `ck_disable_bwd`，或 cache key 为 `*-v6`（无 `bwd[...]` 段）；以当前 `10.verify` 输出为准。`dist/` 内样例可能来自较早 CI run。
 
@@ -185,8 +185,8 @@ flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.w
 
 | 检查 | 脚本 |
 |------|------|
-| CI smoke test serial（CPU） | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant serial --build-caches dist\build-caches.json` |
-| CI smoke test parallel（CPU） | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant parallel --build-caches cache-meta` |
+| CI smoke test serial（CPU） | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant serial --build-meta dist\compile-success-meta.json` |
+| CI smoke test parallel（CPU） | `npx tsx scripts/cli.ts 10.verify --dist-dir dist --build-variant parallel --build-meta compile-success-meta` |
 | parallel link API dispatch 重编校验 | `build/build-fa-steps.py`（merge skip + ninja 前后断言） |
 | 部署前 GPU smoke test（gfx120x 真机） | `python test/gpu-smoke-test.py -w .` |
 

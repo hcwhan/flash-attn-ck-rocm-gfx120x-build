@@ -1,0 +1,166 @@
+name: Bootstrap job
+description: Job bootstrap：Node/npm、01.config + 三个必填 step 开关（step-prep-source / step-setup-toolchain / step-restore-ninja-cache）。
+
+inputs:
+  step-prep-source:
+    description: 运行 03.prep 与 04.patch（需 FA_SRC；且同 job 内已 01.config --export-github-env）
+    required: true
+  step-setup-toolchain:
+    description: 运行 Python/MSVC/pip toolchain cache、rocm[devel]、torch[device-*]（PYTHON/PYTORCH/TORCH_DEVICE_EXTRA/ROCM_INDEX/ROCM_VERSION/PIP_TOOLCHAIN_CACHE_KEY）
+    required: true
+  step-restore-ninja-cache:
+    description: true 时运行 05.toolchain-fingerprint + ninja cache restore（compile job）
+    required: true
+  build-variant:
+    description: serial 或 parallel（step-restore-ninja-cache=true 时必填）
+    required: false
+  opt-dim:
+    description: parallel shard OPT_DIM（build-variant=parallel 时必填）
+    required: false
+
+outputs:
+  cache-family-key:
+    description: 05.toolchain-fingerprint 输出的 ninja cache family-key
+    value: ${{ steps.ninja-fingerprint.outputs.cache-family-key }}
+  cache-key:
+    description: 05.toolchain-fingerprint 输出的 ninja cache key
+    value: ${{ steps.ninja-fingerprint.outputs.cache-key }}
+  cache-exists:
+    description: ninja cache 远程条目是否存在
+    value: ${{ steps.ninja-cache.outputs.cache-exists }}
+  cache-used:
+    description: 已 restore ninja cache 到 build/
+    value: ${{ steps.ninja-cache.outputs.cache-used }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: "26"
+        cache: npm
+
+    - name: Run npm ci
+      shell: pwsh
+      run: npm ci
+
+    - name: Export VERSION.lock env
+      shell: pwsh
+      run: npx tsx scripts/cli.ts 01.config -w $env:GITHUB_WORKSPACE --export-github-env
+
+    - name: Clone source
+      if: inputs.step-prep-source == 'true'
+      shell: pwsh
+      run: npx tsx scripts/cli.ts 03.prep --fa-src $env:FA_SRC
+
+    - name: Patch source
+      if: inputs.step-prep-source == 'true'
+      shell: pwsh
+      run: npx tsx scripts/cli.ts 04.patch --fa-src $env:FA_SRC
+
+    - name: Setup MSVC
+      if: inputs.step-setup-toolchain == 'true'
+      uses: TheMrMilchmann/setup-msvc-dev@v4.1.0
+      with:
+        arch: x64
+
+    - name: Setup Python
+      if: inputs.step-setup-toolchain == 'true'
+      uses: actions/setup-python@v7
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Restore pip toolchain cache
+      if: inputs.step-setup-toolchain == 'true'
+      uses: hcwhan/actions/kit/cache/restore@main
+      id: pip-toolchain-cache
+      with:
+        path: ${{ runner.temp }}/pip-toolchain-cache
+        family-key: ${{ env.PIP_TOOLCHAIN_CACHE_PREFIX }}
+        cache-key: ${{ env.PIP_TOOLCHAIN_CACHE_KEY }}
+
+    - name: Export pip cache dir env
+      if: inputs.step-setup-toolchain == 'true'
+      shell: pwsh
+      run: echo "PIP_CACHE_DIR=$env:RUNNER_TEMP/pip-toolchain-cache" >> $env:GITHUB_ENV
+
+    - name: Upgrade pip tooling
+      if: inputs.step-setup-toolchain == 'true'
+      shell: pwsh
+      run: |
+        python -m pip install --upgrade pip wheel setuptools psutil packaging ninja
+
+    - name: Install ROCm devel headers
+      if: inputs.step-setup-toolchain == 'true'
+      shell: pwsh
+      run: |
+        python -m pip install `
+          --index-url ${{ env.ROCM_INDEX }} `
+          "rocm[devel]==${{ env.ROCM_VERSION }}"
+
+    - name: Initialize ROCm devel tree
+      if: inputs.step-setup-toolchain == 'true'
+      shell: pwsh
+      run: |
+        python -m rocm_sdk init --quiet
+        python -m rocm_sdk path --root
+
+    - name: Install pinned PyTorch ROCm
+      if: inputs.step-setup-toolchain == 'true'
+      shell: pwsh
+      run: |
+        python -m pip install `
+          --index-url ${{ env.ROCM_INDEX }} `
+          "torch[device-${{ env.TORCH_DEVICE_EXTRA }}]==${{ env.PYTORCH_VERSION }}"
+
+    - name: Save pip toolchain cache
+      if: inputs.step-setup-toolchain == 'true' && steps.pip-toolchain-cache.outputs.cache-used != 'true'
+      uses: hcwhan/actions/kit/cache/save@main
+      with:
+        path: ${{ runner.temp }}/pip-toolchain-cache
+        family-key: ${{ env.PIP_TOOLCHAIN_CACHE_PREFIX }}
+        cache-key: ${{ env.PIP_TOOLCHAIN_CACHE_KEY }}
+
+    - name: Fingerprint toolchain for ninja cache key
+      if: inputs.step-restore-ninja-cache == 'true'
+      id: ninja-fingerprint
+      shell: pwsh
+      run: |
+        if ('${{ inputs.build-variant }}' -eq 'parallel') {
+          npx tsx scripts/cli.ts 05.toolchain-fingerprint -w $env:GITHUB_WORKSPACE --build-variant parallel --opt-dim "${{ inputs.opt-dim }}"
+        } else {
+          npx tsx scripts/cli.ts 05.toolchain-fingerprint -w $env:GITHUB_WORKSPACE --build-variant serial
+        }
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    - name: Restore ninja cache
+      if: inputs.step-restore-ninja-cache == 'true' && env.USE_CACHE == 'true'
+      uses: hcwhan/actions/kit/cache/restore@main
+      id: cache-restore
+      with:
+        path: ${{ env.FA_SRC }}\build
+        family-key: ${{ steps.ninja-fingerprint.outputs.cache-family-key }}
+        cache-key: ${{ steps.ninja-fingerprint.outputs.cache-key }}
+
+    - name: Lookup ninja cache
+      if: inputs.step-restore-ninja-cache == 'true' && env.USE_CACHE != 'true'
+      uses: hcwhan/actions/kit/cache/lookup@main
+      id: cache-lookup
+      with:
+        cache-key: ${{ steps.ninja-fingerprint.outputs.cache-key }}
+
+    - name: Return ninja cache outputs
+      if: inputs.step-restore-ninja-cache == 'true'
+      id: ninja-cache
+      shell: pwsh
+      run: |
+        if ('${{ env.USE_CACHE }}' -eq 'true') {
+          $existsStr = '${{ steps.cache-restore.outputs.cache-exists }}'
+          $usedStr = '${{ steps.cache-restore.outputs.cache-used }}'
+        } else {
+          $existsStr = '${{ steps.cache-lookup.outputs.cache-exists }}'
+          $usedStr = 'false'
+        }
+        "cache-exists=$existsStr" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        "cache-used=$usedStr" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8

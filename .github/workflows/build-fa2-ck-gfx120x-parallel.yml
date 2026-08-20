@@ -58,11 +58,12 @@ jobs:
       - name: Checkout build repo
         uses: actions/checkout@v7
 
-      - name: Bootstrap build job
-        uses: "./.github/actions/A00.fa-job-bootstrap"
+      - name: Bootstrap job
+        uses: "./.github/actions/A00.bootstrap-job"
         with:
-          prep-source: false
-          setup-toolchain: false
+          step-prep-source: "false"
+          step-setup-toolchain: "false"
+          step-restore-ninja-cache: "false"
 
       - name: Plan OPT_DIM matrix
         id: plan-opt-dim-matrix
@@ -86,43 +87,44 @@ jobs:
         id: job-start
         uses: hcwhan/actions/kit/watchdog/job-start@main
 
-      - name: Bootstrap build job
+      - name: Bootstrap job
         id: bootstrap
-        uses: "./.github/actions/A00.fa-job-bootstrap"
+        uses: "./.github/actions/A00.bootstrap-job"
         with:
-          ninja-cache-restore: true
+          step-prep-source: "true"
+          step-setup-toolchain: "true"
+          step-restore-ninja-cache: "true"
           build-variant: parallel
           opt-dim: "${{ matrix.opt-dim }}"
 
-      - name: Compile OPT_DIM shard with ninja cache
+      - name: Compile OPT_DIM shard
         id: build
-        uses: "./.github/actions/A01.fa-build-with-cache"
+        uses: "./.github/actions/A01.compile-with-cache"
         with:
+          job-start-time: ${{ steps.job-start.outputs.job-start-time }}
           fa-src: ${{ env.FA_SRC }}
           opt-dim: ${{ matrix.opt-dim }}
           cache-family-key: ${{ steps.bootstrap.outputs.cache-family-key }}
           cache-key: ${{ steps.bootstrap.outputs.cache-key }}
           use-cache: ${{ env.USE_CACHE }}
-          job-start-time: ${{ steps.job-start.outputs.job-start-time }}
 
       - name: Write watchdog abort metadata
         if: always() && !cancelled() && steps.build.outputs.aborted == 'true'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path abort-meta | Out-Null
+          New-Item -ItemType Directory -Force -Path watchdog-abort-meta | Out-Null
           $entry = [ordered]@{
             opt_dim = '${{ matrix.opt-dim }}'
-            abort_triggered = $true
-            force_killed = ('${{ steps.build.outputs.force-killed }}' -eq 'true')
+            should_retry = ('${{ steps.build.outputs.should-retry }}' -eq 'true')
           }
-          $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath abort-meta/d${{ matrix.opt-dim }}.json -Encoding utf8
+          $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath watchdog-abort-meta/watchdog-abort-meta-d${{ matrix.opt-dim }}.json -Encoding utf8
 
       - name: Upload watchdog abort metadata
         if: always() && !cancelled() && steps.build.outputs.aborted == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: abort-meta-d${{ matrix.opt-dim }}
-          path: abort-meta/d${{ matrix.opt-dim }}.json
+          name: watchdog-abort-meta-d${{ matrix.opt-dim }}
+          path: watchdog-abort-meta/watchdog-abort-meta-d${{ matrix.opt-dim }}.json
           retention-days: 1
           if-no-files-found: error
 
@@ -131,29 +133,29 @@ jobs:
         shell: pwsh
         run: npx tsx scripts/cli.ts 08.shard --fa-src $env:FA_SRC --opt-dim "${{ matrix.opt-dim }}"
 
-      - name: Write compile cache metadata
+      - name: Write compile success metadata
         if: success()
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path cache-meta | Out-Null
+          New-Item -ItemType Directory -Force -Path compile-success-meta | Out-Null
           $entry = [ordered]@{
             opt_dim = '${{ matrix.opt-dim }}'
             key = '${{ steps.bootstrap.outputs.cache-key }}'
             exists = '${{ steps.bootstrap.outputs.cache-exists }}' -eq 'true'
             used = '${{ steps.bootstrap.outputs.cache-used }}' -eq 'true'
           }
-          $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath cache-meta/d${{ matrix.opt-dim }}.json -Encoding utf8
+          $entry | ConvertTo-Json -Depth 3 | Out-File -FilePath compile-success-meta/compile-success-meta-d${{ matrix.opt-dim }}.json -Encoding utf8
 
-      - name: Upload compile cache metadata
+      - name: Upload compile success metadata
         if: success()
         uses: actions/upload-artifact@v7
         with:
-          name: cache-meta-d${{ matrix.opt-dim }}
-          path: cache-meta/d${{ matrix.opt-dim }}.json
+          name: compile-success-meta-d${{ matrix.opt-dim }}
+          path: compile-success-meta/compile-success-meta-d${{ matrix.opt-dim }}.json
           retention-days: 7
           if-no-files-found: error
 
-      - name: Upload object files
+      - name: Upload compile object files
         if: success()
         uses: actions/upload-artifact@v7
         with:
@@ -173,32 +175,33 @@ jobs:
       - name: Checkout build repo
         uses: actions/checkout@v7
 
-      - name: Bootstrap build job
-        uses: "./.github/actions/A00.fa-job-bootstrap"
+      - name: Bootstrap job
+        uses: "./.github/actions/A00.bootstrap-job"
         with:
-          prep-source: false
-          setup-toolchain: false
-
-      - name: Download compile cache metadata
-        uses: actions/download-artifact@v8
-        continue-on-error: true
-        with:
-          pattern: cache-meta-d*
-          path: cache-meta
-          merge-multiple: true
+          step-prep-source: "false"
+          step-setup-toolchain: "false"
+          step-restore-ninja-cache: "false"
 
       - name: Download watchdog abort metadata
         uses: actions/download-artifact@v8
         continue-on-error: true
         with:
-          pattern: abort-meta-d*
-          path: abort-meta
+          pattern: watchdog-abort-meta-d*
+          path: watchdog-abort-meta
+          merge-multiple: true
+
+      - name: Download compile success metadata
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          pattern: compile-success-meta-d*
+          path: compile-success-meta
           merge-multiple: true
 
       - name: Evaluate parallel watchdog retry eligibility
         id: evaluate-retry
         shell: pwsh
-        run: npx tsx scripts/cli.ts 07.evaluate-parallel-retry --abort-meta-dir abort-meta --cache-meta-dir cache-meta --all-opt-dims '${{ needs.plan-opt-dim.outputs.opt-dims-json }}'
+        run: npx tsx scripts/cli.ts 07.evaluate-parallel-retry --watchdog-abort-meta-dir watchdog-abort-meta --compile-success-meta-dir compile-success-meta --all-opt-dims '${{ needs.plan-opt-dim.outputs.opt-dims-json }}'
 
       - name: Retry after watchdog abort
         if: success()
@@ -221,8 +224,12 @@ jobs:
       - name: Checkout build repo
         uses: actions/checkout@v7
 
-      - name: Bootstrap build job
-        uses: "./.github/actions/A00.fa-job-bootstrap"
+      - name: Bootstrap job
+        uses: "./.github/actions/A00.bootstrap-job"
+        with:
+          step-prep-source: "true"
+          step-setup-toolchain: "true"
+          step-restore-ninja-cache: "false"
 
       - name: Download OPT_DIM object artifacts
         uses: actions/download-artifact@v8
@@ -231,19 +238,19 @@ jobs:
           path: ${{ env.FA_STAGING }}
           merge-multiple: false
 
-      - name: Download compile cache metadata
+      - name: Download compile success metadata
         uses: actions/download-artifact@v8
         with:
-          pattern: cache-meta-d*
-          path: cache-meta
+          pattern: compile-success-meta-d*
+          path: compile-success-meta
           merge-multiple: true
 
-      - name: Link and package wheel from merged objects
+      - name: Link wheel from merged objects
         shell: pwsh
         run: npx tsx scripts/cli.ts 09.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist --staging-root $env:FA_STAGING --primary-dim "${{ needs.plan-opt-dim.outputs.primary-dim }}"
 
-      - name: Verify wheel and publish
-        uses: "./.github/actions/A99.fa-verify-publish"
+      - name: Wheel verify and publish
+        uses: "./.github/actions/A99.verify-and-publish"
         with:
           build-variant: parallel
-          build-caches: cache-meta
+          build-meta: compile-success-meta
