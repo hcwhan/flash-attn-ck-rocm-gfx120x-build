@@ -46,8 +46,8 @@
 
 FlashAttention 2 CK wheel 构建配置（workflow `ck_disable_bwd=false`，默认）：
 
-- CK 内核：**fwd + fwd_appendkv + fwd_splitkv + bwd**（`CK_FMHA_DISABLE_BWD=0` 默认完整编译；设为 `1` 时无 bwd）
-- **`-DFLASHATTENTION_DISABLE_BACKWARD`**（仅 `CK_FMHA_DISABLE_BWD=1` 时启用）
+- CK 内核：**fwd + fwd_appendkv + fwd_splitkv + bwd**（`CK_DISABLE_BWD=false` 默认完整编译；`true` 时无 bwd）
+- **`-DFLASHATTENTION_DISABLE_BACKWARD`**（仅 `CK_DISABLE_BWD=true` 时启用）
 - **C++11 ABI `cxx11.abi`**（与 pin 的 PyTorch 一致；local tag 见 `wheel.wheel_local_version`）
 - **`GPU_ARCHS`** = lock `compile.gpu_archs`（Windows 分号分隔）
 - **`CK_OPT_DIM`** = lock `compile.ck_opt_dim`（当前 `32,64,128,256`）；`init-build-env.ts` 映射为 upstream `OPT_DIM` env
@@ -163,7 +163,7 @@ GitHub Release（构建成功后自动上传；serial / parallel 使用不同 ta
 
 | 字段 | 含义 |
 |------|------|
-| `fmha_bwd` | 顶层；是否编译 bwd 内核（=`CK_FMHA_DISABLE_BWD=0`） |
+| `fmha_bwd` | 顶层；是否编译 bwd 内核（`CK_DISABLE_BWD=false`） |
 | `dispatch` | `ninja_workers`、`use_cache`、`ck_disable_bwd`、`retry_count`（workflow 快照） |
 | `build_meta[]` | serial 单条 / parallel 四 shard（`opt_dim` / `key` / `exists` / `used`） |
 
@@ -190,7 +190,7 @@ flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.w
 | parallel link API dispatch 重编校验 | `build/build-fa-steps.py`（merge skip + ninja 前后断言） |
 | 部署前 GPU smoke test（gfx120x 真机） | `python test/gpu-smoke-test.py -w .` |
 
-Smoke test：wheel 文件名/结构（.pyd 体积、METADATA）→ pip 安装 → import flash_attn_2_cuda；parallel link 另在 merge 阶段断言 API dispatch 对象（fwd 3 个，`CK_FMHA_DISABLE_BWD=0` 时再加 `fmha_bwd_api.obj`）被 skip 并由 ninja 重编。GPU fwd + kvcache + backward 探测见 `test/gpu-smoke-test.py`（部署前在 gfx1200/gfx1201 真机手动跑）。
+Smoke test：wheel 文件名/结构（.pyd 体积、METADATA）→ pip 安装 → import flash_attn_2_cuda；parallel link 另在 merge 阶段断言 API dispatch 对象（fwd 3 个，`CK_DISABLE_BWD=false` 时再加 `fmha_bwd_api.obj`）被 skip 并由 ninja 重编。GPU fwd + kvcache + backward 探测见 `test/gpu-smoke-test.py`（部署前在 gfx1200/gfx1201 真机手动跑）。
 
 ## 安装到 ComfyUI
 

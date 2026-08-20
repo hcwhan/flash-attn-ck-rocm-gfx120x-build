@@ -43,7 +43,7 @@ env:
   USE_CACHE: ${{ github.event.inputs.use_cache != 'false' && 'true' || 'false' }}
   PUBLISH_RELEASE: ${{ github.event.inputs.publish_release != 'false' && 'true' || 'false' }}
   RETRY_COUNT: ${{ github.event.inputs.retry_count || '0' }}
-  CK_FMHA_DISABLE_BWD: ${{ github.event.inputs.ck_disable_bwd == 'true' && '1' || '0' }}
+  CK_DISABLE_BWD: ${{ github.event.inputs.ck_disable_bwd == 'true' && 'true' || 'false' }}
 
 jobs:
   plan-opt-dim:
@@ -97,7 +97,7 @@ jobs:
           build-variant: parallel
           opt-dim: "${{ matrix.opt-dim }}"
 
-      - name: Compile OPT_DIM shard
+      - name: Compile OPT_DIM shard and save cache
         id: build
         uses: "./.github/actions/A01.compile-with-cache"
         with:
@@ -212,7 +212,7 @@ jobs:
           retry-count: ${{ env.RETRY_COUNT }}
           workflow-file: build-fa2-ck-gfx120x-parallel.yml
           dispatch-inputs: |
-            {"ninja_workers":"${{ env.MAX_JOBS }}","use_cache":"${{ env.USE_CACHE }}","publish_release":"${{ env.PUBLISH_RELEASE }}","ck_disable_bwd":"${{ env.CK_FMHA_DISABLE_BWD == '1' && 'true' || 'false' }}"}
+            {"ninja_workers":"${{ env.MAX_JOBS }}","use_cache":"${{ env.USE_CACHE }}","publish_release":"${{ env.PUBLISH_RELEASE }}","ck_disable_bwd":"${{ env.CK_DISABLE_BWD }}"}
 
   link:
     name: link-wheel
@@ -249,7 +249,7 @@ jobs:
         shell: pwsh
         run: npx tsx scripts/cli.ts 09.wheel --fa-src $env:FA_SRC --dist-dir $env:GITHUB_WORKSPACE\dist --staging-root $env:FA_STAGING --primary-dim "${{ needs.plan-opt-dim.outputs.primary-dim }}"
 
-      - name: Wheel verify and publish
+      - name: Verify Wheel and Publish Release
         uses: "./.github/actions/A99.verify-and-publish"
         with:
           build-variant: parallel

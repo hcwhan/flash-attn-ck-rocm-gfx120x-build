@@ -1,6 +1,6 @@
 """同进程 setuptools 构建 flash-attn（compile / wheel / merge-and-wheel）。
 
-由 TS CLI（06.prepare / watchdog/run / 09.wheel）调用；直接运行须自行设置 OPT_DIM、GPU_ARCHS、ROCM_* 等 env。
+由 TS CLI（06.prepare / watchdog/run / 09.wheel）调用；直接运行须自行设置 OPT_DIM、GPU_ARCHS、CK_DISABLE_BWD、ROCM_* 等 env。
 """
 from __future__ import annotations
 
@@ -32,13 +32,13 @@ API_OBJ_PATTERN = re.compile(r"^fmha_.*_api\.obj$")
 
 
 def required_api_objs() -> frozenset[str]:
-    value = os.environ.get("CK_FMHA_DISABLE_BWD", "").strip()
-    if value == "1":
+    value = os.environ.get("CK_DISABLE_BWD", "").strip()
+    if value == "true":
         return _FWD_API_OBJS
-    if value == "0":
+    if value == "false":
         return _FWD_API_OBJS | frozenset({_BWD_API_OBJ})
     raise SystemExit(
-        f"CK_FMHA_DISABLE_BWD must be '1' or '0', got {value!r}"
+        f"CK_DISABLE_BWD must be 'true' or 'false', got {value!r}"
     )
 
 

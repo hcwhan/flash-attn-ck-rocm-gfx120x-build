@@ -91,7 +91,7 @@ runs:
       run: |
         python -m pip install --upgrade pip wheel setuptools psutil packaging ninja
 
-    - name: Install ROCm devel headers
+    - name: Install ROCm devel SDK
       if: inputs.step-setup-toolchain == 'true'
       shell: pwsh
       run: |

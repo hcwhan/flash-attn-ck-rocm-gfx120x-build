@@ -46,8 +46,8 @@ Prep clones **`flash_attention.build_commit`** (SHA or tag; `fetch origin <ref>`
 
 FlashAttention 2 CK wheel default build profile (workflow `ck_disable_bwd=false`, default):
 
-- CK kernels: **fwd + fwd_appendkv + fwd_splitkv + bwd** (full build by default when `CK_FMHA_DISABLE_BWD=0`; no bwd when `1`)
-- **`-DFLASHATTENTION_DISABLE_BACKWARD`** (enabled only when `CK_FMHA_DISABLE_BWD=1`)
+- CK kernels: **fwd + fwd_appendkv + fwd_splitkv + bwd** (full build by default when `CK_DISABLE_BWD=false`; no bwd when `true`)
+- **`-DFLASHATTENTION_DISABLE_BACKWARD`** (enabled only when `CK_DISABLE_BWD=true`)
 - **C++11 ABI `cxx11.abi`** (matches pinned PyTorch; local tag see `wheel.wheel_local_version`)
 - **`GPU_ARCHS`** = lock `compile.gpu_archs` (semicolon-separated on Windows)
 - **`CK_OPT_DIM`** = lock `compile.ck_opt_dim` (currently `32,64,128,256`); `init-build-env.ts` maps to upstream `OPT_DIM` env
@@ -163,7 +163,7 @@ GitHub Release (uploaded automatically after a successful build; serial / parall
 
 | Field | Meaning |
 |-------|---------|
-| `fmha_bwd` | Top-level; whether bwd kernels were compiled (`CK_FMHA_DISABLE_BWD=0`) |
+| `fmha_bwd` | Top-level; whether bwd kernels were compiled (`CK_DISABLE_BWD=false`) |
 | `dispatch` | `ninja_workers`, `use_cache`, `ck_disable_bwd`, `retry_count` (workflow snapshot) |
 | `build_meta[]` | Serial single entry / parallel four shards (`opt_dim` / `key` / `exists` / `used`) |
 
@@ -190,7 +190,7 @@ flash_attn-*+ck.torch2.12.0.rocm7.14.0.gfx120x.cxx11.abi-cp312-cp312-win_amd64.w
 | Parallel link API dispatch recompile checks | `build/build-fa-steps.py` (merge skip + pre/post ninja asserts) |
 | Pre-deploy GPU smoke test (gfx120x hardware) | `python test/gpu-smoke-test.py -w .` |
 
-Smoke test: wheel filename/structure (.pyd size, METADATA) → pip install → import flash_attn_2_cuda; parallel link additionally asserts the API dispatch objects (3 fwd, plus `fmha_bwd_api.obj` when `CK_FMHA_DISABLE_BWD=0`) are skipped during merge and recompiled by ninja. GPU fwd + kvcache + backward probe see `test/gpu-smoke-test.py` (run manually on gfx1200/gfx1201 hardware before deploy).
+Smoke test: wheel filename/structure (.pyd size, METADATA) → pip install → import flash_attn_2_cuda; parallel link additionally asserts the API dispatch objects (3 fwd, plus `fmha_bwd_api.obj` when `CK_DISABLE_BWD=false`) are skipped during merge and recompiled by ninja. GPU fwd + kvcache + backward probe see `test/gpu-smoke-test.py` (run manually on gfx1200/gfx1201 hardware before deploy).
 
 ## ComfyUI install
 

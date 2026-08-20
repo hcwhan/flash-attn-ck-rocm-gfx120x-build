@@ -6,21 +6,21 @@ const FWD_API_OBJS = [
 
 const BWD_API_OBJ = "fmha_bwd_api.obj";
 
-export function parseCkFmhaDisableBwd(ckFmhaDisableBwd: string): boolean {
-  if (ckFmhaDisableBwd === "1") {
+export function parseCkDisableBwd(ckDisableBwd: string): boolean {
+  if (ckDisableBwd === "true") {
     return true;
   }
-  if (ckFmhaDisableBwd === "0") {
+  if (ckDisableBwd === "false") {
     return false;
   }
   throw new Error(
-    `CK_FMHA_DISABLE_BWD must be '1' or '0', got ${ckFmhaDisableBwd}`,
+    `CK_DISABLE_BWD must be 'true' or 'false', got ${ckDisableBwd}`,
   );
 }
 
-export function requiredApiObjs(ckFmhaDisableBwd: boolean): ReadonlySet<string> {
+export function requiredApiObjs(ckDisableBwd: boolean): ReadonlySet<string> {
   const objs = new Set<string>(FWD_API_OBJS);
-  if (!ckFmhaDisableBwd) {
+  if (!ckDisableBwd) {
     objs.add(BWD_API_OBJ);
   }
   return objs;

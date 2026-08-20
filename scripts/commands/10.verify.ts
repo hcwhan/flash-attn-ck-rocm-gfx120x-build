@@ -100,7 +100,7 @@ function readWorkflowDispatch(): {
 } {
   const maxJobs = requireGithubActionsEnv("MAX_JOBS");
   const useCache = requireGithubActionsEnv("USE_CACHE");
-  const ckFmhaDisableBwd = requireGithubActionsEnv("CK_FMHA_DISABLE_BWD");
+  const ckDisableBwd = requireGithubActionsEnv("CK_DISABLE_BWD");
   const retryCountRaw = requireGithubActionsEnv("RETRY_COUNT");
   const ninjaWorkers = Number(maxJobs);
   const retryCount = Number.parseInt(retryCountRaw, 10);
@@ -116,9 +116,9 @@ function readWorkflowDispatch(): {
       `USE_CACHE must be 'true' or 'false', got ${useCache}`,
     );
   }
-  if (ckFmhaDisableBwd !== "1" && ckFmhaDisableBwd !== "0") {
+  if (ckDisableBwd !== "true" && ckDisableBwd !== "false") {
     throw new Error(
-      `CK_FMHA_DISABLE_BWD must be '1' or '0', got ${ckFmhaDisableBwd}`,
+      `CK_DISABLE_BWD must be 'true' or 'false', got ${ckDisableBwd}`,
     );
   }
   if (!Number.isFinite(retryCount) || !Number.isInteger(retryCount) || retryCount < 0) {
@@ -127,7 +127,7 @@ function readWorkflowDispatch(): {
   return {
     ninja_workers: ninjaWorkers,
     use_cache: useCache === "true",
-    ck_disable_bwd: ckFmhaDisableBwd === "1",
+    ck_disable_bwd: ckDisableBwd === "true",
     retry_count: retryCount,
   };
 }
@@ -139,7 +139,7 @@ export function runVerify(options: {
 }): void {
   const expectedWheelPattern = requireLockEnv("EXPECTED_WHEEL_PATTERN");
   const ckOptDim = requireLockEnv("CK_OPT_DIM");
-  const ckFmhaDisableBwd = requireGithubActionsEnv("CK_FMHA_DISABLE_BWD");
+  const ckDisableBwd = requireGithubActionsEnv("CK_DISABLE_BWD");
   const flashAttentionBuildCommit = requireLockEnv("FLASH_ATTENTION_BUILD_COMMIT");
   const wheelLocalVersion = requireLockEnv("WHEEL_LOCAL_VERSION");
   const pytorchVersion = requireLockEnv("PYTORCH_VERSION");
@@ -220,7 +220,7 @@ export function runVerify(options: {
     rocm: rocmVersion,
     gpu_archs: gpuArchs,
     ck_opt_dim: ckOptDim,
-    fmha_bwd: ckFmhaDisableBwd === "0",
+    fmha_bwd: ckDisableBwd === "false",
     wheel_local_version: wheelLocalVersion,
     source_date_epoch: Number(sourceDateEpoch),
     build_variant: buildVariant,

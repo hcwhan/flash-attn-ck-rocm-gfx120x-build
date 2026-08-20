@@ -126,13 +126,13 @@ export function runToolchainFingerprint(options?: {
       `VERSION.lock compile fingerprint (toolchain+flash_attention+compile): ${lockHash}`,
     );
 
-    const ckFmhaDisableBwd = requireGithubActionsEnv("CK_FMHA_DISABLE_BWD");
-    if (ckFmhaDisableBwd !== "1" && ckFmhaDisableBwd !== "0") {
+    const ckDisableBwd = requireGithubActionsEnv("CK_DISABLE_BWD");
+    if (ckDisableBwd !== "true" && ckDisableBwd !== "false") {
       throw new Error(
-        `CK_FMHA_DISABLE_BWD must be '1' or '0', got ${ckFmhaDisableBwd}`,
+        `CK_DISABLE_BWD must be 'true' or 'false', got ${ckDisableBwd}`,
       );
     }
-    const fmhaBwd = ckFmhaDisableBwd === "0";
+    const fmhaBwd = ckDisableBwd === "false";
     console.log(`fmha_bwd (cache key): ${fmhaBwd}`);
 
     const cacheKeyOptions = {

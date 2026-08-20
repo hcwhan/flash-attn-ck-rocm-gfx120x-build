@@ -139,7 +139,7 @@ function validatePatchPoint(content: string, point: PatchPoint): void {
 }
 
 export function runPatch(options: { faSrc: string }): void {
-  const disableBwd = requireGithubActionsEnv("CK_FMHA_DISABLE_BWD") === "1";
+  const disableBwd = requireGithubActionsEnv("CK_DISABLE_BWD") === "true";
   const patchPoints: PatchPoint[] = disableBwd
     ? [...bwdPatchPoints, breproPatchPoint, ...warningSuppressionPatchPoints]
     : [breproPatchPoint, ...warningSuppressionPatchPoints];
@@ -167,7 +167,7 @@ export function runPatch(options: { faSrc: string }): void {
 
   writeNormalized(setup, content, setupEol);
   console.log(
-    `Patched ${setup} (CK_FMHA_DISABLE_BWD=${disableBwd ? "1" : "0"})`,
+    `Patched ${setup} (CK_DISABLE_BWD=${disableBwd ? "true" : "false"})`,
   );
 
   if (!disableBwd) {

@@ -2,7 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { requireGithubActionsEnv } from "./require-env.js";
 import {
-  parseCkFmhaDisableBwd,
+  parseCkDisableBwd,
   requiredApiObjs,
 } from "./required-api-objs.js";
 
@@ -140,7 +140,7 @@ export function validateStaging(options: {
   }
 
   const requiredApi = requiredApiObjs(
-    parseCkFmhaDisableBwd(requireGithubActionsEnv("CK_FMHA_DISABLE_BWD")),
+    parseCkDisableBwd(requireGithubActionsEnv("CK_DISABLE_BWD")),
   );
   const apiInPrimary = new Set(
     primaryObjs

@@ -1,4 +1,4 @@
-name: Verify and publish
+name: Verify Wheel and Publish Release
 description: Wheel 收尾：10.verify + upload artifact；publish_release≠false 时 11.publish + GitHub Release。
 
 inputs:
