@@ -396,7 +396,19 @@ def require_parallel_link_force_build_true() -> None:
         )
 
 
-def install_patch(staging_root: Path | None, fa_src: Path, primary_dim: str) -> None:
+def collect_inplace_prebuilt_objects(build_dir: Path) -> list[Path]:
+    if not build_dir.is_dir():
+        return []
+    return sorted(build_dir.rglob("*.obj"), key=lambda p: p.as_posix())
+
+
+def install_patch(
+    staging_root: Path | None,
+    fa_src: Path,
+    primary_dim: str,
+    *,
+    verify_inplace_prebuilt: bool = False,
+) -> None:
     global _ORIGINAL_RUN_NINJA
 
     import torch.utils.cpp_extension as cpp_ext
@@ -405,25 +417,35 @@ def install_patch(staging_root: Path | None, fa_src: Path, primary_dim: str) -> 
 
     def patched_run_ninja(build_directory, *args, **kwargs):
         build_dir = Path(build_directory)
-        merged_objs: list[Path] = []
+        reuse_objs: list[Path] = []
         log_sources: list[Path] | None = None
         if staging_root is not None:
-            merged_objs, log_sources, skipped_api = merge_prebuilt_objects(
+            reuse_objs, log_sources, skipped_api = merge_prebuilt_objects(
                 staging_root, build_dir, fa_src, primary_dim=primary_dim
             )
             print(
-                f"Merged {len(merged_objs)} prebuilt .obj files into {build_dir} "
+                f"Merged {len(reuse_objs)} prebuilt .obj files into {build_dir} "
                 f"(skipped {len(skipped_api)} API dispatch objs)",
                 flush=True,
             )
             verify_api_objs_absent(build_dir)
+        elif verify_inplace_prebuilt:
+            reuse_objs = collect_inplace_prebuilt_objects(build_dir)
+            if reuse_objs:
+                print(
+                    f"Serial link: {len(reuse_objs)} in-place prebuilt .obj files "
+                    f"in {build_dir} (precheck + post-build reuse verify enabled)",
+                    flush=True,
+                )
         stamp = stamp_prebuilt_objects(build_dir, fa_src, log_sources)
-        if staging_root is not None and merged_objs:
-            precheck_merged_objects_clean(build_dir, merged_objs)
+        if reuse_objs:
+            precheck_merged_objects_clean(build_dir, reuse_objs)
+        if staging_root is not None and reuse_objs:
             precheck_link_ninja_will_build_api_objs(build_dir)
         result = _ORIGINAL_RUN_NINJA(build_directory, *args, **kwargs)
-        if staging_root is not None and merged_objs:
-            verify_merged_objects_reused(build_dir, merged_objs, stamp)
+        if reuse_objs:
+            verify_merged_objects_reused(build_dir, reuse_objs, stamp)
+        if staging_root is not None:
             verify_api_objs_recompiled(build_dir, stamp)
         return result
 
@@ -468,7 +490,12 @@ def main() -> None:
         raise SystemExit("--dist-dir is required for step wheel/merge-and-wheel")
 
     if args.step == "wheel":
-        install_patch(None, args.fa_src, primary_dim="")
+        install_patch(
+            None,
+            args.fa_src,
+            primary_dim="",
+            verify_inplace_prebuilt=True,
+        )
         build_wheel(args.fa_src, args.dist_dir, verbose=args.verbose)
         return
 

@@ -37,9 +37,18 @@ export function runWheel(options: {
   // upstream flash-attention setup.py 在 wheel 时读取 FLASH_ATTN_LOCAL_VERSION。
   process.env.FLASH_ATTN_LOCAL_VERSION = requireLockEnv("WHEEL_LOCAL_VERSION");
 
-  initBuildEnv({
-    optDim: requireLockEnv("CK_OPT_DIM"),
-  });
+  if (hasStagingRoot) {
+    // parallel link job：独立 runner，须完整初始化 build env。
+    initBuildEnv({
+      optDim: requireLockEnv("CK_OPT_DIM"),
+    });
+  } else {
+    // serial link：同 job 内 compile 已由 06.prepare 导出 build env；重复
+    // initBuildEnv 会叠加 CPATH/INCLUDE，导致 wheel build_ext 命令 hash 漂移。
+    console.log(
+      "Serial link: reusing compile build env from GITHUB_ENV (skipping initBuildEnv)",
+    );
+  }
 
   const buildScript = path.join(resolveBuildDir(), "build-fa-steps.py");
   const step = hasStagingRoot ? "merge-and-wheel" : "wheel";

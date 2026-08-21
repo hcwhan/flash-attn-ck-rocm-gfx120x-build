@@ -8,8 +8,11 @@ import { requireLockEnv } from "./require-env.js";
 
 const PYTHON = "python";
 
+const BUILD_ENV_INITIALIZED = "FA2_BUILD_ENV_INITIALIZED";
+
 // initBuildEnv 写入或覆盖的 env 键（供 export 至 GITHUB_ENV）
 const BUILD_ENV_VAR_NAMES = [
+  BUILD_ENV_INITIALIZED,
   "MAX_JOBS",
   "OPT_DIM",
   "ROCM_HOME",
@@ -47,6 +50,14 @@ export function initBuildEnv(options: {
   optDim: string;
   exportGithubEnv?: boolean;
 }): void {
+  if (process.env[BUILD_ENV_INITIALIZED] === "true") {
+    process.env.OPT_DIM = options.optDim;
+    console.log(
+      `Build env already initialized (${BUILD_ENV_INITIALIZED}=true), skipping duplicate setup (OPT_DIM=${options.optDim})`,
+    );
+    return;
+  }
+
   const maxJobs = requireMaxJobs();
   process.env.MAX_JOBS = String(maxJobs);
   console.log(`MAX_JOBS=${maxJobs}`);
@@ -102,12 +113,15 @@ export function initBuildEnv(options: {
 
   const clangClFlags =
     "-Wno-ignored-attributes -Wno-unknown-argument -Wno-unused-command-line-argument -Wno-unknown-attributes -Wno-inconsistent-dllimport -Wno-cuda-compat -Wno-pass-failed";
+
   process.env.CFLAGS = process.env.CFLAGS
     ? `${process.env.CFLAGS} ${clangClFlags}`
     : clangClFlags;
   process.env.CXXFLAGS = process.env.CXXFLAGS
     ? `${process.env.CXXFLAGS} ${clangClFlags}`
     : clangClFlags;
+
+  process.env[BUILD_ENV_INITIALIZED] = "true";
 
   if (options.exportGithubEnv) {
     exportBuildEnvToGithub();
